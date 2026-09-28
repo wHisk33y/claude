@@ -6,6 +6,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
@@ -56,10 +57,10 @@ val LocalTokens = staticCompositionLocalOf<KnuffiTokens> { error("KnuffiTheme mi
 val LocalHapticsEnabled = staticCompositionLocalOf { true }
 
 private val Fredoka = FontFamily(
-    Font(R.font.fredoka, FontWeight.Normal),
-    Font(R.font.fredoka, FontWeight.Medium),
-    Font(R.font.fredoka, FontWeight.SemiBold),
-    Font(R.font.fredoka, FontWeight.Bold),
+    Font(R.font.fredoka_regular, FontWeight.Normal),
+    Font(R.font.fredoka_medium, FontWeight.Medium),
+    Font(R.font.fredoka_semibold, FontWeight.SemiBold),
+    Font(R.font.fredoka_bold, FontWeight.Bold),
 )
 private val PressStart = FontFamily(Font(R.font.press_start, FontWeight.Normal))
 private val Vt323 = FontFamily(Font(R.font.vt323, FontWeight.Normal))
@@ -280,7 +281,10 @@ fun KnuffiTheme(style: VisualStyle, content: @Composable () -> Unit) {
         }
     }
     CompositionLocalProvider(LocalTokens provides tokens) {
-        MaterialTheme(colorScheme = scheme, typography = typography, shapes = shapes, content = content)
+        MaterialTheme(colorScheme = scheme, typography = typography, shapes = shapes) {
+            // Text outside of a Surface should still use the theme's foreground colour.
+            CompositionLocalProvider(LocalContentColor provides scheme.onBackground, content = content)
+        }
     }
 }
 

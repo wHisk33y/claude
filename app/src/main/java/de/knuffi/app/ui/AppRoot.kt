@@ -102,7 +102,7 @@ fun AppRoot(debug: DebugScenes.Launch? = null) {
             ) {
                 val pet = state.pet
                 when {
-                    !state.onboarded || pet == null -> OnboardingScreen()
+                    !state.onboarded || pet == null -> OnboardingScreen(state.style)
                     !pet.alive -> MemorialScreen(state)
                     else -> MainNavigation(state, debug)
                 }

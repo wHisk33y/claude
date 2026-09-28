@@ -34,22 +34,22 @@ run_scene() {
 for style in kawaii pixel minimal; do
   for scene in home shop goals games walk settings onboarding catch memory whack gallery widget levelup sick night egg memorial; do
     run_scene "$style" "$scene"
+    # The CI emulator renders in software and is slow: give every screen time for its first frames.
     case $scene in
-      catch|whack) shot "${style}_${scene}" 6 ;;
-      levelup) shot "${style}_${scene}" 2 ;;
-      *) shot "${style}_${scene}" 3 ;;
+      catch|whack) shot "${style}_${scene}" 10 ;;
+      *) shot "${style}_${scene}" 8 ;;
     esac
   done
   run_scene "$style" evolution
-  shot "${style}_evolution_a" 2
-  shot "${style}_evolution_b" 3
+  shot "${style}_evolution_a" 8
+  shot "${style}_evolution_b" 6
 done
 
 for scene in forest ocean space candy; do
   run_scene kawaii "$scene"
-  shot "kawaii_room_${scene}" 3
+  shot "kawaii_room_${scene}" 8
   run_scene pixel "$scene"
-  shot "pixel_room_${scene}" 3
+  shot "pixel_room_${scene}" 8
 done
 
 # Notification shade

@@ -143,6 +143,7 @@ class SceneRenderer {
                 c.drawRect(l, t + i * bh, r, t + (i + 1) * bh + 1f, fill)
             }
         } else {
+            fill.color = Color.WHITE
             fill.shader = LinearGradient(0f, t, 0f, b, top, bottom, Shader.TileMode.CLAMP)
             c.drawRect(l, t, r, b, fill)
             fill.shader = null
@@ -193,6 +194,7 @@ class SceneRenderer {
             val x = l + w * (0.12f + 0.76f * p)
             val y = b - h * (0.18f + 0.6f * sin(p * PI.toFloat()))
             if (mode == RenderMode.SMOOTH) {
+                fill.color = Color.WHITE
                 fill.shader = RadialGradient(x, y, rr * 2.6f, Colors.alpha(0xFFFFF3B0.toInt(), 0.8f), Colors.alpha(0xFFFFF3B0.toInt(), 0f), Shader.TileMode.CLAMP)
                 c.drawCircle(x, y, rr * 2.6f, fill)
                 fill.shader = null
@@ -205,6 +207,7 @@ class SceneRenderer {
             val x = l + w * (0.15f + 0.7f * p)
             val y = b - h * (0.25f + 0.5f * sin(p * PI.toFloat()))
             if (mode == RenderMode.SMOOTH) {
+                fill.color = Color.WHITE
                 fill.shader = RadialGradient(x, y, rr * 2.4f, Colors.alpha(0xFFE8ECFF.toInt(), 0.45f), Colors.alpha(0xFFE8ECFF.toInt(), 0f), Shader.TileMode.CLAMP)
                 c.drawCircle(x, y, rr * 2.4f, fill)
                 fill.shader = null
@@ -360,6 +363,7 @@ class SceneRenderer {
         c.drawRect(lx - w * 0.006f, h * 0.36f, lx + w * 0.006f, floorTop + h * 0.08f, fill)
         c.drawOval(lx - w * 0.04f, floorTop + h * 0.07f, lx + w * 0.04f, floorTop + h * 0.095f, fill)
         if (!s.lightsOff && mode == RenderMode.SMOOTH) {
+            fill.color = Color.WHITE
             fill.shader = RadialGradient(lx, h * 0.36f, h * 0.25f, Colors.alpha(0xFFFFE8A3.toInt(), 0.5f), Colors.alpha(0xFFFFE8A3.toInt(), 0f), Shader.TileMode.CLAMP)
             c.drawCircle(lx, h * 0.36f, h * 0.25f, fill)
             fill.shader = null
@@ -444,6 +448,7 @@ class SceneRenderer {
                 val fy = (0.35f + 0.4f * starField[60 + i] + sin(t * 0.8f + i * 2f) * 0.04f) * h
                 val glow = (sin(t * 3f + i) + 1f) / 2f
                 if (mode == RenderMode.SMOOTH) {
+                    fill.color = Color.WHITE
                     fill.shader = RadialGradient(fx, fy, h * 0.03f, Colors.alpha(0xFFFFF59D.toInt(), 0.7f * glow * dark), Colors.alpha(0xFFFFF59D.toInt(), 0f), Shader.TileMode.CLAMP)
                     c.drawCircle(fx, fy, h * 0.03f, fill)
                     fill.shader = null
@@ -559,6 +564,7 @@ class SceneRenderer {
         val py = h * 0.22f
         val pr = h * 0.09f
         if (mode == RenderMode.SMOOTH) {
+            fill.color = Color.WHITE
             fill.shader = LinearGradient(px - pr, py - pr, px + pr, py + pr, 0xFFFFB38A.toInt(), 0xFFE0607E.toInt(), Shader.TileMode.CLAMP)
             c.drawCircle(px, py, pr, fill)
             fill.shader = null

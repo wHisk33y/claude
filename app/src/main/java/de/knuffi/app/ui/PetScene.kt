@@ -134,7 +134,6 @@ fun PetScene(
     val isEgg = look?.form == de.knuffi.core.Form.EGG
     val eggState by rememberUpdatedState(isEgg)
 
-    LaunchedEffect(hourOverride) { animator.hourOverride = hourOverride }
     LaunchedEffect(Unit) {
         GameRepository.events.collect { animator.onEvent(it, time.floatValue, particles) }
     }
@@ -179,6 +178,7 @@ fun PetScene(
         animator.scene.poops = state.pet?.poops ?: 0
         animator.scene.lightsOff = state.pet?.sleeping == true
         animator.scene.flat = flat
+        animator.hourOverride = hourOverride
         animator.update(t, look, particles, walking)
         particles.update(t)
         val scene = animator.scene

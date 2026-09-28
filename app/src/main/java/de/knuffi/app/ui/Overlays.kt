@@ -236,7 +236,7 @@ private fun LevelUpOverlay(state: GameState, level: Int, coins: Int, onDone: () 
     val tokens = LocalTokens.current
     val appear = remember { Animatable(0f) }
     LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 180f)) }
-    Scrim {
+    Scrim(0.8f) {
         Rays(tokens.gold, Modifier.size(420.dp))
         ConfettiLayer(Modifier.fillMaxSize())
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.scale(appear.value).padding(24.dp)) {
@@ -336,8 +336,8 @@ private fun EvolutionOverlay(state: GameState, from: Form, to: Form, onDone: () 
                     frame.expression = de.knuffi.app.render.Expression.EXCITED
                     if (!burst) {
                         burst = true
-                        sparkles.burst(PKind.SPARKLE, 0.5f, 0.45f, 30, 0.5f, 2.2f, 0.03f, ParticleSystem.STAR_COLORS)
-                        sparkles.burst(PKind.STAR, 0.5f, 0.45f, 16, 0.6f, 2f, 0.025f, ParticleSystem.STAR_COLORS, gravity = 0.3f)
+                        sparkles.burst(PKind.SPARKLE, 0.5f, 0.32f, 24, 0.35f, 1.8f, 0.018f, ParticleSystem.STAR_COLORS)
+                        sparkles.burst(PKind.STAR, 0.5f, 0.32f, 12, 0.4f, 1.6f, 0.014f, ParticleSystem.STAR_COLORS, gravity = 0.2f)
                     }
                 }
             }
@@ -376,7 +376,12 @@ private fun EvolutionOverlay(state: GameState, from: Form, to: Form, onDone: () 
                 .navigationBarsPadding()
                 .padding(bottom = 36.dp, start = 24.dp, end = 24.dp),
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .background(Color(0xCC120C2E), tokens.cardShape)
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+            ) {
                 Text(
                     "${state.pet?.name} ist jetzt ${to.title}!",
                     style = MaterialTheme.typography.headlineSmall,

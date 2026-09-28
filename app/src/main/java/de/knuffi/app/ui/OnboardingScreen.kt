@@ -77,9 +77,9 @@ private val eggLook = PetLook(Form.EGG, Mood.HAPPY)
 private val babyLook = PetLook(Form.BABY, Mood.HAPPY)
 
 @Composable
-fun OnboardingScreen() {
+fun OnboardingScreen(initialStyle: VisualStyle = VisualStyle.KAWAII) {
     var step by rememberSaveable { mutableIntStateOf(0) }
-    var style by rememberSaveable { mutableStateOf(VisualStyle.KAWAII) }
+    var style by rememberSaveable { mutableStateOf(initialStyle) }
     var difficulty by rememberSaveable { mutableStateOf(Difficulty.RELAXED) }
     var name by rememberSaveable { mutableStateOf(OnboardingNames.random()) }
     val context = LocalContext.current
@@ -118,7 +118,7 @@ fun OnboardingScreen() {
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     when (s) {
-                        0 -> Welcome { step = 1 }
+                        0 -> Welcome(style) { step = 1 }
                         1 -> StylePick(style, onPick = { style = it }) { step = 2 }
                         2 -> DifficultyPick(difficulty, onPick = { difficulty = it }) { step = 3 }
                         else -> NamePick(style, name, onName = { name = it }) {
@@ -152,9 +152,9 @@ fun OnboardingScreen() {
 }
 
 @Composable
-private fun Welcome(onNext: () -> Unit) {
+private fun Welcome(style: VisualStyle, onNext: () -> Unit) {
     Spacer(Modifier.height(24.dp))
-    PetPortrait(eggLook, VisualStyle.KAWAII, Modifier.size(220.dp)) { f, t ->
+    PetPortrait(eggLook, style, Modifier.size(220.dp)) { f, t ->
         f.eggWobble = kotlin.math.sin(t * 3f) * 6f
         val phase = t % 2.4f
         if (phase < 0.35f) f.eggWobble = kotlin.math.sin(phase * 60f) * 10f

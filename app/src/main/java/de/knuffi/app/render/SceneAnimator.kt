@@ -113,10 +113,13 @@ class SceneAnimator {
     fun update(t: Float, look: PetLook?, ps: ParticleSystem, walking: Boolean) {
         val dt = (t - lastT).coerceIn(0f, 0.1f)
         lastT = t
-        if (t - lastHourCheck > 5f || lastHourCheck < 0f) {
+        val override = hourOverride
+        if (override != null) {
+            scene.hour = override
+        } else if (t - lastHourCheck > 5f || lastHourCheck < 0f) {
             lastHourCheck = t
             val now = LocalTime.now()
-            scene.hour = hourOverride ?: (now.hour + now.minute / 60f)
+            scene.hour = now.hour + now.minute / 60f
         }
         scene.look = look
         if (look == null) return

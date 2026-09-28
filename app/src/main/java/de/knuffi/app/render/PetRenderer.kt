@@ -221,6 +221,7 @@ class PetRenderer {
         bodyPath(path, bw, bh, fl.ghost, t)
         when (mode) {
             RenderMode.SMOOTH -> {
+                fill.color = Color.WHITE
                 fill.shader = LinearGradient(
                     0f, -2f * bh, 0f, 0f,
                     intArrayOf(Colors.lighten(col.body, 0.22f), col.body, col.shade),
@@ -275,6 +276,7 @@ class PetRenderer {
     private fun drawAura(c: Canvas, bw: Float, bh: Float, t: Float, color: Int) {
         val r = bw * 2.1f * (1f + 0.04f * sin(t * 2f))
         if (mode == RenderMode.SMOOTH) {
+            fill.color = Color.WHITE
             fill.shader = RadialGradient(0f, -bh, r, Colors.alpha(color, 0.45f), Colors.alpha(color, 0f), Shader.TileMode.CLAMP)
             c.drawCircle(0f, -bh, r, fill)
             fill.shader = null
@@ -472,6 +474,7 @@ class PetRenderer {
                 val pulse = (sin(t * 2.5f) + 1f) / 2f
                 if (mode == RenderMode.SMOOTH) {
                     val gr = u * (0.26f + 0.06f * pulse)
+                    fill.color = Color.WHITE
                     fill.shader = RadialGradient(topX, topY, gr, Colors.alpha(col.accent, 0.7f), Colors.alpha(col.accent, 0f), Shader.TileMode.CLAMP)
                     c.drawCircle(topX, topY, gr, fill)
                     fill.shader = null
@@ -521,6 +524,7 @@ class PetRenderer {
         path.lineTo(w, base)
         path.close()
         if (mode == RenderMode.SMOOTH) {
+            fill.color = Color.WHITE
             fill.shader = LinearGradient(0f, base - h, 0f, base, 0xFFFFE082.toInt(), 0xFFFFA000.toInt(), Shader.TileMode.CLAMP)
             c.drawPath(path, fill)
             fill.shader = null
@@ -662,6 +666,7 @@ class PetRenderer {
             EyeKind.GLOW -> {
                 val h = re * 1.0f * (1f - blink)
                 if (mode == RenderMode.SMOOTH) {
+                    fill.color = Color.WHITE
                     fill.shader = RadialGradient(x, y, re * 2f, Colors.alpha(col.eye, 0.5f), Colors.alpha(col.eye, 0f), Shader.TileMode.CLAMP)
                     c.drawCircle(x, y, re * 2f, fill)
                     fill.shader = null
@@ -679,6 +684,7 @@ class PetRenderer {
         fill.shader = null
         when (mode) {
             RenderMode.SMOOTH -> {
+                fill.color = Color.WHITE
                 fill.shader = LinearGradient(0f, y - h, 0f, y + h, col.eye, Colors.lerp(col.eye, 0xFF8A7BD1.toInt(), 0.55f), Shader.TileMode.CLAMP)
                 c.drawOval(x - w, y - h, x + w, y + h, fill)
                 fill.shader = null
@@ -993,12 +999,14 @@ class PetRenderer {
         if (taps >= 3 && mode == RenderMode.SMOOTH && silhouette == null) {
             val pulse = (sin(f.t * 6f) + 1f) / 2f
             val r = eh * (1.5f + 0.1f * pulse)
+            fill.color = Color.WHITE
             fill.shader = RadialGradient(0f, -eh, r, Colors.alpha(0xFFFFE680.toInt(), 0.55f), Colors.alpha(0xFFFFE680.toInt(), 0f), Shader.TileMode.CLAMP)
             c.drawCircle(0f, -eh, r, fill)
             fill.shader = null
         }
 
         if (mode == RenderMode.SMOOTH) {
+            fill.color = Color.WHITE
             fill.shader = LinearGradient(0f, -2f * eh, 0f, 0f, Colors.lighten(col.body, 0.3f), col.shade, Shader.TileMode.CLAMP)
             c.drawPath(path, fill)
             fill.shader = null
