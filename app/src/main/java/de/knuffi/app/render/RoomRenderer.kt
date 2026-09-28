@@ -44,9 +44,9 @@ class SceneLayout {
         this.kind = kind
         when (kind) {
             LayoutKind.HOME -> {
-                floorY = h * 0.585f
-                groundY = h * 0.745f
-                petSize = min(w * 0.46f, h * 0.24f)
+                floorY = h * 0.595f
+                groundY = h * 0.775f
+                petSize = min(w * 0.52f, h * 0.27f)
                 window.set(w * 0.07f, h * 0.245f, w * 0.43f, h * 0.46f)
             }
             LayoutKind.WALLPAPER -> {

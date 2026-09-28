@@ -183,6 +183,8 @@ fun ClayButton(
             haptic()
             onClick()
         },
+        // Lets a button with fillMaxWidth() stretch its face, not just its lip.
+        propagateMinConstraints = true,
     ) {
         Box(
             Modifier

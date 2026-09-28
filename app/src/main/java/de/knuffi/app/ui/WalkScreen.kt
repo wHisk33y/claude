@@ -43,6 +43,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -103,7 +104,9 @@ fun WalkScreen(state: GameState) {
             )
             Text(
                 "Gassi gehen",
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    shadow = Shadow(Color(0x88000000), offset = Offset(0f, 3f), blurRadius = 10f),
+                ),
                 color = Color.White,
                 modifier = Modifier
                     .statusBarsPadding()

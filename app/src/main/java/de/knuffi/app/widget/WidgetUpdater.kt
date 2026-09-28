@@ -124,6 +124,8 @@ object WidgetUpdater {
             for ((vid, action) in buttons) {
                 views.setOnClickPendingIntent(vid, ActionReceiver.pendingIntent(context, action))
                 views.setInt(vid, "setBackgroundResource", button)
+                // Opaque text colour, otherwise the default grey alpha fades the emoji.
+                views.setTextColor(vid, 0xFFFFFFFF.toInt())
             }
             if (!small) views.setTextViewText(R.id.btn_sleep, if (pet.sleeping) "☀️" else "🌙")
         }

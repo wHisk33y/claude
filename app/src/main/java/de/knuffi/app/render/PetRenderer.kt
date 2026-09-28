@@ -181,7 +181,7 @@ class PetRenderer {
         bounds.set(cx - bw * 1.15f * sx, baseY + top * sy - u * 0.1f, cx + bw * 1.15f * sx, baseY + u * 0.02f)
         head.set(cx + fx * sx, baseY + (top - earHeight(fl)) * sy)
 
-        val useLayer = silhouette != null || pose.sickTint > 0.01f
+        val useLayer = silhouette != null || pose.sickTint > 0.01f || pose.glow > 0.01f
         val save = if (useLayer) {
             layerPaint.colorFilter = silhouette?.let { PorterDuffColorFilter(it, PorterDuff.Mode.SRC_IN) }
             c.saveLayer(null, layerPaint)
@@ -218,7 +218,9 @@ class PetRenderer {
             fill.shader = null
         }
         if (pose.glow > 0.01f && silhouette == null) {
-            tint.color = Colors.alpha(Color.WHITE, pose.glow)
+            // A warm shine on top of the body (golden pet, memorial). Needs the layer above.
+            tint.shader = null
+            tint.color = Colors.alpha(0xFFFFF1B8.toInt(), 0.38f * pose.glow.coerceAtMost(1f))
             tint.xfermode = srcAtop
             c.drawRect(-bw * 3f, top - u, bw * 3f, u, tint)
             tint.xfermode = null

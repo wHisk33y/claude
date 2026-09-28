@@ -205,7 +205,7 @@ private class WhackPainter {
         for (i in 0 until 9) {
             val r = i / 3
             val c = i % 3
-            val spread = 0.29f * scales[r]
+            val spread = 0.3f * scales[r]
             logic.holes[i].cx = w * (0.5f + (c - 1) * spread)
             logic.holes[i].cy = h * rows[r]
             logic.holes[i].scale = scales[r]
@@ -279,7 +279,7 @@ private class WhackPainter {
 
     fun drawHoleBack(c: NativeCanvas, hole: Hole, petSize: Float) {
         val s = petSize * hole.scale
-        val rw = s * 0.62f
+        val rw = s * 0.46f
         val rh = s * 0.2f
         // dirt mound
         fill.color = 0x33000000
@@ -295,7 +295,7 @@ private class WhackPainter {
 
     fun drawHoleFront(c: NativeCanvas, hole: Hole, petSize: Float) {
         val s = petSize * hole.scale
-        val rw = s * 0.62f
+        val rw = s * 0.46f
         val rh = s * 0.2f
         // front lip of the mound covering the lower part
         path.reset()
@@ -453,7 +453,7 @@ fun WhackGame(state: GameState, onFinished: (Int) -> Unit, onBack: () -> Unit) {
             lastT[0] = t
             val w = size.width
             val h = size.height
-            val petSize = min(w * 0.3f, h * 0.17f)
+            val petSize = min(w * 0.27f, h * 0.15f)
             dims[0] = w
             dims[1] = h
             dims[2] = petSize
