@@ -3,10 +3,10 @@ package de.knuffi.core
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class VisualStyle(val title: String, val subtitle: String) {
-    KAWAII("Kawaii", "Pastell, weich & knuddelig"),
-    PIXEL("Pixel-Retro", "Wie früher, nur schöner"),
-    MINIMAL("Minimal", "Klar, ruhig & modern"),
+enum class ThemeMode(val title: String) {
+    SYSTEM("System"),
+    LIGHT("Hell"),
+    DARK("Dunkel"),
 }
 
 @Serializable
@@ -194,6 +194,8 @@ data class Settings(
     val stepGoal: Int = 5000,
     val stepsAvailable: Boolean = true,
     val haptics: Boolean = true,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val overlayPet: Boolean = false,
 )
 
 @Serializable
@@ -217,7 +219,6 @@ enum class Slot(val title: String) {
 data class GameState(
     val version: Int = 1,
     val onboarded: Boolean = false,
-    val style: VisualStyle = VisualStyle.KAWAII,
     val difficulty: Difficulty = Difficulty.RELAXED,
     val pet: Pet? = null,
     val coins: Int = 0,

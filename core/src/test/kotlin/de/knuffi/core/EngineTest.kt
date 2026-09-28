@@ -14,14 +14,14 @@ class EngineTest {
     private val hour = 3_600_000L
 
     private fun started(difficulty: Difficulty = Difficulty.RELAXED): GameState {
-        var s = Engine.perform(GameState(), Action.Start(VisualStyle.KAWAII, difficulty, "Mochi"), t0, zone).state
+        var s = Engine.perform(GameState(), Action.Start(difficulty, "Mochi"), t0, zone).state
         repeat(Engine.HATCH_TAPS) { s = Engine.perform(s, Action.HatchTap, t0, zone).state }
         return s
     }
 
     @Test
     fun startCreatesEggAndHatches() {
-        val egg = Engine.perform(GameState(), Action.Start(VisualStyle.PIXEL, Difficulty.CLASSIC, "  Bobo  "), t0, zone)
+        val egg = Engine.perform(GameState(), Action.Start(Difficulty.CLASSIC, "  Bobo  "), t0, zone)
         assertEquals("Bobo", egg.state.pet!!.name)
         assertEquals(Form.EGG, egg.state.pet!!.form)
         assertEquals(Catalog.START_COINS, egg.state.coins)
@@ -234,6 +234,14 @@ class EngineTest {
         assertFalse(s.pet!!.sick)
         assertEquals(0, s.count(Catalog.MEDICINE))
         assertTrue(s.isUnlocked(Achievement.HEAL_1))
+    }
+
+    @Test
+    fun oldSavesWithStyleStillLoad() {
+        val old = GameJson.encode(started()).replaceFirst("{", "{\"style\":\"PIXEL\",")
+        val back = GameJson.decode(old)
+        assertNotNull(back)
+        assertEquals(ThemeMode.SYSTEM, back!!.settings.themeMode)
     }
 
     @Test

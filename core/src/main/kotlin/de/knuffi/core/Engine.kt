@@ -6,7 +6,7 @@ import kotlin.math.min
 import kotlin.random.Random
 
 sealed interface Action {
-    data class Start(val style: VisualStyle, val difficulty: Difficulty, val name: String) : Action
+    data class Start(val difficulty: Difficulty, val name: String) : Action
     data object HatchTap : Action
     data class Feed(val itemId: String) : Action
     data class UseItem(val itemId: String) : Action
@@ -24,7 +24,6 @@ sealed interface Action {
     data class ClaimStepTier(val index: Int) : Action
     data class StepReading(val sensorValue: Float) : Action
     data class Rename(val name: String) : Action
-    data class SetStyle(val style: VisualStyle) : Action
     data class SetDifficulty(val difficulty: Difficulty) : Action
     data class UpdateSettings(val settings: Settings) : Action
     data class NewEgg(val name: String) : Action
@@ -374,7 +373,6 @@ object Engine {
                 is Action.ClaimStepTier -> claimStepTier(action.index)
                 is Action.StepReading -> stepReading(action.sensorValue, now)
                 is Action.Rename -> updatePet { it.copy(name = cleanName(action.name, it.name)) }
-                is Action.SetStyle -> s = s.copy(style = action.style)
                 is Action.SetDifficulty -> s = s.copy(difficulty = action.difficulty)
                 is Action.UpdateSettings -> {
                     val stepsChanged = action.settings.stepsAvailable != s.settings.stepsAvailable
@@ -404,7 +402,6 @@ object Engine {
             val name = cleanName(a.name, "Knuffi")
             s = GameState(
                 onboarded = true,
-                style = a.style,
                 difficulty = a.difficulty,
                 pet = Pet(name = name, bornAt = now),
                 coins = Catalog.START_COINS,
