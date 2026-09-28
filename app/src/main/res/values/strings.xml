@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Knuffi</string>
+    <string name="widget_description">Dein Knuffi auf dem Startbildschirm: füttern, spielen und saubermachen mit einem Tipp.</string>
+    <string name="widget_pet">Dein Haustier</string>
+    <string name="widget_feed">Füttern</string>
+    <string name="widget_play">Spielen</string>
+    <string name="widget_clean">Saubermachen</string>
+    <string name="widget_sleep">Schlafen</string>
+</resources>

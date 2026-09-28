@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="250dp"
+    android:height="110dp"
+    android:viewportWidth="250"
+    android:viewportHeight="110">
+    <path
+        android:fillColor="#FFFFE3F1"
+        android:strokeWidth="2"
+        android:strokeColor="#FFFFC2DD"
+        android:pathData="M24,1 L226,1 Q249,1 249,24 L249,86 Q249,109 226,109 L24,109 Q1,109 1,86 L1,24 Q1,1 24,1 Z" />
+    <path
+        android:fillColor="#FFFFC4DF"
+        android:strokeWidth="1.5"
+        android:strokeColor="#FFE58BB5"
+        android:pathData="M60,28 C80.4,28 93,44.5 93,62.5 C93,79.6 79.8,88 60,88 C40.2,88 27,79.6 27,62.5 C27,44.5 39.6,28 60,28 Z" />
+    <path android:fillColor="#FF2E2440" android:pathData="M47,58 a3.5,4.5 0 1,0 7,0 a3.5,4.5 0 1,0 -7,0 Z" />
+    <path android:fillColor="#FF2E2440" android:pathData="M66,58 a3.5,4.5 0 1,0 7,0 a3.5,4.5 0 1,0 -7,0 Z" />
+    <path android:fillColor="#B3FF8FB5" android:pathData="M38,68 a4,2.2 0 1,0 8,0 a4,2.2 0 1,0 -8,0 Z" />
+    <path android:fillColor="#B3FF8FB5" android:pathData="M74,68 a4,2.2 0 1,0 8,0 a4,2.2 0 1,0 -8,0 Z" />
+    <path android:fillColor="#FF4A2D4F" android:pathData="M112,20 L190,20 L190,30 L112,30 Z" />
+    <path android:fillColor="#FFFF9F5A" android:pathData="M112,44 L210,44 L210,49 L112,49 Z" />
+    <path android:fillColor="#FFFF6FA5" android:pathData="M112,54 L190,54 L190,59 L112,59 Z" />
+    <path android:fillColor="#FFFFD23F" android:pathData="M112,64 L220,64 L220,69 L112,69 Z" />
+    <path android:fillColor="#FF5EC8F2" android:pathData="M112,74 L180,74 L180,79 L112,79 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M112,86 L140,86 L140,102 L112,102 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M145,86 L173,86 L173,102 L145,102 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M178,86 L206,86 L206,102 L178,102 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M211,86 L239,86 L239,102 L211,102 Z" />
+</vector>
