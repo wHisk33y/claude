@@ -6,7 +6,6 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -302,17 +301,17 @@ private fun FloatingNavBar(state: GameState, selected: Tab, modifier: Modifier =
                             )
                             Text(t.label, style = MaterialTheme.typography.labelSmall, color = labelColor, maxLines = 1)
                         }
-                        AnimatedVisibility(
-                            visible = badge,
-                            enter = scaleIn(spring(dampingRatio = 0.4f)),
-                            exit = scaleOut(),
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(top = 4.dp, end = 10.dp),
-                        ) {
+                        val badgeScale by animateFloatAsState(if (badge) 1f else 0f, spring(dampingRatio = 0.4f), label = "badge")
+                        if (badgeScale > 0.01f) {
                             Box(
                                 Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(top = 4.dp, end = 10.dp)
                                     .size(11.dp)
+                                    .graphicsLayer {
+                                        scaleX = badgeScale
+                                        scaleY = badgeScale
+                                    }
                                     .clip(CircleShape)
                                     .background(p.red)
                                     .border(2.dp, if (p.dark) Color(0xFF211A3A) else Color.White, CircleShape),

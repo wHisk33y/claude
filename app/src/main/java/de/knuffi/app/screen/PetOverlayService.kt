@@ -117,11 +117,11 @@ class PetOverlayService : Service(), OverlayPetView.Host {
         scope = s
         s.launch {
             GameRepository.state.combine(ScreenPet.appVisible) { state, appVisible -> state to appVisible }
-                .collect { (state, appVisible) -> apply(state, appVisible) }
+                .collect { (state, appVisible) -> applyState(state, appVisible) }
         }
     }
 
-    private fun apply(state: GameState, appVisible: Boolean) {
+    private fun applyState(state: GameState, appVisible: Boolean) {
         val v = view ?: return
         if (!state.settings.overlayPet) {
             stopSelf()
