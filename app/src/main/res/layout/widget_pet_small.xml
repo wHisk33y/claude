@@ -3,7 +3,7 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_bg_kawaii"
+    android:background="@drawable/widget_bg_light"
     android:padding="8dp">
 
     <LinearLayout
@@ -76,7 +76,7 @@
                     android:layout_height="30dp"
                     android:layout_weight="1"
                     android:layout_marginEnd="4dp"
-                    android:background="@drawable/widget_btn_kawaii"
+                    android:background="@drawable/widget_btn_light"
                     android:contentDescription="@string/widget_feed"
                     android:gravity="center"
                     android:text="🍙"
@@ -86,7 +86,7 @@
                     android:layout_width="0dp"
                     android:layout_height="30dp"
                     android:layout_weight="1"
-                    android:background="@drawable/widget_btn_kawaii"
+                    android:background="@drawable/widget_btn_light"
                     android:contentDescription="@string/widget_clean"
                     android:gravity="center"
                     android:text="🫧"

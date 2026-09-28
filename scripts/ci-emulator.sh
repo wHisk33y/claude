@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs on the CI emulator: takes screenshots of every screen in every style (debug build)
+# Runs on the CI emulator: takes screenshots of every screen in light and dark mode (debug build)
 # and hammers the release build with the monkey to catch crashes.
 set -u
 OUT=shots
@@ -26,34 +26,52 @@ shot() {
 }
 
 run_scene() {
-  local style=$1 scene=$2
+  local theme=$1 scene=$2
   adb shell am force-stop $DEBUG_PKG
-  adb shell am start -W -n "$DEBUG_PKG/$ACT" --es debug_scene "$scene" --es debug_style "$style" > /dev/null
+  adb shell am start -W -n "$DEBUG_PKG/$ACT" --es debug_scene "$scene" --es debug_theme "$theme" > /dev/null
 }
 
-for style in kawaii pixel minimal; do
-  for scene in home shop goals games walk settings onboarding catch memory whack gallery widget levelup sick night egg memorial; do
-    run_scene "$style" "$scene"
-    # The CI emulator renders in software and is slow: give every screen time for its first frames.
+# The CI emulator renders in software and is slow: give every screen time for its first frames.
+for theme in light dark; do
+  for scene in home shop goals games walk settings onboarding gallery widget wallpaper levelup sick egg catch memory whack; do
+    run_scene "$theme" "$scene"
     case $scene in
-      catch|whack) shot "${style}_${scene}" 10 ;;
-      *) shot "${style}_${scene}" 8 ;;
+      catch|whack|memory) shot "${theme}_${scene}" 12 ;;
+      *) shot "${theme}_${scene}" 8 ;;
     esac
   done
-  run_scene "$style" evolution
-  shot "${style}_evolution_a" 8
-  shot "${style}_evolution_b" 6
 done
+
+# Care animations and special moments (two shots each to catch different phases)
+for scene in feed bath ball heal love; do
+  run_scene light "$scene"
+  shot "act_${scene}_a" 9
+  shot "act_${scene}_b" 3
+done
+for scene in night sunset hatch toast memorial; do
+  run_scene light "$scene"
+  shot "light_${scene}" 8
+done
+run_scene dark night
+shot dark_night 8
+run_scene light evolution
+shot evolution_a 8
+shot evolution_b 6
 
 for scene in forest ocean space candy; do
-  run_scene kawaii "$scene"
-  shot "kawaii_room_${scene}" 8
-  run_scene pixel "$scene"
-  shot "pixel_room_${scene}" 8
+  run_scene light "$scene"
+  shot "room_${scene}" 8
 done
 
+# Floating pet over the launcher
+adb shell appops set $DEBUG_PKG SYSTEM_ALERT_WINDOW allow || true
+run_scene light overlay
+shot overlay_a 12
+shot overlay_b 4
+adb shell am force-stop $DEBUG_PKG
+
 # Notification shade
-run_scene kawaii notify
+run_scene light notify
 sleep 3
 adb shell cmd statusbar expand-notifications
 shot notifications 2

@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.view.View
@@ -17,7 +18,7 @@ import de.knuffi.app.render.PetLook
 import de.knuffi.app.work.PetWorker
 import de.knuffi.core.GameState
 import de.knuffi.core.Mood
-import de.knuffi.core.VisualStyle
+import de.knuffi.core.ThemeMode
 
 class PetWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
@@ -54,7 +55,7 @@ object WidgetUpdater {
 
     fun frames(state: GameState): List<Bitmap>? {
         val look = PetLook.of(state) ?: return null
-        return List(PetBitmaps.FRAME_COUNT) { PetBitmaps.render(look, state.style, 240, it) }
+        return List(PetBitmaps.FRAME_COUNT) { PetBitmaps.render(look, 240, it) }
     }
 
     fun update(context: Context, mgr: AppWidgetManager, id: Int, state: GameState, message: String?, frames: List<Bitmap>?) {
@@ -65,11 +66,10 @@ object WidgetUpdater {
 
     fun build(context: Context, state: GameState, small: Boolean, message: String?, frames: List<Bitmap>? = frames(state)): RemoteViews {
         val views = RemoteViews(context.packageName, if (small) R.layout.widget_pet_small else R.layout.widget_pet)
-        val style = state.style
-        val (bg, text, subText, button) = when (style) {
-            VisualStyle.KAWAII -> Quad(R.drawable.widget_bg_kawaii, 0xFF4A2D4F.toInt(), 0xFF8A5F8C.toInt(), R.drawable.widget_btn_kawaii)
-            VisualStyle.PIXEL -> Quad(R.drawable.widget_bg_pixel, 0xFFB8FF9E.toInt(), 0xFF8FD1FF.toInt(), R.drawable.widget_btn_pixel)
-            VisualStyle.MINIMAL -> Quad(R.drawable.widget_bg_minimal, 0xFF1F1D2B.toInt(), 0xFF5C5A6E.toInt(), R.drawable.widget_btn_minimal)
+        val (bg, text, subText, button) = if (isDark(context, state)) {
+            Quad(R.drawable.widget_bg_dark, 0xFFF4EEFF.toInt(), 0xFFB3A7CC.toInt(), R.drawable.widget_btn_dark)
+        } else {
+            Quad(R.drawable.widget_bg_light, 0xFF3A2A45.toInt(), 0xFF8C7A96.toInt(), R.drawable.widget_btn_light)
         }
         views.setInt(R.id.widget_root, "setBackgroundResource", bg)
         views.setTextColor(R.id.name, text)
@@ -124,11 +124,16 @@ object WidgetUpdater {
             for ((vid, action) in buttons) {
                 views.setOnClickPendingIntent(vid, ActionReceiver.pendingIntent(context, action))
                 views.setInt(vid, "setBackgroundResource", button)
-                views.setTextColor(vid, text)
             }
             if (!small) views.setTextViewText(R.id.btn_sleep, if (pet.sleeping) "☀️" else "🌙")
         }
         return views
+    }
+
+    private fun isDark(context: Context, state: GameState): Boolean = when (state.settings.themeMode) {
+        ThemeMode.DARK -> true
+        ThemeMode.LIGHT -> false
+        ThemeMode.SYSTEM -> (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
     }
 
     private fun setButtonsVisible(views: RemoteViews, small: Boolean, visible: Boolean) {

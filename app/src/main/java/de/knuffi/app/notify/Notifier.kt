@@ -29,6 +29,7 @@ import java.time.ZoneId
 object Notifier {
     const val CH_CARE = "care"
     const val CH_EVENTS = "events"
+    const val CH_OVERLAY = "overlay"
 
     private const val HOUR = 3_600_000L
 
@@ -54,6 +55,12 @@ object Notifier {
         nm.createNotificationChannel(
             NotificationChannel(CH_EVENTS, "Belohnungen & Ereignisse", NotificationManager.IMPORTANCE_LOW).apply {
                 description = "Tägliche Belohnungen, Schrittziele und Neuigkeiten."
+            },
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(CH_OVERLAY, "Haustier auf dem Bildschirm", NotificationManager.IMPORTANCE_MIN).apply {
+                description = "Dauerhafte Info, solange dein Haustier über anderen Apps herumläuft."
+                setShowBadge(false)
             },
         )
     }
@@ -166,7 +173,7 @@ object Notifier {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setPriority(if (spec.urgent) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
         PetLook.of(state)?.let { look ->
-            runCatching { builder.setLargeIcon(PetBitmaps.render(look, state.style, 192)) }
+            runCatching { builder.setLargeIcon(PetBitmaps.render(look, 192)) }
         }
         for ((label, action) in spec.actions) {
             builder.addAction(0, label, ActionReceiver.pendingIntent(context, action, spec.id))

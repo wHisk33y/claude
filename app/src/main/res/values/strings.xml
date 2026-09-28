@@ -7,4 +7,6 @@
     <string name="widget_play">Spielen</string>
     <string name="widget_clean">Saubermachen</string>
     <string name="widget_sleep">Schlafen</string>
+    <string name="wallpaper_label">Knuffi Live-Hintergrund</string>
+    <string name="wallpaper_description">Dein Haustier lebt auf deinem Startbildschirm, mit Tag und Nacht, Wetter und Stimmung.</string>
 </resources>

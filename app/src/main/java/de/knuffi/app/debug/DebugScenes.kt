@@ -1,5 +1,18 @@
 package de.knuffi.app.debug
 
+import android.app.Activity
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.Color
+import de.knuffi.app.data.GameRepository
+import de.knuffi.app.render.LayoutKind
+import de.knuffi.app.screen.PetOverlayService
+import de.knuffi.app.ui.PetScene
+import de.knuffi.app.ui.theme.LocalPalette
+import de.knuffi.core.GameEvent
+import de.knuffi.core.ReactionKind
+import de.knuffi.core.Settings
+import de.knuffi.core.ThemeMode
+import kotlinx.coroutines.delay
 import android.content.Context
 import android.content.Intent
 import android.view.ViewGroup
@@ -46,12 +59,11 @@ import de.knuffi.core.QuestType
 import de.knuffi.core.Slot
 import de.knuffi.core.StepState
 import de.knuffi.core.TimeUtil
-import de.knuffi.core.VisualStyle
 import java.time.ZoneId
 
 /**
- * Debug-only launch hooks used by CI to take screenshots of every screen in every style:
- * `adb shell am start -n de.knuffi.app.debug/de.knuffi.app.MainActivity --es debug_scene shop --es debug_style pixel`.
+ * Debug-only launch hooks used by CI to take screenshots of every screen in light and dark mode:
+ * `adb shell am start -n de.knuffi.app.debug/de.knuffi.app.MainActivity --es debug_scene shop --es debug_theme dark`.
  * The seeded state is never saved.
  */
 object DebugScenes {
@@ -59,17 +71,17 @@ object DebugScenes {
 
     fun fromIntent(intent: Intent?): Launch? {
         val scene = intent?.getStringExtra("debug_scene") ?: return null
-        val style = when (intent.getStringExtra("debug_style")) {
-            "pixel" -> VisualStyle.PIXEL
-            "minimal" -> VisualStyle.MINIMAL
-            else -> VisualStyle.KAWAII
+        val theme = when (intent.getStringExtra("debug_theme")) {
+            "dark" -> ThemeMode.DARK
+            else -> ThemeMode.LIGHT
         }
         val form = intent.getStringExtra("debug_form")?.let { f -> Form.entries.firstOrNull { it.name.equals(f, true) } }
         val hour = intent.getStringExtra("debug_hour")?.toFloatOrNull() ?: when (scene) {
             "night" -> 23f
+            "sunset" -> 19.2f
             else -> 11f
         }
-        return Launch(scene, seed(style, scene, form), hour)
+        return Launch(scene, seed(theme, scene, form), hour)
     }
 
     fun initialRoute(scene: String?): Route = when (scene) {
@@ -79,6 +91,7 @@ object DebugScenes {
         "settings" -> Route.Settings
         "gallery" -> Route.Gallery
         "widget" -> Route.WidgetPreview
+        "wallpaper" -> Route.WallpaperPreview
         else -> Route.Main
     }
 
@@ -90,8 +103,55 @@ object DebugScenes {
         else -> Tab.HOME
     }
 
-    private fun seed(style: VisualStyle, scene: String, form: Form?): GameState {
-        if (scene == "onboarding") return GameState(style = style)
+    /** Replays care animations over and over so that screenshots catch them. */
+    @Composable
+    fun Driver(launch: Launch) {
+        val context = LocalContext.current
+        LaunchedEffect(launch.scene) {
+            val event = when (launch.scene) {
+                "feed" -> GameEvent.Reaction(ReactionKind.EAT, "cake")
+                "bath" -> GameEvent.Reaction(ReactionKind.CLEAN)
+                "ball" -> GameEvent.Reaction(ReactionKind.PLAY)
+                "heal" -> GameEvent.Reaction(ReactionKind.HEAL, "medicine")
+                "love" -> GameEvent.Reaction(ReactionKind.PET)
+                else -> null
+            }
+            if (event != null) {
+                delay(2500)
+                while (true) {
+                    GameRepository.emit(event)
+                    delay(if (event is GameEvent.Reaction && event.kind == ReactionKind.PET) 700 else 7000)
+                }
+            }
+            if (launch.scene == "overlay") {
+                delay(1500)
+                PetOverlayService.start(context)
+                delay(1500)
+                (context as? Activity)?.moveTaskToBack(true)
+            }
+        }
+    }
+
+    @Composable
+    fun WallpaperPreview(state: GameState) {
+        Box(Modifier.fillMaxSize()) {
+            PetScene(state, Modifier.fillMaxSize(), kind = LayoutKind.WALLPAPER)
+            Column(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("11:00", style = MaterialTheme.typography.displayLarge, color = Color.White)
+                Text("Montag, 28. September", style = MaterialTheme.typography.titleMedium, color = Color.White)
+            }
+        }
+    }
+
+    private fun seed(theme: ThemeMode, scene: String, form: Form?): GameState {
+        val settings = Settings(themeMode = theme, overlayPet = scene == "overlay")
+        if (scene == "onboarding") return GameState(settings = settings)
         val now = System.currentTimeMillis()
         val today = TimeUtil.epochDay(now, ZoneId.systemDefault())
         val day = 86_400_000L
@@ -147,7 +207,7 @@ object DebugScenes {
         }
         return GameState(
             onboarded = true,
-            style = style,
+            settings = settings,
             difficulty = if (scene == "memorial") Difficulty.CLASSIC else Difficulty.RELAXED,
             pet = pet,
             coins = 1234,
@@ -198,19 +258,19 @@ object DebugScenes {
                 .verticalScroll(rememberScrollState())
                 .padding(12.dp),
         ) {
-            Text("Alle Formen", style = MaterialTheme.typography.titleLarge)
+            Text("Alle Formen", style = MaterialTheme.typography.titleLarge, color = LocalPalette.current.text)
             for (row in Form.entries.chunked(4)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     for (f in row) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            PetPortrait(PetLook(f, Mood.HAPPY), state.style, Modifier.size(84.dp))
+                            PetPortrait(PetLook(f, Mood.HAPPY), Modifier.size(84.dp))
                             Text(f.title, style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }
             }
             Spacer(Modifier.height(8.dp))
-            Text("Stimmungen & Extras", style = MaterialTheme.typography.titleLarge)
+            Text("Stimmungen & Extras", style = MaterialTheme.typography.titleLarge, color = LocalPalette.current.text)
             val base = PetLook(Form.HOPSI, Mood.OKAY)
             val variants = listOf(
                 "Glücklich" to base.copy(mood = Mood.HAPPY),
@@ -230,7 +290,7 @@ object DebugScenes {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     for ((label, look) in row) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            PetPortrait(look, state.style, Modifier.size(84.dp))
+                            PetPortrait(look, Modifier.size(84.dp))
                             Text(label, style = MaterialTheme.typography.labelSmall)
                         }
                     }
@@ -248,7 +308,7 @@ object DebugScenes {
                 .statusBarsPadding()
                 .padding(16.dp),
         ) {
-            Text("Widget-Vorschau", style = MaterialTheme.typography.titleLarge)
+            Text("Widget-Vorschau", style = MaterialTheme.typography.titleLarge, color = LocalPalette.current.text)
             Spacer(Modifier.height(12.dp))
             Box(
                 Modifier
@@ -284,6 +344,7 @@ object DebugScenes {
                 Text(
                     "So sieht Knuffi auf deinem Startbildschirm aus. Die Knöpfe füttern, spielen, putzen und bringen ins Bett.",
                     style = MaterialTheme.typography.bodyMedium,
+                    color = LocalPalette.current.text,
                 )
             }
         }

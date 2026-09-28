@@ -1,67 +1,77 @@
 package de.knuffi.app.ui
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.CutCornerShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.knuffi.app.data.GameRepository
-import de.knuffi.app.ui.components.ActionButton
-import de.knuffi.app.ui.components.CoinChip
-import de.knuffi.app.ui.components.KButton
-import de.knuffi.app.ui.components.KCard
-import de.knuffi.app.ui.components.KProgress
+import de.knuffi.app.ui.components.ClayButton
+import de.knuffi.app.ui.components.ClayTextButton
+import de.knuffi.app.ui.components.EmojiTile
+import de.knuffi.app.ui.components.GlassIconButton
+import de.knuffi.app.ui.components.GlassPanel
+import de.knuffi.app.ui.components.CoinPill
+import de.knuffi.app.ui.components.LevelBadge
 import de.knuffi.app.ui.components.Pill
-import de.knuffi.app.ui.components.StatGauge
+import de.knuffi.app.ui.components.SurfaceCard
+import de.knuffi.app.ui.components.lighter
 import de.knuffi.app.ui.components.rememberHaptic
-import de.knuffi.app.ui.theme.LocalTokens
+import de.knuffi.app.ui.components.staggered
+import de.knuffi.app.ui.theme.LocalPalette
 import de.knuffi.core.Action
 import de.knuffi.core.Catalog
 import de.knuffi.core.DailyRewards
@@ -69,77 +79,76 @@ import de.knuffi.core.Effect
 import de.knuffi.core.Engine
 import de.knuffi.core.GameState
 import de.knuffi.core.Item
-import de.knuffi.core.Need
 import de.knuffi.core.Pet
-import kotlinx.coroutines.delay
 
 private enum class Sheet { FOOD, CARE }
 
 @Composable
 fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () -> Unit, onOpenShop: () -> Unit) {
     val pet = state.pet ?: return
-    val tokens = LocalTokens.current
     var sheet by remember { mutableStateOf<Sheet?>(null) }
     val act: (Action) -> Unit = { GameRepository.perform(it) }
+    val navSpace = bottomBarSpace()
+    val dockHeight = if (pet.isEgg) 112.dp else 124.dp
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp),
-    ) {
-        Header(state, pet, onOpenSettings)
-        Spacer(Modifier.height(10.dp))
-        Box(
-            Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .clip(tokens.cardShape)
-                .then(tokens.border?.let { Modifier.border(it, tokens.cardShape) } ?: Modifier),
-        ) {
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
             PetScene(
                 state,
-                Modifier.fillMaxSize(),
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .shadow(12.dp, RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp))
+                    .clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp)),
                 hourOverride = debugHour,
                 onPetTap = { act(if (pet.isEgg) Action.HatchTap else Action.Stroke) },
                 onStroke = { act(Action.Stroke) },
             )
-            ThoughtBubble(pet, Modifier.align(Alignment.TopStart).padding(12.dp))
-            if (Engine.canClaimDaily(state, System.currentTimeMillis(), GameRepository.zone)) {
-                GiftButton(state, Modifier.align(Alignment.TopEnd).padding(12.dp))
-            }
-            if (pet.isEgg) {
-                EggHint(pet, Modifier.align(Alignment.BottomCenter).padding(12.dp))
-            } else if (pet.sleeping) {
+            Spacer(Modifier.height(navSpace + dockHeight - 34.dp))
+        }
+
+        Hud(state, pet, onOpenSettings, Modifier.align(Alignment.TopCenter))
+
+        Column(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(bottom = navSpace)
+                .padding(horizontal = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            AnimatedVisibility(
+                visible = pet.sleeping,
+                enter = fadeIn() + slideInVertically { it / 2 },
+                exit = fadeOut() + slideOutVertically { it / 2 },
+            ) {
                 Pill(
-                    "💤 ${pet.name} schläft",
-                    Modifier.align(Alignment.BottomCenter).padding(10.dp),
-                    color = Color(0xCC1B1F4F),
+                    "💤 ${pet.name} schläft …",
+                    Modifier.padding(bottom = 8.dp),
+                    color = Color(0xE61B1F4F),
                     textColor = Color.White,
                 )
             }
-        }
-        Spacer(Modifier.height(12.dp))
-        if (!pet.isEgg) {
-            StatsRow(pet)
-            Spacer(Modifier.height(10.dp))
-            ActionsRow(pet, state, onFeed = { sheet = Sheet.FOOD }, onCare = { sheet = Sheet.CARE }, act = act)
-        } else {
-            KCard(Modifier.fillMaxWidth()) {
-                Text(
-                    "Dein Ei ist bereit! Tippe ${Engine.HATCH_TAPS}-mal darauf, damit ${pet.name} schlüpfen kann.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
+            if (pet.sick && state.count(Catalog.MEDICINE) == 0) {
+                Pill(
+                    "Keine Medizin mehr – im Shop gibt es Nachschub!",
+                    Modifier.padding(bottom = 8.dp),
+                    color = LocalPalette.current.red,
+                    textColor = Color.White,
                 )
             }
+            if (pet.isEgg) {
+                EggDock(pet, Modifier.height(dockHeight))
+            } else {
+                ActionDock(pet, Modifier.height(dockHeight), onFeed = { sheet = Sheet.FOOD }, onCare = { sheet = Sheet.CARE }, act = act)
+            }
         }
-        Spacer(Modifier.height(10.dp))
     }
 
     when (sheet) {
         Sheet.FOOD -> ItemSheet(
             title = "Was gibt's zu essen?",
+            emoji = "🍽️",
             items = Catalog.foods,
             state = state,
             onDismiss = { sheet = null },
@@ -154,6 +163,7 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
         )
         Sheet.CARE -> ItemSheet(
             title = "Pflege & Extras",
+            emoji = "🧴",
             items = Catalog.careItems,
             state = state,
             onDismiss = { sheet = null },
@@ -171,197 +181,236 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
 }
 
 @Composable
-private fun Header(state: GameState, pet: Pet, onOpenSettings: () -> Unit) {
-    val tokens = LocalTokens.current
-    val haptic = rememberHaptic()
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-            Column(Modifier.weight(1f)) {
-                Text(pet.name, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onBackground, maxLines = 1)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Pill(pet.form.title)
-                    if (!pet.isEgg) Pill(pet.stage.title, color = MaterialTheme.colorScheme.tertiaryContainer, textColor = MaterialTheme.colorScheme.onTertiaryContainer)
-                    if (state.daily.streak > 1) Pill("🔥 ${state.daily.streak}", color = tokens.danger.copy(alpha = 0.15f), textColor = MaterialTheme.colorScheme.onSurface)
-                }
-            }
-            CoinChip(state.coins)
-            Spacer(Modifier.width(8.dp))
-            Box(
-                Modifier
-                    .size(42.dp)
-                    .clip(if (tokens.pixel) CutCornerShape(3.dp) else CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable {
-                        haptic()
-                        onOpenSettings()
-                    },
-                contentAlignment = Alignment.Center,
-            ) { Text("⚙️", fontSize = 19.sp) }
-        }
-        if (!pet.isEgg) {
-            Spacer(Modifier.height(10.dp))
+private fun Hud(state: GameState, pet: Pet, onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
+    val p = LocalPalette.current
+    Column(
+        modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    ) {
+        GlassPanel(
+            Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(30.dp),
+            contentPadding = PaddingValues(start = 6.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "Lv ${pet.level}",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = tokens.xp,
-                    fontWeight = FontWeight.Bold,
-                )
-                Spacer(Modifier.width(8.dp))
-                KProgress(pet.xp / pet.xpToNext.toFloat(), tokens.xp, Modifier.weight(1f), height = 10.dp)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "${pet.xp}/${pet.xpToNext} XP",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (pet.isEgg) {
+                    EmojiTile("🥚", size = 50.dp, color = p.gold)
+                } else {
+                    LevelBadge(pet.level, pet.xp / pet.xpToNext.toFloat())
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(pet.name, style = MaterialTheme.typography.titleLarge, color = p.text, maxLines = 1)
+                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        MiniTag(pet.form.title, p.violet)
+                        if (state.daily.streak > 1) MiniTag("🔥 ${state.daily.streak}", p.orange)
+                    }
+                }
+                CoinPill(state.coins)
+                Spacer(Modifier.width(6.dp))
+                GlassIconButton("⚙️", onOpenSettings, size = 42.dp)
             }
+        }
+        if (Engine.canClaimDaily(state, System.currentTimeMillis(), GameRepository.zone)) {
+            GiftButton(state, Modifier.align(Alignment.End).padding(top = 10.dp, end = 4.dp))
         }
     }
-}
-
-private fun thoughtText(need: Need, pet: Pet): String = when (need) {
-    Need.SICK -> "Mir geht's nicht gut …"
-    Need.HUNGRY -> "Hunger!"
-    Need.DIRTY -> if (pet.poops > 0) "Iiih, sauber machen!" else "Ich will baden!"
-    Need.BORED -> "Mir ist langweilig!"
-    Need.TIRED -> "Ich bin müde …"
 }
 
 @Composable
-private fun ThoughtBubble(pet: Pet, modifier: Modifier = Modifier) {
-    val needs = pet.needs()
-    var index by remember { mutableIntStateOf(0) }
-    LaunchedEffect(needs.size) {
-        while (true) {
-            delay(3200)
-            index++
-        }
-    }
-    val need = if (needs.isEmpty()) null else needs[index % needs.size]
-    val tokens = LocalTokens.current
-    AnimatedContent(
-        targetState = need,
-        transitionSpec = { (scaleIn(initialScale = 0.6f) + fadeIn()) togetherWith (scaleOut(targetScale = 0.6f) + fadeOut()) },
-        modifier = modifier,
-        label = "thought",
-    ) { n ->
-        if (n != null) {
-            Row(
-                Modifier
-                    .clip(tokens.cardShape)
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
-                    .then(if (tokens.pixel) Modifier.border(3.dp, MaterialTheme.colorScheme.outline, tokens.cardShape) else Modifier)
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(n.emoji, fontSize = 18.sp)
-                Spacer(Modifier.width(6.dp))
-                Text(thoughtText(n, pet), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
-            }
-        } else {
-            Spacer(Modifier.size(1.dp))
-        }
-    }
+private fun MiniTag(text: String, color: Color) {
+    val p = LocalPalette.current
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = if (p.dark) color.lighter(0.35f) else color,
+        maxLines = 1,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(color.copy(alpha = if (p.dark) 0.22f else 0.14f))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    )
 }
 
 @Composable
 private fun GiftButton(state: GameState, modifier: Modifier = Modifier) {
-    val tokens = LocalTokens.current
+    val p = LocalPalette.current
     val haptic = rememberHaptic()
-    val bounce by rememberInfiniteTransition(label = "gift").animateFloat(0f, 1f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "bounce")
+    val anim = rememberInfiniteTransition(label = "gift")
+    val bounce by anim.animateFloat(0f, 1f, infiniteRepeatable(tween(650), RepeatMode.Reverse), label = "bounce")
+    val shine by anim.animateFloat(0f, 1f, infiniteRepeatable(tween(1800)), label = "shine")
     val coins = DailyRewards.coins[DailyRewards.dayIndex(state.daily.streak)]
     Column(
         modifier
-            .offset(y = (-6 * bounce).dp)
-            .clip(tokens.cardShape)
-            .background(tokens.gold.copy(alpha = 0.9f))
-            .clickable {
+            .graphicsLayer {
+                translationY = -6.dp.toPx() * bounce
+                rotationZ = (bounce - 0.5f) * 8f
+            }
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
                 haptic()
                 GameRepository.perform(Action.ClaimDaily)
                 GameRepository.message("Tägliche Belohnung: +$coins 🪙")
-            }
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("🎁", fontSize = 26.sp, modifier = Modifier.scale(1f + 0.08f * bounce))
-        Text("+$coins", style = MaterialTheme.typography.labelMedium, color = Color(0xFF3B2A00), fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-private fun EggHint(pet: Pet, modifier: Modifier = Modifier) {
-    val tokens = LocalTokens.current
-    Row(
-        modifier
-            .clip(tokens.pillShape)
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("👆 Tippe aufs Ei ", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
-        for (i in 0 until Engine.HATCH_TAPS) {
-            Box(
-                Modifier
-                    .padding(horizontal = 2.dp)
-                    .size(10.dp)
-                    .clip(if (tokens.pixel) CutCornerShape(0.dp) else CircleShape)
-                    .background(if (i < pet.hatchTaps) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)),
-            )
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(64.dp)) {
+            Canvas(Modifier.fillMaxSize()) {
+                drawCircle(Brush.radialGradient(listOf(p.gold.copy(alpha = 0.7f), Color.Transparent)), radius = size.minDimension / 2f * (0.8f + 0.2f * shine))
+                for (i in 0 until 8) {
+                    val a = Math.toRadians(i * 45.0 + shine * 45.0)
+                    val r0 = size.minDimension * 0.28f
+                    val r1 = size.minDimension * 0.48f
+                    drawLine(
+                        p.gold.copy(alpha = 0.55f),
+                        Offset(center.x + (Math.cos(a) * r0).toFloat(), center.y + (Math.sin(a) * r0).toFloat()),
+                        Offset(center.x + (Math.cos(a) * r1).toFloat(), center.y + (Math.sin(a) * r1).toFloat()),
+                        strokeWidth = 3.dp.toPx(),
+                        cap = StrokeCap.Round,
+                    )
+                }
+            }
+            Text("🎁", fontSize = 34.sp)
         }
-    }
-}
-
-@Composable
-private fun StatsRow(pet: Pet) {
-    val tokens = LocalTokens.current
-    KCard(Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 10.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            StatGauge("🍙", "Sattheit", (pet.satiety / 100.0).toFloat(), tokens.satiety)
-            StatGauge("😊", "Laune", (pet.joy / 100.0).toFloat(), tokens.joy)
-            StatGauge("⚡", "Energie", (pet.energy / 100.0).toFloat(), tokens.energy)
-            StatGauge("🫧", "Hygiene", (pet.hygiene / 100.0).toFloat(), tokens.hygiene)
-            StatGauge("❤️", "Gesundheit", (pet.health / 100.0).toFloat(), tokens.health)
-        }
-    }
-}
-
-@Composable
-private fun ActionsRow(pet: Pet, state: GameState, onFeed: () -> Unit, onCare: () -> Unit, act: (Action) -> Unit) {
-    val tokens = LocalTokens.current
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        ActionButton("🍙", "Füttern", onFeed, highlight = pet.satiety < 35, tint = tokens.satiety.copy(alpha = 0.22f))
-        ActionButton(
-            "🎾", "Spielen", { act(Action.Play) },
-            enabled = !pet.sleeping,
-            highlight = pet.joy < 35 && !pet.sleeping,
-            tint = tokens.joy.copy(alpha = 0.22f),
-        )
-        ActionButton(
-            if (pet.poops > 0) "💩" else "🧽", "Putzen", { act(Action.Clean) },
-            highlight = pet.poops > 0 || pet.hygiene < 35,
-            tint = tokens.hygiene.copy(alpha = 0.22f),
-        )
-        ActionButton(
-            if (pet.sleeping) "☀️" else "🌙",
-            if (pet.sleeping) "Wecken" else "Schlafen",
-            { act(Action.ToggleSleep) },
-            highlight = !pet.sleeping && pet.energy < 25,
-            tint = tokens.energy.copy(alpha = 0.22f),
-        )
-        ActionButton(
-            "💊", "Pflege", onCare,
-            highlight = pet.sick,
-            tint = tokens.health.copy(alpha = 0.22f),
-        )
-    }
-    if (state.count(Catalog.MEDICINE) == 0 && pet.sick) {
         Text(
-            "Keine Medizin mehr! Im Shop gibt es Nachschub.",
-            style = MaterialTheme.typography.bodySmall,
-            color = tokens.danger,
-            modifier = Modifier.padding(top = 4.dp),
+            "+$coins",
+            style = MaterialTheme.typography.labelLarge,
+            color = Color(0xFF4A3000),
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(Brush.verticalGradient(listOf(p.gold.lighter(0.3f), p.gold)))
+                .padding(horizontal = 10.dp, vertical = 2.dp),
         )
+    }
+}
+
+@Composable
+private fun EggDock(pet: Pet, modifier: Modifier = Modifier) {
+    val p = LocalPalette.current
+    GlassPanel(modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), contentPadding = PaddingValues(16.dp)) {
+        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Text("Tippe aufs Ei, damit ${pet.name} schlüpft!", style = MaterialTheme.typography.titleMedium, color = p.text, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (i in 0 until Engine.HATCH_TAPS) {
+                    val filled = i < pet.hatchTaps
+                    val s by animateFloatAsState(if (filled) 1f else 0.7f, spring(dampingRatio = 0.35f), label = "dot")
+                    Box(
+                        Modifier
+                            .size(18.dp)
+                            .graphicsLayer {
+                                scaleX = s
+                                scaleY = s
+                            }
+                            .clip(CircleShape)
+                            .background(if (filled) Brush.verticalGradient(listOf(p.pink.lighter(0.3f), p.pinkDeep)) else Brush.verticalGradient(listOf(p.track, p.track))),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionDock(pet: Pet, modifier: Modifier = Modifier, onFeed: () -> Unit, onCare: () -> Unit, act: (Action) -> Unit) {
+    val p = LocalPalette.current
+    GlassPanel(modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)) {
+        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+            StatAction("🍙", "Füttern", pet.satiety, p.satiety, p.orangeDeep, onFeed, alert = pet.satiety < 30, modifier = Modifier.staggered(0))
+            StatAction(
+                "🎾", "Spielen", pet.joy, p.joy, p.pinkDeep, { act(Action.Play) },
+                enabled = !pet.sleeping, alert = pet.joy < 30 && !pet.sleeping, modifier = Modifier.staggered(1),
+            )
+            StatAction(
+                if (pet.poops > 0) "💩" else "🫧", "Putzen", pet.hygiene, p.hygiene, p.skyDeep, { act(Action.Clean) },
+                alert = pet.poops > 0 || pet.hygiene < 30, modifier = Modifier.staggered(2),
+            )
+            StatAction(
+                if (pet.sleeping) "☀️" else "🌙", if (pet.sleeping) "Wecken" else "Schlafen", pet.energy, p.energy, p.goldDeep,
+                { act(Action.ToggleSleep) }, alert = !pet.sleeping && pet.energy < 25, modifier = Modifier.staggered(3),
+            )
+            StatAction("💊", "Pflege", pet.health, p.health, p.mintDeep, onCare, alert = pet.sick, modifier = Modifier.staggered(4))
+        }
+    }
+}
+
+/** An action button with a ring around it that shows the matching stat. */
+@Composable
+private fun StatAction(
+    emoji: String,
+    label: String,
+    stat: Double,
+    color: Color,
+    deep: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    alert: Boolean = false,
+) {
+    val p = LocalPalette.current
+    val value by animateFloatAsState((stat / 100.0).toFloat().coerceIn(0f, 1f), tween(900), label = "stat")
+    val anim = rememberInfiniteTransition(label = "alert")
+    val pulse by anim.animateFloat(0f, 1f, infiniteRepeatable(tween(1100)), label = "pulse")
+    val wiggle by anim.animateFloat(-1f, 1f, infiniteRepeatable(tween(180), RepeatMode.Reverse), label = "wiggle")
+    val low = value < 0.3f
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(68.dp), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.fillMaxSize()) {
+                val sw = 5.dp.toPx()
+                val inset = sw / 2f + 1.dp.toPx()
+                val arc = Size(size.width - inset * 2, size.height - inset * 2)
+                if (alert) {
+                    drawCircle(p.red.copy(alpha = (1f - pulse) * 0.55f), radius = size.minDimension / 2f * (0.8f + 0.25f * pulse), style = Stroke(3.dp.toPx()))
+                }
+                drawArc(p.track, 0f, 360f, false, Offset(inset, inset), arc, style = Stroke(sw))
+                val ring = if (low) p.red else color
+                drawArc(
+                    Brush.sweepGradient(listOf(ring.lighter(0.35f), ring, if (low) p.redDeep else deep, ring.lighter(0.35f))),
+                    -90f, 360f * value, false, Offset(inset, inset), arc,
+                    style = Stroke(sw, cap = StrokeCap.Round),
+                )
+            }
+            ClayButton(
+                onClick = onClick,
+                modifier = Modifier
+                    .size(50.dp)
+                    .graphicsLayer { rotationZ = if (alert && enabled) wiggle * 6f * (if (pulse < 0.35f) 1f else 0f) else 0f },
+                color = color,
+                deep = deep,
+                shape = CircleShape,
+                enabled = enabled,
+                depth = 4.dp,
+                contentPadding = PaddingValues(0.dp),
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Box(
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 4.dp)
+                            .size(width = 24.dp, height = 7.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(Color.White.copy(alpha = 0.35f)),
+                    )
+                    Text(emoji, fontSize = 21.sp)
+                }
+            }
+            if (alert) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(p.red)
+                        .border(2.dp, if (p.dark) Color(0xFF231C3D) else Color.White, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("!", color = Color.White, fontSize = 11.sp, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+        Text(label, style = MaterialTheme.typography.labelMedium, color = p.text, maxLines = 1)
+        Text("${stat.toInt()}%", style = MaterialTheme.typography.labelSmall, color = if (low) p.red else p.textMuted, maxLines = 1)
     }
 }
 
@@ -380,18 +429,20 @@ private fun sign(v: Int) = if (v > 0) "+$v" else "$v"
 @Composable
 private fun ItemSheet(
     title: String,
+    emoji: String,
     items: List<Item>,
     state: GameState,
     onDismiss: () -> Unit,
     onUse: (Item) -> Unit,
     onShop: () -> Unit,
 ) {
+    val p = LocalPalette.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val tokens = LocalTokens.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = if (p.dark) p.surface else p.bgTop,
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
     ) {
         Column(
             Modifier
@@ -399,38 +450,62 @@ private fun ItemSheet(
                 .navigationBarsPadding()
                 .padding(bottom = 16.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                EmojiTile(emoji, size = 42.dp, color = p.pink)
+                Spacer(Modifier.width(12.dp))
+                Text(title, style = MaterialTheme.typography.titleLarge, color = p.text)
+            }
+            Spacer(Modifier.height(14.dp))
             val visible = items.filter { it.unlimited || state.count(it.id) > 0 }
             if (visible.isEmpty()) {
-                Text("Dein Vorrat ist leer.", style = MaterialTheme.typography.bodyLarge)
+                Text("Dein Vorrat ist leer.", style = MaterialTheme.typography.bodyLarge, color = p.textMuted)
+                Spacer(Modifier.height(10.dp))
             }
+            var index = 0
             for (row in visible.chunked(3)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     for (item in row) {
-                        KCard(
-                            Modifier.weight(1f),
+                        SurfaceCard(
+                            Modifier
+                                .weight(1f)
+                                .staggered(index++),
                             onClick = { onUse(item) },
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(10.dp),
+                            contentPadding = PaddingValues(10.dp),
                         ) {
-                            Text(item.emoji, fontSize = 34.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+                            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
+                                Box(
+                                    Modifier
+                                        .align(Alignment.Center)
+                                        .size(62.dp)
+                                        .drawBehind {
+                                            drawCircle(Brush.radialGradient(listOf(p.pink.copy(alpha = 0.22f), Color.Transparent)))
+                                        },
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(item.emoji, fontSize = 36.sp)
+                                }
+                                Text(
+                                    if (item.unlimited) "∞" else "×${state.count(item.id)}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color.White,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .background(p.violet)
+                                        .padding(horizontal = 7.dp, vertical = 1.dp),
+                                )
+                            }
                             Text(
                                 item.name,
                                 style = MaterialTheme.typography.titleSmall,
-                                modifier = Modifier.align(Alignment.CenterHorizontally),
+                                color = p.text,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth(),
                                 maxLines = 1,
-                            )
-                            Text(
-                                if (item.unlimited) "∞" else "× ${state.count(item.id)}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.align(Alignment.CenterHorizontally),
                             )
                             Text(
                                 effectText(item.effect),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = p.textMuted,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.fillMaxWidth(),
                             )
@@ -441,15 +516,14 @@ private fun ItemSheet(
                 Spacer(Modifier.height(10.dp))
             }
             Spacer(Modifier.height(4.dp))
-            KButton(
+            ClayTextButton(
                 "Mehr im Shop",
                 onShop,
                 emoji = "🛍️",
                 modifier = Modifier.fillMaxWidth(),
-                container = MaterialTheme.colorScheme.secondaryContainer,
-                content = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = p.violet,
+                deep = p.violetDeep,
             )
-            if (tokens.pixel) Spacer(Modifier.height(4.dp))
         }
     }
 }

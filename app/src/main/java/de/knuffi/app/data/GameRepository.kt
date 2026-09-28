@@ -72,6 +72,11 @@ object GameRepository {
         _events.tryEmit(GameEvent.Message(text))
     }
 
+    /** Replays an event without changing the state (debug scenes use it to trigger animations). */
+    fun emit(event: GameEvent) {
+        _events.tryEmit(event)
+    }
+
     /** Wipes everything and starts over with the onboarding. */
     fun reset() {
         mutate(updateWidget = true, sync = true) { Outcome(GameState()) }
