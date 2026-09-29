@@ -22,7 +22,7 @@ import de.knuffi.app.render.RoomRenderer
 import de.knuffi.app.render.SceneModel
 import de.knuffi.app.render.SceneRenderer
 import de.knuffi.core.Action
-import de.knuffi.core.Engine
+import de.knuffi.core.EventCalendar
 import de.knuffi.core.GameState
 import de.knuffi.core.ThemeMode
 import kotlinx.coroutines.CoroutineScope
@@ -150,7 +150,7 @@ class KnuffiWallpaperService : WallpaperService() {
                 model.look = PetLook.of(state)?.takeIf { state.pet?.alive == true }
                 model.needs = state.pet?.needs() ?: emptyList()
                 model.room = state.room
-                model.furniture = Furnishing.of(state, Engine.activeEvent(System.currentTimeMillis(), ZoneId.systemDefault()))
+                model.furniture = Furnishing.of(state, EventCalendar.active(System.currentTimeMillis(), ZoneId.systemDefault()))
                 model.poops = state.pet?.poops ?: 0
                 model.lightsOff = state.pet?.sleeping == true
                 model.darkUi = darkMode(state)
