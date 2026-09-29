@@ -71,6 +71,7 @@ import de.knuffi.app.ui.theme.LocalHapticsEnabled
 import de.knuffi.app.ui.theme.LocalPalette
 import de.knuffi.core.Engine
 import de.knuffi.core.GameState
+import de.knuffi.core.LookStyle
 import de.knuffi.core.MiniGame
 import de.knuffi.core.StepRewards
 import de.knuffi.core.ThemeMode
@@ -78,10 +79,10 @@ import kotlinx.coroutines.delay
 
 enum class Tab(val emoji: String, val label: String) {
     HOME("🏠", "Zuhause"),
+    WORLD("🌍", "Welt"),
     GAMES("🎮", "Spiele"),
     SHOP("🛍️", "Shop"),
     GOALS("🏆", "Ziele"),
-    WALK("👟", "Gassi"),
 }
 
 sealed interface Route {
@@ -91,6 +92,13 @@ sealed interface Route {
     data object Gallery : Route
     data object WidgetPreview : Route
     data object WallpaperPreview : Route
+    data object Kuschelhaus : Route
+    data object Album : Route
+    data object Garden : Route
+    data object Trips : Route
+    data object Walk : Route
+    data object Pass : Route
+    data object EventShop : Route
 }
 
 /** Space that scrolling pages keep free at the bottom for the floating navigation bar. */
@@ -108,7 +116,7 @@ fun isDarkTheme(mode: ThemeMode): Boolean = when (mode) {
 fun AppRoot(debug: DebugScenes.Launch? = null) {
     val state by GameRepository.state.collectAsStateWithLifecycle()
     val dark = isDarkTheme(state.settings.themeMode)
-    KnuffiTheme(dark) {
+    KnuffiTheme(dark, adventure = state.settings.look == LookStyle.ABENTEUER) {
         SystemBars(dark)
         LaunchedEffect(Unit) {
             // Keep stats moving while the app is open.
@@ -164,9 +172,15 @@ private fun SystemBars(dark: Boolean) {
 private fun MainNavigation(state: GameState, debug: DebugScenes.Launch?) {
     var route by remember { mutableStateOf(DebugScenes.initialRoute(debug?.scene)) }
     var tab by remember { mutableStateOf(DebugScenes.initialTab(debug?.scene)) }
+    var backToKuschelhaus by remember { mutableStateOf(false) }
 
+    // Sub pages of the world hub go back to the hub, everything else to the main screen.
+    val parent: Route = when (route) {
+        Route.Trips -> if (backToKuschelhaus) Route.Kuschelhaus else Route.Main
+        else -> Route.Main
+    }
     BackHandler(enabled = route != Route.Main || tab != Tab.HOME) {
-        if (route != Route.Main) route = Route.Main else tab = Tab.HOME
+        if (route != Route.Main) route = parent else tab = Tab.HOME
     }
 
     AnimatedContent(
@@ -200,19 +214,32 @@ private fun MainNavigation(state: GameState, debug: DebugScenes.Launch?) {
                             onOpenSettings = { route = Route.Settings },
                             onOpenShop = { tab = Tab.SHOP },
                         )
+                        Tab.WORLD -> WorldScreen(state) {
+                            backToKuschelhaus = false
+                            route = it
+                        }
                         Tab.GAMES -> GamesScreen(state, onStart = { route = Route.Game(it) })
                         Tab.SHOP -> ShopScreen(state)
-                        Tab.GOALS -> GoalsScreen(state)
-                        Tab.WALK -> WalkScreen(state)
+                        Tab.GOALS -> GoalsScreen(state, onOpenPass = { route = Route.Pass })
                     }
                 }
                 FloatingNavBar(state, tab, Modifier.align(Alignment.BottomCenter)) { tab = it }
             }
             is Route.Game -> GameHost(r.game, state, onExit = { route = Route.Main })
             Route.Settings -> SettingsScreen(state, onBack = { route = Route.Main })
-            Route.Gallery -> DebugScenes.Gallery(state)
+            Route.Gallery -> DebugScenes.Gallery(state, debug?.scene)
             Route.WidgetPreview -> DebugScenes.WidgetPreview(state)
             Route.WallpaperPreview -> DebugScenes.WallpaperPreview(state)
+            Route.Kuschelhaus -> KuschelhausScreen(state, onBack = { route = Route.Main }, onTrips = {
+                backToKuschelhaus = true
+                route = Route.Trips
+            })
+            Route.Album -> AlbumScreen(state, onBack = { route = Route.Main })
+            Route.Garden -> GardenScreen(state, onBack = { route = Route.Main })
+            Route.Trips -> TripsScreen(state, onBack = { route = parent })
+            Route.Walk -> WalkScreen(state, onBack = { route = Route.Main })
+            Route.Pass -> PassScreen(state, onBack = { route = Route.Main })
+            Route.EventShop -> EventShopScreen(state, onBack = { route = Route.Main })
         }
     }
 }
@@ -225,7 +252,9 @@ private fun FloatingNavBar(state: GameState, selected: Tab, modifier: Modifier =
     val stepTierReady = StepRewards.tiers.withIndex().any { (i, t) -> state.steps.today >= t.first && i !in state.steps.claimedTiers }
     val goalsBadge = Engine.canClaimDaily(state, now, GameRepository.zone) ||
         state.daily.quests.any { it.done && !it.claimed } ||
-        (!state.daily.bonusClaimed && state.daily.quests.isNotEmpty() && state.daily.quests.all { it.claimed })
+        state.weekly.quests.any { it.done && !it.claimed } ||
+        (!state.daily.bonusClaimed && state.daily.quests.isNotEmpty() && state.daily.quests.all { it.claimed }) ||
+        (!state.weekly.bonusClaimed && state.weekly.quests.isNotEmpty() && state.weekly.quests.all { it.claimed })
     val index by animateFloatAsState(selected.ordinal.toFloat(), spring(dampingRatio = 0.68f, stiffness = 420f), label = "navIndex")
     val shape = RoundedCornerShape(30.dp)
 
@@ -241,7 +270,7 @@ private fun FloatingNavBar(state: GameState, selected: Tab, modifier: Modifier =
                 .height(70.dp)
                 .shadow(18.dp, shape, ambientColor = p.shadow.copy(alpha = 0.4f), spotColor = p.shadow.copy(alpha = 0.4f))
                 .clip(shape)
-                .background(if (p.dark) Color(0xF2211A3A) else Color(0xF7FFFFFF))
+                .background(if (p.dark) p.surface.copy(alpha = 0.95f) else Color(0xF7FFFFFF))
                 .border(1.dp, Brush.verticalGradient(listOf(p.glassBorder, p.glassBorder.copy(alpha = 0.1f))), shape)
                 .padding(6.dp),
         ) {
@@ -274,7 +303,7 @@ private fun FloatingNavBar(state: GameState, selected: Tab, modifier: Modifier =
                     val labelColor by animateColorAsState(if (active) Color.White else p.textMuted, label = "labelColor")
                     val badge = when (t) {
                         Tab.GOALS -> goalsBadge
-                        Tab.WALK -> stepTierReady
+                        Tab.WORLD -> stepTierReady || worldBadge(state, now)
                         else -> false
                     }
                     Box(
@@ -314,7 +343,7 @@ private fun FloatingNavBar(state: GameState, selected: Tab, modifier: Modifier =
                                     }
                                     .clip(CircleShape)
                                     .background(p.red)
-                                    .border(2.dp, if (p.dark) Color(0xFF211A3A) else Color.White, CircleShape),
+                                    .border(2.dp, if (p.dark) p.surface else Color.White, CircleShape),
                             )
                         }
                     }

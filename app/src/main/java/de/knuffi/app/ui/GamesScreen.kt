@@ -62,6 +62,9 @@ private fun themeFor(game: MiniGame) = when (game) {
     MiniGame.CATCH -> GameTheme(Color(0xFF7FD3FF), Color(0xFFB9F0C8), Color(0xFFFF9A4D), Color(0xFFDB6F26))
     MiniGame.MEMORY -> GameTheme(Color(0xFFB9A8FF), Color(0xFFFFC2E0), Color(0xFF8C7BFF), Color(0xFF6150D6))
     MiniGame.WHACK -> GameTheme(Color(0xFF6FD69A), Color(0xFFFFE08A), Color(0xFF34C99F), Color(0xFF1E9C78))
+    MiniGame.RUNNER -> GameTheme(Color(0xFFFFC48A), Color(0xFFFFE9B0), Color(0xFFFF7A5A), Color(0xFFD1503A))
+    MiniGame.BUBBLES -> GameTheme(Color(0xFF3FB8E8), Color(0xFF9CE8F0), Color(0xFF2EA8D6), Color(0xFF1A78A8))
+    MiniGame.SIMON -> GameTheme(Color(0xFFD8B0FF), Color(0xFFFFD0E8), Color(0xFFB27CFF), Color(0xFF7E50D6))
 }
 
 @Composable
@@ -127,12 +130,11 @@ private fun GameCard(state: GameState, game: MiniGame, look: PetLook?, blocker: 
         MiniGame.CATCH -> state.counters.bestCatch.takeIf { it > 0 }?.let { "🏅 $it Punkte" }
         MiniGame.MEMORY -> state.counters.bestMemoryMoves.takeIf { it > 0 }?.let { "🏅 $it Züge" }
         MiniGame.WHACK -> state.counters.bestWhack.takeIf { it > 0 }?.let { "🏅 $it Treffer" }
+        MiniGame.RUNNER -> state.counters.bestRunner.takeIf { it > 0 }?.let { "🏅 $it m" }
+        MiniGame.BUBBLES -> state.counters.bestBubbles.takeIf { it > 0 }?.let { "🏅 $it Blasen" }
+        MiniGame.SIMON -> state.counters.bestSimon.takeIf { it > 0 }?.let { "🏅 $it Töne" }
     }
-    val maxCoins = when (game) {
-        MiniGame.CATCH -> 60
-        MiniGame.MEMORY -> 40
-        MiniGame.WHACK -> 50
-    }
+    val maxCoins = Engine.gameMaxCoins(game)
     val start = { if (blocker == null) onStart() else GameRepository.message(blocker) }
     SurfaceCard(modifier.fillMaxWidth(), onClick = start, contentPadding = PaddingValues(0.dp)) {
         Box(
@@ -190,6 +192,9 @@ private fun GamePreview(game: MiniGame, look: PetLook?, theme: GameTheme, modifi
             MiniGame.CATCH -> drawCatch(t, look, renderer, pose, emoji)
             MiniGame.MEMORY -> drawMemory(t, emoji)
             MiniGame.WHACK -> drawWhack(t, look, renderer, pose, emoji)
+            MiniGame.RUNNER -> drawRunner(t, look, renderer, pose, emoji)
+            MiniGame.BUBBLES -> drawBubbles(t, look, renderer, pose, emoji)
+            MiniGame.SIMON -> drawSimon(t, look, renderer, pose, emoji)
         }
     }
 }
@@ -311,4 +316,94 @@ private fun DrawScope.drawWhack(t: Float, look: PetLook?, renderer: PetRenderer,
     // lightning cloud drifting over
     val cloudX = w * ((t * 0.08f) % 1.3f) - w * 0.15f
     emojiAt(paint, "⛈️", cloudX, h * 0.2f, h * 0.22f)
+}
+
+private fun DrawScope.drawRunner(t: Float, look: PetLook?, renderer: PetRenderer, pose: PetPose, paint: Paint) {
+    val w = size.width
+    val h = size.height
+    val ground = h * 0.86f
+    // far hills scrolling
+    for (i in 0 until 4) {
+        val x = w * (((i * 0.35f) - t * 0.05f) % 1.4f + 1.4f) % 1.4f - w * 0.2f
+        drawCircle(Color(0xFFFFB38A).copy(alpha = 0.55f), radius = h * 0.45f, center = Offset(x, ground + h * 0.25f))
+    }
+    drawRect(Color(0xFFE0A060), topLeft = Offset(0f, ground), size = Size(w, h - ground))
+    for (i in 0 until 12) {
+        val x = w * (((i / 12f) - t * 0.4f) % 1f + 1f) % 1f
+        drawRect(Color(0xFFC88040), topLeft = Offset(x, ground + h * 0.03f), size = Size(w * 0.03f, h * 0.03f))
+    }
+    // obstacle coming, the pet hops over it
+    val cycle = (t * 0.6f) % 1f
+    val ox = w * (1.1f - cycle * 1.2f)
+    emojiAt(paint, "🌵", ox, ground - h * 0.12f, h * 0.24f)
+    val coinX = w * (1.25f - cycle * 1.2f)
+    emojiAt(paint, "🪙", coinX, ground - h * 0.48f, h * 0.13f)
+    val px = w * 0.3f
+    val d = abs(ox - px) / w
+    val jump = if (d < 0.2f) cos(d / 0.2f * Math.PI.toFloat() / 2f) else 0f
+    drawPet(renderer, pose, look, px, ground, h * 0.46f, t) {
+        lift = jump * 0.9f
+        turn = 0.6f
+        strideL = if (jump > 0.05f) 0.5f else sin(t * 14f) * 0.8f
+        strideR = if (jump > 0.05f) -0.5f else -strideL
+        footL = if (jump > 0.05f) 0f else kotlin.math.max(0f, sin(t * 14f)) * 0.8f
+        footR = if (jump > 0.05f) 0f else kotlin.math.max(0f, -sin(t * 14f)) * 0.8f
+        armL = if (jump > 0.05f) 1f else 0.3f
+        armR = armL
+        eyes = if (jump > 0.05f) de.knuffi.app.render.EyeShape.HAPPY else de.knuffi.app.render.EyeShape.OPEN
+    }
+}
+
+private fun DrawScope.drawBubbles(t: Float, look: PetLook?, renderer: PetRenderer, pose: PetPose, paint: Paint) {
+    val w = size.width
+    val h = size.height
+    val colors = listOf(Color(0xFFFF6A8A), Color(0xFF5AB8FF), Color(0xFF6ED88A), Color(0xFFFFD84D))
+    for (i in 0 until 9) {
+        val prog = ((t * (0.18f + 0.03f * (i % 3)) + i * 0.13f) % 1f)
+        val x = w * (0.1f + 0.1f * i) + sin(t * 2f + i) * 8f
+        val y = h * (1.05f - prog * 1.15f)
+        val r = h * (0.07f + 0.02f * (i % 3))
+        val col = colors[i % colors.size]
+        drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.8f), col.copy(alpha = 0.55f), col.copy(alpha = 0.8f)), center = Offset(x - r * 0.3f, y - r * 0.3f), radius = r * 1.4f), radius = r, center = Offset(x, y))
+        drawCircle(Color.White.copy(alpha = 0.85f), radius = r * 0.22f, center = Offset(x - r * 0.35f, y - r * 0.35f))
+    }
+    // pop!
+    val popPh = (t % 1.5f) / 1.5f
+    if (popPh < 0.3f) emojiAt(paint, "✨", w * 0.7f, h * 0.35f, h * 0.2f * (0.6f + popPh))
+    drawPet(renderer, pose, look, w * 0.22f, h * 0.95f, h * 0.44f, t) {
+        mouth = de.knuffi.app.render.MouthShape.O
+        mouthOpen = 0.6f + 0.4f * sin(t * 4f)
+        lookY = -1f
+        lookX = 0.6f
+        turn = 0.3f
+    }
+}
+
+private fun DrawScope.drawSimon(t: Float, look: PetLook?, renderer: PetRenderer, pose: PetPose, paint: Paint) {
+    val w = size.width
+    val h = size.height
+    val pads = listOf(Color(0xFFFF6A8A), Color(0xFF5AB8FF), Color(0xFF6ED88A), Color(0xFFFFD84D))
+    val lit = ((t * 1.6f).toInt()) % 4
+    val on = (t * 1.6f) % 1f < 0.6f
+    val s = h * 0.34f
+    val cx = w * 0.66f
+    val cy = h * 0.5f
+    for (i in 0 until 4) {
+        val x = cx + (if (i % 2 == 0) -1 else 1) * s * 0.56f
+        val y = cy + (if (i < 2) -1 else 1) * s * 0.56f
+        val bright = i == lit && on
+        val col = if (bright) pads[i] else pads[i].copy(alpha = 0.55f)
+        drawRoundRect(Color(0x33000000), topLeft = Offset(x - s / 2f, y - s / 2f + 5f), size = Size(s, s), cornerRadius = CornerRadius(s * 0.28f))
+        drawRoundRect(col, topLeft = Offset(x - s / 2f, y - s / 2f), size = Size(s, s), cornerRadius = CornerRadius(s * 0.28f))
+        if (bright) drawCircle(Color.White.copy(alpha = 0.35f), radius = s * 0.4f, center = Offset(x, y))
+    }
+    val noteY = h * 0.35f - ((t * 0.8f) % 1f) * h * 0.25f
+    emojiAt(paint, "🎵", w * 0.3f, noteY, h * 0.16f)
+    drawPet(renderer, pose, look, w * 0.22f, h * 0.95f, h * 0.44f, t) {
+        mouth = if (on) de.knuffi.app.render.MouthShape.OPEN else de.knuffi.app.render.MouthShape.SMILE
+        eyes = de.knuffi.app.render.EyeShape.HAPPY
+        armL = 0.6f + 0.4f * sin(t * 5f)
+        armR = 0.6f - 0.4f * sin(t * 5f)
+        tilt = sin(t * 3f) * 6f
+    }
 }

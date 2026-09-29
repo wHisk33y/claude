@@ -76,6 +76,9 @@ fun GameHost(game: MiniGame, state: GameState, onExit: () -> Unit) {
             MiniGame.CATCH -> CatchGame(startState, onFinished = finish, onBack = onExit)
             MiniGame.MEMORY -> MemoryGame(startState, onFinished = finish, onBack = onExit)
             MiniGame.WHACK -> WhackGame(startState, onFinished = finish, onBack = onExit)
+            MiniGame.RUNNER -> RunnerGame(startState, onFinished = finish, onBack = onExit)
+            MiniGame.BUBBLES -> BubblesGame(startState, onFinished = finish, onBack = onExit)
+            MiniGame.SIMON -> SimonGame(startState, onFinished = finish, onBack = onExit)
         }
         result?.let { score ->
             ResultOverlay(game, score, startState) {
@@ -95,21 +98,18 @@ private fun ResultOverlay(game: MiniGame, score: Int, state: GameState, onCollec
         MiniGame.CATCH -> score > c.bestCatch
         MiniGame.MEMORY -> c.bestMemoryMoves == 0 || score < c.bestMemoryMoves
         MiniGame.WHACK -> score > c.bestWhack
+        MiniGame.RUNNER -> score > c.bestRunner
+        MiniGame.BUBBLES -> score > c.bestBubbles
+        MiniGame.SIMON -> score > c.bestSimon
     }
-    val maxCoins = when (game) {
-        MiniGame.CATCH -> 60
-        MiniGame.MEMORY -> 40
-        MiniGame.WHACK -> 50
-    }
-    val stars = when {
-        reward.coins >= maxCoins * 0.75f -> 3
-        reward.coins >= maxCoins * 0.4f -> 2
-        else -> 1
-    }
+    val stars = Engine.stars(game, score)
     val scoreText = when (game) {
         MiniGame.CATCH -> "$score Punkte"
         MiniGame.MEMORY -> "$score Züge"
         MiniGame.WHACK -> "$score Treffer"
+        MiniGame.RUNNER -> "$score Meter"
+        MiniGame.BUBBLES -> "$score Blasen"
+        MiniGame.SIMON -> "$score ${if (score == 1) "Ton" else "Töne"}"
     }
     val appear = remember { Animatable(0.5f) }
     var shownStars by remember { mutableIntStateOf(0) }

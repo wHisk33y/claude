@@ -21,6 +21,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.res.ResourcesCompat
 import de.knuffi.app.R
 import de.knuffi.app.data.GameRepository
+import de.knuffi.app.debug.DebugScenes
+import de.knuffi.app.render.Furnishing
 import de.knuffi.app.render.LayoutKind
 import de.knuffi.app.render.ParticleSystem
 import de.knuffi.app.render.PetDirector
@@ -31,11 +33,13 @@ import de.knuffi.app.render.RoomRenderer
 import de.knuffi.app.render.SceneModel
 import de.knuffi.app.render.SceneRenderer
 import de.knuffi.app.ui.theme.LocalPalette
+import de.knuffi.core.Engine
 import de.knuffi.core.GameState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 
 /** Seconds since this composable entered the composition, updated every frame. */
 @Composable
@@ -122,6 +126,9 @@ fun PetScene(
 ) {
     val look = remember(state.pet, state.equipped) { PetLook.of(state) }
     val needs = remember(state.pet) { state.pet?.needs() ?: emptyList() }
+    val furniture = remember(state.equipped, state.settings.look) {
+        Furnishing.of(state, DebugScenes.eventOverride ?: Engine.activeEvent(System.currentTimeMillis(), ZoneId.systemDefault()))
+    }
     val dark = LocalPalette.current.dark
     val typeface = rememberCanvasTypeface()
     val time = rememberFrameTime()
@@ -199,6 +206,7 @@ fun PetScene(
         val w = size.width
         val h = size.height
         m.room = state.room
+        m.furniture = furniture
         m.hour = hourOverride ?: hour.floatValue
         m.lightsOff = state.pet?.sleeping == true
         m.poops = state.pet?.poops ?: 0

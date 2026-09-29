@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import de.knuffi.app.BuildConfig
 import de.knuffi.app.data.GameRepository
+import de.knuffi.app.notify.Battery
 import de.knuffi.app.notify.Notifier
 import de.knuffi.app.render.LayoutKind
 import de.knuffi.app.screen.PetOverlayService
@@ -63,6 +64,7 @@ import de.knuffi.core.Action
 import de.knuffi.core.Difficulty
 import de.knuffi.core.GameState
 import de.knuffi.core.Settings
+import de.knuffi.core.LookStyle
 import de.knuffi.core.ThemeMode
 import de.knuffi.core.TimeUtil
 import kotlin.math.roundToInt
@@ -81,6 +83,7 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
     var goal by remember { mutableFloatStateOf(s.stepGoal.toFloat()) }
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     var wallpaperActive by remember { mutableStateOf(ScreenPet.isWallpaperActive(context)) }
+    var batteryOk by remember { mutableStateOf(Battery.isIgnoring(context)) }
     var waitingForOverlayPermission by remember { mutableStateOf(false) }
     fun update(settings: Settings) {
         GameRepository.perform(Action.UpdateSettings(settings))
@@ -88,6 +91,7 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
 
     LifecycleResumeEffect(Unit) {
         wallpaperActive = ScreenPet.isWallpaperActive(context)
+        batteryOk = Battery.isIgnoring(context)
         if (waitingForOverlayPermission) {
             waitingForOverlayPermission = false
             if (ScreenPet.canDrawOverlays(context)) {
@@ -121,6 +125,20 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
                 Spacer(Modifier.height(8.dp))
                 Text(
                     "„System“ folgt dem Dunkelmodus deines Handys.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = p.textMuted,
+                )
+                Spacer(Modifier.height(16.dp))
+                Text("Look", style = MaterialTheme.typography.titleSmall, color = p.text)
+                Spacer(Modifier.height(10.dp))
+                SegmentedControl(
+                    listOf("✨ Zauber", "🐉 Abenteuer"),
+                    if (s.look == LookStyle.ABENTEUER) 1 else 0,
+                    { update(s.copy(look = if (it == 1) LookStyle.ABENTEUER else LookStyle.ZAUBER)) },
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Zauber: Rosa und Flieder. Abenteuer: Blau und Grün. Alle Haustiere, Kleider und Möbel gibt es in beiden Looks.",
                     style = MaterialTheme.typography.bodySmall,
                     color = p.textMuted,
                 )
@@ -221,6 +239,27 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
                 SwitchRow("Nachtruhe", "Keine Erinnerungen zwischen ${s.quietStart} und ${s.quietEnd} Uhr", s.quietHours) {
                     update(s.copy(quietHours = it))
                 }
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Akku-Optimierung", style = MaterialTheme.typography.titleSmall, color = p.text)
+                        Text(
+                            if (batteryOk) "Ausnahme aktiv: Erinnerungen kommen pünktlich. ✅" else "Manche Handys verzögern Erinnerungen, um Akku zu sparen.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = p.textMuted,
+                        )
+                    }
+                    if (!batteryOk) {
+                        Spacer(Modifier.width(8.dp))
+                        ClayTextButton("Erlauben", { Battery.request(context) }, small = true, color = p.mint, deep = p.mintDeep)
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Du bekommst Bescheid bei Hunger, Krankheit, Schmutz, Langeweile und Müdigkeit, wenn Pflanzen reif sind, ein Ausflug zurück ist, ein Fest beginnt und an Geburtstagen.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = p.textMuted,
+                )
             }
 
             SectionHeader("Gassi gehen", "👟")

@@ -89,7 +89,7 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
     var sheet by remember { mutableStateOf<Sheet?>(null) }
     val act: (Action) -> Unit = { GameRepository.perform(it) }
     val navSpace = bottomBarSpace()
-    val dockHeight = if (pet.isEgg) 112.dp else 124.dp
+    val dockHeight = if (pet.isEgg) (if (state.count(Catalog.GLITTER) > 0 || pet.shiny) 160.dp else 112.dp) else 124.dp
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -138,7 +138,7 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
                 )
             }
             if (pet.isEgg) {
-                EggDock(pet, Modifier.height(dockHeight))
+                EggDock(pet, Modifier.height(dockHeight), glitter = state.count(Catalog.GLITTER)) { act(Action.UseItem(Catalog.GLITTER)) }
             } else {
                 ActionDock(pet, Modifier.height(dockHeight), onFeed = { sheet = Sheet.FOOD }, onCare = { sheet = Sheet.CARE }, act = act)
             }
@@ -286,7 +286,7 @@ private fun GiftButton(state: GameState, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun EggDock(pet: Pet, modifier: Modifier = Modifier) {
+private fun EggDock(pet: Pet, modifier: Modifier = Modifier, glitter: Int = 0, onGlitter: () -> Unit = {}) {
     val p = LocalPalette.current
     GlassPanel(modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), contentPadding = PaddingValues(16.dp)) {
         Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -307,6 +307,13 @@ private fun EggDock(pet: Pet, modifier: Modifier = Modifier) {
                             .background(if (filled) Brush.verticalGradient(listOf(p.pink.lighter(0.3f), p.pinkDeep)) else Brush.verticalGradient(listOf(p.track, p.track))),
                     )
                 }
+            }
+            if (glitter > 0 && !pet.shiny) {
+                Spacer(Modifier.height(10.dp))
+                ClayTextButton("Glitzerstaub streuen (×$glitter)", onGlitter, small = true, emoji = "✨", color = p.gold, deep = p.goldDeep)
+            } else if (pet.shiny) {
+                Spacer(Modifier.height(8.dp))
+                Text("✨ Dieses Ei glitzert!", style = MaterialTheme.typography.labelLarge, color = p.goldDeep)
             }
         }
     }

@@ -114,6 +114,39 @@ val DarkPalette = KnuffiPalette(
     shadow = Color(0xFF000000),
 )
 
+/** "Abenteuer" look: blue and teal instead of pink and violet. */
+val AdventureLightPalette = LightPalette.copy(
+    bgTop = Color(0xFFEFF8FF),
+    bgBottom = Color(0xFFE2F4EC),
+    surfaceAlt = Color(0xFFEEF6FB),
+    text = Color(0xFF1F3345),
+    textMuted = Color(0xFF6F8494),
+    pink = Color(0xFF3D8BFF),
+    pinkDeep = Color(0xFF2463C8),
+    violet = Color(0xFF6C7CF0),
+    violetDeep = Color(0xFF4452C4),
+    sky = Color(0xFF22C4D0),
+    skyDeep = Color(0xFF168E9C),
+    track = Color(0x1F1F3345),
+    shadow = Color(0xFF2A4A70),
+)
+
+val AdventureDarkPalette = DarkPalette.copy(
+    bgTop = Color(0xFF14213A),
+    bgBottom = Color(0xFF0A1220),
+    surface = Color(0xFF1B2B45),
+    surfaceAlt = Color(0xFF243757),
+    glass = Color(0xE0192740),
+    text = Color(0xFFEAF4FF),
+    textMuted = Color(0xFFA3B6CC),
+    pink = Color(0xFF5AA0FF),
+    pinkDeep = Color(0xFF2F6FCC),
+    violet = Color(0xFF8A98FF),
+    violetDeep = Color(0xFF5A66D6),
+    sky = Color(0xFF3ED6E0),
+    skyDeep = Color(0xFF1A9AA6),
+)
+
 val LocalPalette = staticCompositionLocalOf { LightPalette }
 val LocalHapticsEnabled = staticCompositionLocalOf { true }
 
@@ -155,8 +188,13 @@ private val KnuffiShapes = Shapes(
 )
 
 @Composable
-fun KnuffiTheme(dark: Boolean, content: @Composable () -> Unit) {
-    val p = if (dark) DarkPalette else LightPalette
+fun KnuffiTheme(dark: Boolean, adventure: Boolean = false, content: @Composable () -> Unit) {
+    val p = when {
+        adventure && dark -> AdventureDarkPalette
+        adventure -> AdventureLightPalette
+        dark -> DarkPalette
+        else -> LightPalette
+    }
     val scheme = if (dark) {
         darkColorScheme(
             primary = p.pink,
@@ -189,11 +227,11 @@ fun KnuffiTheme(dark: Boolean, content: @Composable () -> Unit) {
         lightColorScheme(
             primary = p.pinkDeep,
             onPrimary = Color.White,
-            primaryContainer = Color(0xFFFFD9E8),
+            primaryContainer = if (adventure) lerp(p.surface, p.pink, 0.22f) else Color(0xFFFFD9E8),
             onPrimaryContainer = p.text,
             secondary = p.violet,
             onSecondary = Color.White,
-            secondaryContainer = Color(0xFFE7E1FF),
+            secondaryContainer = if (adventure) lerp(p.surface, p.violet, 0.22f) else Color(0xFFE7E1FF),
             onSecondaryContainer = p.text,
             tertiary = p.mintDeep,
             onTertiary = Color.White,
@@ -206,9 +244,9 @@ fun KnuffiTheme(dark: Boolean, content: @Composable () -> Unit) {
             surfaceContainer = p.surface,
             surfaceContainerLow = p.surface,
             surfaceContainerHigh = p.surfaceAlt,
-            surfaceContainerHighest = Color(0xFFF6E8F1),
-            outline = Color(0xFFE3CCDB),
-            outlineVariant = Color(0xFFF1E1EB),
+            surfaceContainerHighest = if (adventure) Color(0xFFE6F0F8) else Color(0xFFF6E8F1),
+            outline = if (adventure) Color(0xFFC8D8E6) else Color(0xFFE3CCDB),
+            outlineVariant = if (adventure) Color(0xFFDDE8F1) else Color(0xFFF1E1EB),
             error = p.redDeep,
             errorContainer = Color(0xFFFFDDE2),
             onErrorContainer = p.text,

@@ -8,6 +8,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,10 +22,12 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -58,13 +62,14 @@ import de.knuffi.app.ui.components.ClayTextButton
 import de.knuffi.app.ui.components.CoinIcon
 import de.knuffi.app.ui.components.CoinPill
 import de.knuffi.app.ui.components.Pill
+import de.knuffi.app.ui.components.rememberHaptic
 import de.knuffi.app.ui.components.ScreenHeader
-import de.knuffi.app.ui.components.SegmentedControl
 import de.knuffi.app.ui.components.SurfaceCard
 import de.knuffi.app.ui.components.staggered
 import de.knuffi.app.ui.theme.LocalPalette
 import de.knuffi.core.Action
 import de.knuffi.core.Catalog
+import de.knuffi.core.Form
 import de.knuffi.core.GameState
 import de.knuffi.core.Item
 import de.knuffi.core.ItemKind
@@ -74,18 +79,50 @@ import de.knuffi.core.Slot
 private data class ShopTab(val label: String, val kinds: List<ItemKind>, val top: Color, val bottom: Color)
 
 private val shopTabs = listOf(
-    ShopTab("Essen", listOf(ItemKind.FOOD), Color(0xFFFFD6A8), Color(0xFFFFB7C9)),
-    ShopTab("Pflege", listOf(ItemKind.CARE), Color(0xFFB8F0DC), Color(0xFFA8D8FF)),
-    ShopTab("Mode", listOf(ItemKind.HAT, ItemKind.FACE, ItemKind.NECK), Color(0xFFE2D6FF), Color(0xFFFFC8E4)),
-    ShopTab("Zimmer", listOf(ItemKind.ROOM), Color(0xFFBDE6FF), Color(0xFFD9CCFF)),
+    ShopTab("🍙 Essen", listOf(ItemKind.FOOD), Color(0xFFFFD6A8), Color(0xFFFFB7C9)),
+    ShopTab("🧴 Pflege", listOf(ItemKind.CARE), Color(0xFFB8F0DC), Color(0xFFA8D8FF)),
+    ShopTab("🥚 Eier", listOf(ItemKind.EGG), Color(0xFFFFF1C4), Color(0xFFFFD0E4)),
+    ShopTab("🌱 Garten", listOf(ItemKind.SEED), Color(0xFFD0F5C8), Color(0xFFFFF0B0)),
+    ShopTab("🎀 Mode", listOf(ItemKind.HAT, ItemKind.FACE, ItemKind.NECK), Color(0xFFE2D6FF), Color(0xFFFFC8E4)),
+    ShopTab(
+        "🛋️ Zimmer",
+        listOf(ItemKind.ROOM, ItemKind.WALL, ItemKind.RUG, ItemKind.BED, ItemKind.PLANT, ItemKind.LAMP, ItemKind.PICTURE),
+        Color(0xFFBDE6FF),
+        Color(0xFFD9CCFF),
+    ),
 )
+
+@Composable
+private fun ShopTabs(selected: Int, onSelect: (Int) -> Unit) {
+    val p = LocalPalette.current
+    val haptic = rememberHaptic()
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 4.dp)) {
+        itemsIndexed(shopTabs) { i, t ->
+            val active = i == selected
+            Text(
+                t.label,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (active) Color.White else p.text,
+                modifier = Modifier
+                    .shadow(if (active) 6.dp else 0.dp, RoundedCornerShape(50), ambientColor = p.pink, spotColor = p.pink)
+                    .clip(RoundedCornerShape(50))
+                    .background(if (active) Brush.linearGradient(listOf(p.pink, p.violet)) else Brush.linearGradient(listOf(p.track, p.track)))
+                    .clickable {
+                        haptic()
+                        onSelect(i)
+                    }
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+            )
+        }
+    }
+}
 
 @Composable
 fun ShopScreen(state: GameState) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf<Item?>(null) }
     val current = shopTabs[tab]
-    val shown = Catalog.items.filter { it.kind in current.kinds && !it.unlimited }
+    val shown = Catalog.items.filter { it.kind in current.kinds && !it.unlimited && (it.sold || it.id in state.owned) }
     val navSpace = bottomBarSpace()
 
     LazyVerticalGrid(
@@ -97,10 +134,17 @@ fun ShopScreen(state: GameState) {
     ) {
         item(span = { GridItemSpan(2) }) {
             Column {
-                ScreenHeader("Shop", "🛍️", "Leckereien, Mode und neue Zimmer") { CoinPill(state.coins) }
+                ScreenHeader("Shop", "🛍️", "Leckereien, Eier, Mode und Möbel") { CoinPill(state.coins) }
                 Spacer(Modifier.height(8.dp))
-                SegmentedControl(shopTabs.map { it.label }, tab, { tab = it })
-                Spacer(Modifier.height(4.dp))
+                ShopTabs(tab) { tab = it }
+                if (current.kinds.first() == ItemKind.EGG) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Jede Ei-Sorte hat ihre eigene Familie. Ausgebrütet wird im Kuschelhaus unter 🌍 Welt.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LocalPalette.current.textMuted,
+                    )
+                }
             }
         }
         itemsIndexed(shown, key = { _, it -> it.id }) { i, item ->
@@ -129,7 +173,13 @@ private fun ShopTile(item: Item, state: GameState, tab: ShopTab, modifier: Modif
     val slot = item.kind.slot
     val owned = item.cosmetic && item.id in state.owned
     val equipped = slot != null && state.equipped[slot] == item.id
-    val tryOn = if (item.kind == ItemKind.HAT || item.kind == ItemKind.FACE || item.kind == ItemKind.NECK) lookWith(state, item) else null
+    val eggLine = item.line
+    val tryOn = when {
+        item.kind.wearable -> lookWith(state, item)
+        item.kind == ItemKind.EGG && eggLine != null -> PetLook(Form.EGG, Mood.HAPPY, line = eggLine)
+        else -> null
+    }
+    val eggs = if (eggLine != null && item.kind == ItemKind.EGG) state.eggCount(eggLine) else 0
     val float by rememberInfiniteTransition(label = "float").animateFloat(
         -1f, 1f, infiniteRepeatable(tween(1600 + (item.id.hashCode() and 0x1FF)), RepeatMode.Reverse), label = "f",
     )
@@ -189,11 +239,12 @@ private fun ShopTile(item: Item, state: GameState, tab: ShopTab, modifier: Modif
                         .background(Color(0xCC2A2040))
                         .padding(horizontal = 8.dp, vertical = 2.dp),
                 )
-            } else if (equipped || owned || (item.consumable && state.count(item.id) > 0)) {
+            } else if (equipped || owned || (item.stackable && state.count(item.id) > 0) || eggs > 0) {
                 Text(
                     when {
                         equipped -> "✓ An"
                         owned -> "Deins"
+                        eggs > 0 -> "×$eggs"
                         else -> "×${state.count(item.id)}"
                     },
                     style = MaterialTheme.typography.labelMedium,
@@ -272,9 +323,14 @@ private fun ItemDetailSheet(item: Item, state: GameState, onDismiss: () -> Unit)
                 .padding(bottom = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            val eggLine = item.line
             when {
-                item.kind == ItemKind.ROOM -> {
-                    val preview = state.copy(equipped = state.equipped + (Slot.ROOM to item.id))
+                item.kind == ItemKind.ROOM || item.kind.furniture -> {
+                    val preview = if (item.kind == ItemKind.ROOM) {
+                        state.copy(equipped = state.equipped + (Slot.ROOM to item.id))
+                    } else {
+                        state.copy(equipped = state.equipped + (Slot.ROOM to Catalog.DEFAULT_ROOM) + (slot!! to item.id))
+                    }
                     Box(
                         Modifier
                             .fillMaxWidth()
@@ -282,6 +338,12 @@ private fun ItemDetailSheet(item: Item, state: GameState, onDismiss: () -> Unit)
                             .clip(RoundedCornerShape(26.dp)),
                     ) {
                         PetScene(preview, Modifier.fillMaxSize(), kind = LayoutKind.BOX, interactive = false, showBubble = false)
+                    }
+                }
+                item.kind == ItemKind.EGG && eggLine != null -> {
+                    Box(Modifier.size(200.dp), contentAlignment = Alignment.Center) {
+                        Rays(p.gold, Modifier.fillMaxSize())
+                        PetPortrait(remember(eggLine) { PetLook(Form.EGG, Mood.HAPPY, line = eggLine) }, Modifier.fillMaxSize(), sizeFactor = 0.6f, groundFactor = 0.88f)
                     }
                 }
                 item.cosmetic -> {
@@ -310,6 +372,22 @@ private fun ItemDetailSheet(item: Item, state: GameState, onDismiss: () -> Unit)
             Spacer(Modifier.height(10.dp))
             Text(item.name, style = MaterialTheme.typography.headlineSmall, color = p.text)
             Text(item.description, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, color = p.textMuted)
+            if (item.kind == ItemKind.EGG && eggLine != null) {
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Pill("${eggLine.forms.size} Wesen in dieser Familie", color = p.violet.copy(alpha = 0.18f))
+                    Pill("Vorrat: ${state.eggCount(eggLine)}")
+                }
+            }
+            if (item.kind == ItemKind.SEED) {
+                Spacer(Modifier.height(10.dp))
+                val y = item.yieldId?.let { Catalog[it] }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Pill("⏱ ${item.growHours} Std", color = p.mint.copy(alpha = 0.2f))
+                    Pill("Ernte: ${item.yieldCount}× ${y?.emoji ?: ""}")
+                    Pill("Vorrat: ${state.count(item.id)}")
+                }
+            }
             if (item.consumable) {
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -323,13 +401,18 @@ private fun ItemDetailSheet(item: Item, state: GameState, onDismiss: () -> Unit)
                 item.cosmetic && owned && slot != null -> {
                     if (equipped) {
                         ClayTextButton(
-                            if (slot == Slot.ROOM) "Standardzimmer nutzen" else "Ablegen",
+                            when {
+                                slot == Slot.ROOM -> "Standardzimmer nutzen"
+                                item.kind.furniture -> "Standard nutzen"
+                                else -> "Ablegen"
+                            },
                             { act(Action.Unequip(slot)) },
                             emoji = "↩️",
                             modifier = Modifier.fillMaxWidth(),
                             color = p.violet,
                             deep = p.violetDeep,
-                            enabled = !(slot == Slot.ROOM && item.id == Catalog.DEFAULT_ROOM),
+                            enabled = !(slot == Slot.ROOM && item.id == Catalog.DEFAULT_ROOM) &&
+                                !(item.kind.furniture && Catalog.defaultEquipped(state.settings.look)[slot] == item.id),
                         )
                     } else {
                         ClayTextButton("Anlegen", { act(Action.Equip(item.id)) }, emoji = "✨", modifier = Modifier.fillMaxWidth(), color = p.mint, deep = p.mintDeep)

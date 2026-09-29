@@ -13,6 +13,7 @@ import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
+import de.knuffi.core.EggLine
 import de.knuffi.core.Form
 import kotlin.math.abs
 import kotlin.math.cos
@@ -25,26 +26,26 @@ import kotlin.math.sin
  * can be used in Compose, the live wallpaper, the floating overlay, the widget and notifications.
  */
 class PetRenderer {
-    private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    internal val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+    internal val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
-    private val emoji = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    internal val emoji = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         typeface = Typeface.DEFAULT
     }
-    private val body = Path()
-    private val path = Path()
-    private val path2 = Path()
-    private val path3 = Path()
-    private val tmp = Path()
-    private val rect = RectF()
+    internal val body = Path()
+    internal val path = Path()
+    internal val path2 = Path()
+    internal val path3 = Path()
+    internal val tmp = Path()
+    internal val rect = RectF()
     private val layerPaint = Paint()
     private val tint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val srcAtop = PorterDuffXfermode(PorterDuff.Mode.SRC_ATOP)
-    private var u = 1f
+    internal var u = 1f
 
     /** Bounds of the most recently drawn pet in canvas coordinates. */
     val bounds = RectF()
@@ -54,16 +55,16 @@ class PetRenderer {
 
     // ------------------------------------------------------------------ shared helpers
 
-    private fun shaderFill(s: Shader) {
+    internal fun shaderFill(s: Shader) {
         fill.color = Color.WHITE
         fill.shader = s
     }
 
-    private fun radial(cx: Float, cy: Float, r: Float, colors: IntArray, stops: FloatArray? = null): RadialGradient =
+    internal fun radial(cx: Float, cy: Float, r: Float, colors: IntArray, stops: FloatArray? = null): RadialGradient =
         RadialGradient(cx, cy, max(r, 0.5f), colors, stops, Shader.TileMode.CLAMP)
 
     /** Fills a path with a soft light-from-top-left gradient and an optional thin outline. */
-    private fun shaded(c: Canvas, p: Path, light: Int, base: Int, dark: Int, outline: Boolean = true) {
+    internal fun shaded(c: Canvas, p: Path, light: Int, base: Int, dark: Int, outline: Boolean = true) {
         p.computeBounds(rect, false)
         val w = rect.width()
         val h = rect.height()
@@ -78,14 +79,14 @@ class PetRenderer {
         if (outline) outline(c, p, dark)
     }
 
-    private fun outline(c: Canvas, p: Path, dark: Int) {
+    internal fun outline(c: Canvas, p: Path, dark: Int) {
         line.shader = null
         line.color = Colors.alpha(Colors.darken(dark, 0.3f), 0.45f)
         line.strokeWidth = u * 0.016f
         c.drawPath(p, line)
     }
 
-    private fun gloss(c: Canvas, x: Float, y: Float, rx: Float, ry: Float, a: Float = 0.8f, rot: Float = -25f) {
+    internal fun gloss(c: Canvas, x: Float, y: Float, rx: Float, ry: Float, a: Float = 0.8f, rot: Float = -25f) {
         c.save()
         c.rotate(rot, x, y)
         c.scale(1f, ry / max(rx, 0.1f), x, y)
@@ -95,14 +96,14 @@ class PetRenderer {
         c.restore()
     }
 
-    private fun stroke(c: Canvas, p: Path, color: Int, width: Float) {
+    internal fun stroke(c: Canvas, p: Path, color: Int, width: Float) {
         line.shader = null
         line.color = color
         line.strokeWidth = max(0.8f, width)
         c.drawPath(p, line)
     }
 
-    private fun ovalPath(p: Path, l: Float, t: Float, r: Float, b: Float): Path {
+    internal fun ovalPath(p: Path, l: Float, t: Float, r: Float, b: Float): Path {
         p.reset()
         p.addOval(l, t, r, b, Path.Direction.CW)
         return p
@@ -193,13 +194,18 @@ class PetRenderer {
         c.scale(sx, sy)
 
         if (look.level >= 25 && silhouette == null) drawAura(c, bw, bh, cy, pose.t, col.accent)
+        if (fl.aura != Aura.NONE && silhouette == null) drawAuraFx(c, fl, bw, bh, cy, pose.t)
+        if (fl.ring) drawRing(c, fl, bw, bh, cy, front = false)
         drawBack(c, fl, look, pose, bw, bh, top, cy, fx)
         if (fl.feet && lying < 0.6f) drawFeet(c, col, pose, bw, footH)
         drawBody(c, fl, look, pose, bw, bh, bottom, top, cy, fx)
         drawFace(c, fl, pose, bw, bh, cy, fx)
+        if (fl.ring) drawRing(c, fl, bw, bh, cy, front = true)
         drawFront(c, fl, look, pose, bw, bh, top, cy, fx)
         drawAccessories(c, look, pose, bw, bh, top, cy, fx)
-        if (lying < 0.5f) drawArms(c, col, pose, bw, bh, cy, fx)
+        if (lying < 0.5f) {
+            if (fl.claws) drawClaws(c, fl, pose, bw, bh, cy, fx) else drawArms(c, col, pose, bw, bh, cy, fx)
+        }
         if (pose.foam > 0.01f) drawFoam(c, pose, bw, top, fx)
         if (fl.sparkles && silhouette == null) drawSparkles(c, bw, bh, cy, pose.t)
 
@@ -230,8 +236,11 @@ class PetRenderer {
 
     private fun earHeight(fl: FormLook): Float = when {
         fl.ears == Ears.BUNNY -> u * 0.6f
-        fl.antenna != Antenna.NONE -> u * 0.35f
-        fl.horns || fl.ears == Ears.CAT -> u * 0.25f
+        fl.antenna == Antenna.WITCH -> u * 0.8f
+        fl.antlers -> u * 0.6f
+        fl.antenna != Antenna.NONE && fl.antenna != Antenna.RAYS && fl.antenna != Antenna.PEARL -> u * 0.35f
+        fl.horns || fl.ears == Ears.CAT || fl.ears == Ears.FOX || fl.ears == Ears.BAT || fl.ears == Ears.HORSE -> u * 0.25f
+        fl.shape == Shape.DROP -> u * 0.2f
         else -> 0f
     }
 
@@ -239,7 +248,7 @@ class PetRenderer {
 
     private fun drawBody(c: Canvas, fl: FormLook, look: PetLook, pose: PetPose, bw: Float, bh: Float, bottom: Float, top: Float, cy: Float, fx: Float) {
         val col = fl.colors
-        buildBody(body, bw, bh, bottom, fl.ghost, pose.t)
+        if (!buildShapedBody(body, fl, bw, bh, bottom, pose.t)) buildBody(body, bw, bh, bottom, fl.ghost, pose.t)
 
         // Base: light from the top left, turning slightly with the head.
         val lx = -bw * 0.38f + fx * 0.3f
@@ -261,6 +270,8 @@ class PetRenderer {
         c.drawCircle(bx, by, bellyW, fill)
         fill.shader = null
         c.restore()
+        drawPatternPart(c, fl, pose, bw, bh, top, bottom, cy, fx)
+        if (fl.jelly) drawJelly(c, fl, bw, bh, top, cy, pose.t)
         // Dirt smudges
         if (look.dirty) {
             fill.color = Colors.alpha(0xFF8D6A4A.toInt(), 0.22f)
@@ -365,6 +376,9 @@ class PetRenderer {
         val t = pose.t
         val lag = pose.earLag
 
+        if (look.neck == "neck_cape") drawCapeBehind(c, pose, bw, bh, cy)
+        drawBackPart(c, fl, pose, bw, bh, top, cy, fx)
+        if (fl.tail != Tail.NONE && fl.tail != Tail.DRAGON) drawTailPart(c, fl, pose, bw, bh, cy)
         if (fl.tail == Tail.DRAGON) {
             val side = if (pose.turn > 0.05f) -1f else 1f
             val wag = sin(t * 3f) * bh * 0.14f
@@ -439,6 +453,7 @@ class PetRenderer {
                 }
                 c.restore()
             }
+            else -> drawWingsPart(c, fl, pose, bw, bh, cy, flap)
         }
 
         when (fl.ears) {
@@ -485,6 +500,7 @@ class PetRenderer {
                 ovalPath(path2, x - r * 0.55f, y - r * 0.55f, x + r * 0.55f, y + r * 0.55f)
                 shaded(c, path2, Colors.lighten(col.accent, 0.35f), col.accent, Colors.darken(col.accent, 0.2f), outline = false)
             }
+            else -> drawEarsPart(c, fl, pose, bw, bh, top, cy, fx)
         }
 
         if (fl.spikes) {
@@ -496,6 +512,8 @@ class PetRenderer {
                 shaded(c, path, Colors.lighten(col.accent, 0.35f), col.accent, Colors.darken(col.accent, 0.3f))
             }
         }
+
+        if (fl.antlers) drawAntlers(c, fl, pose, bw, bh, top, fx)
 
         if (fl.horns) {
             for (s in intArrayOf(-1, 1)) {
@@ -551,6 +569,7 @@ class PetRenderer {
                     shaded(c, path, Color.WHITE, col.accent, Colors.darken(col.accent, 0.25f), outline = false)
                 }
             }
+            else -> if (!fl.antenna.cap && fl.antenna != Antenna.PEARL) drawTopPart(c, fl, pose, bw, bh, top, fx)
         }
     }
 
@@ -575,11 +594,15 @@ class PetRenderer {
             path.close()
             shaded(c, path, Colors.lighten(col.accent, 0.3f), col.accent, Colors.darken(col.accent, 0.25f))
         }
+        if (look.hat == null) {
+            if (fl.antenna.cap) drawCapTop(c, fl, pose, bw, bh, top, cy, fx)
+            else if (fl.antenna == Antenna.PEARL) drawTopPart(c, fl, pose, bw, bh, top, fx)
+        }
         if (fl.crown && look.hat == null) drawCrown(c, top + bh * 0.1f, bw * 0.42f, u * 0.3f, fx)
         if (pose.nightCap > 0.01f && look.hat == null) drawNightCap(c, top, bw, bh, fx, pose)
     }
 
-    private fun drawCrown(c: Canvas, base: Float, w: Float, h: Float, fx: Float) {
+    internal fun drawCrown(c: Canvas, base: Float, w: Float, h: Float, fx: Float) {
         val x0 = fx * 0.4f
         path.reset()
         path.moveTo(x0 - w, base)
@@ -597,7 +620,7 @@ class PetRenderer {
         gem(c, x0, base - h, h * 0.1f, 0xFFFFF3C4.toInt())
     }
 
-    private fun gem(c: Canvas, x: Float, y: Float, r: Float, color: Int) {
+    internal fun gem(c: Canvas, x: Float, y: Float, r: Float, color: Int) {
         ovalPath(path2, x - r, y - r, x + r, y + r)
         shaded(c, path2, Colors.lighten(color, 0.6f), color, Colors.darken(color, 0.35f), outline = false)
     }
@@ -647,6 +670,8 @@ class PetRenderer {
         val ey = cy - bh * 0.1f
         val lx = pose.lookX.coerceIn(-1f, 1f) * re * 0.22f
         val ly = pose.lookY.coerceIn(-1f, 1f) * re * 0.18f
+
+        if (fl.faceplate) drawFaceplate(c, fl, bw, bh, cy, fx)
 
         // Cheeks
         val blush = pose.blush.coerceIn(0f, 1f)
@@ -698,7 +723,13 @@ class PetRenderer {
             fill.shader = null
         }
 
-        drawMouth(c, col, pose, fx, cy + bh * 0.26f, u * 0.075f)
+        drawMuzzle(c, fl, pose, bw, bh, cy, fx)
+        val closed = pose.mouth == MouthShape.CAT || pose.mouth == MouthShape.SMILE || pose.mouth == MouthShape.FLAT ||
+            pose.mouth == MouthShape.FROWN || pose.mouth == MouthShape.WAVY
+        if (!(fl.muzzle == Muzzle.BEAK && closed)) {
+            drawMouth(c, col, pose, fx, cy + bh * (if (fl.muzzle == Muzzle.BEAK) 0.36f else 0.26f), u * 0.075f)
+        }
+        drawFangs(c, fl, bh, cy, fx)
     }
 
     private fun drawEye(c: Canvas, fl: FormLook, pose: PetPose, x: Float, y: Float, re: Float, lx: Float, ly: Float, side: Int) {
@@ -960,6 +991,8 @@ class PetRenderer {
                 path.lineTo(bx + u * 0.045f, by + u * 0.03f)
                 stroke(c, path, 0xFF8A5A00.toInt(), u * 0.02f)
             }
+            null -> Unit
+            else -> look.neck?.let { drawExtraNeck(c, it, pose, bw, bh, cy, fx) }
         }
 
         when (look.face) {
@@ -1012,6 +1045,8 @@ class PetRenderer {
                 path.lineTo(fx + ex - re * 1.2f, ey - re * 0.3f)
                 stroke(c, path, 0xFFD13A78.toInt(), u * 0.035f)
             }
+            null -> Unit
+            else -> look.face?.let { drawExtraFace(c, it, pose, bw, bh, cy, fx) }
         }
 
         val hx = fx * 0.45f
@@ -1112,6 +1147,8 @@ class PetRenderer {
                 shaded(c, path, 0xFF7E70F0.toInt(), 0xFF4636B8.toInt(), 0xFF261A7A.toInt())
             }
             "hat_crown" -> drawCrown(c, top + bh * 0.1f, bw * 0.46f, u * 0.34f, fx)
+            null -> Unit
+            else -> look.hat?.let { drawExtraHat(c, it, pose, bw, bh, top, fx) }
         }
 
         // Held item (e.g. food) in the arms
@@ -1126,7 +1163,7 @@ class PetRenderer {
     // ------------------------------------------------------------------ egg
 
     private fun drawEgg(c: Canvas, cx: Float, groundY: Float, look: PetLook, pose: PetPose, silhouette: Int?) {
-        val col = look.formLook.colors
+        val col = Looks.egg(look.line)
         val ew = u * 0.6f * (1f - 0.02f * pose.breath)
         val eh = u * 0.78f * (1f + 0.02f * pose.breath)
         bounds.set(cx - ew * 1.4f, groundY - eh * 2.3f, cx + ew * 1.4f, groundY)
@@ -1160,6 +1197,9 @@ class PetRenderer {
         fill.shader = null
         c.save()
         c.clipPath(path)
+        if (look.line != EggLine.KNUFFEL) {
+            drawEggDecor(c, look.line, col, ew, eh, pose.t)
+        } else {
         path2.reset()
         val bandY = -eh * 0.95f
         val zw = ew * 0.25f
@@ -1182,6 +1222,7 @@ class PetRenderer {
             val sr = spots[i * 3 + 2] * ew
             ovalPath(path3, sx - sr, sy - sr, sx + sr, sy + sr)
             shaded(c, path3, Colors.lighten(col.accent, 0.4f), col.accent, Colors.darken(col.accent, 0.2f), outline = false)
+        }
         }
         // ambient occlusion
         shaderFill(LinearGradient(0f, -eh * 0.6f, 0f, 0f, Colors.alpha(col.shade, 0f), Colors.alpha(Colors.darken(col.shade, 0.2f), 0.5f), Shader.TileMode.CLAMP))
@@ -1215,6 +1256,7 @@ class PetRenderer {
             stroke(c, path2, Colors.alpha(Color.WHITE, 0.6f), u * 0.015f)
             c.restore()
         }
+        if (look.shiny && silhouette == null) drawSparkles(c, ew, eh * 0.7f, -eh, pose.t)
         c.restoreToCount(save)
     }
 

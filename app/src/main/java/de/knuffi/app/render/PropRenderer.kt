@@ -156,12 +156,14 @@ class PropRenderer : Painter() {
 
     // ------------------------------------------------------------------ bed / nest
 
-    fun bedBack(c: Canvas, x: Float, groundY: Float, s: Float, cozy: Boolean) {
+    fun bedBack(c: Canvas, x: Float, groundY: Float, s: Float, cozy: Boolean, style: String = "bed_classic") {
         val w = s * 1.36f
         val l = x - w / 2f
         val r = x + w / 2f
         ellipseShadow(c, x, groundY, w * 0.62f, s * 0.07f, 0.3f)
-        if (cozy) {
+        if (cozy && style != "bed_classic") {
+            styledBedBack(c, x, groundY, s, l, r, style)
+        } else if (cozy) {
             // headboard with heart
             box(c, l - s * 0.05f, groundY - s * 0.7f, l + s * 0.09f, groundY, s * 0.05f, 0xFFE9B384.toInt(), 0xFFB9774A.toInt())
             fill.color = 0xFFB9774A.toInt()
@@ -192,10 +194,17 @@ class PropRenderer : Painter() {
         }
     }
 
-    fun bedFront(c: Canvas, x: Float, groundY: Float, s: Float, blanket: Float, cozy: Boolean, t: Float) {
+    fun bedFront(c: Canvas, x: Float, groundY: Float, s: Float, blanket: Float, cozy: Boolean, t: Float, style: String = "bed_classic") {
         val w = s * 1.36f
         val l = x - w / 2f
         val r = x + w / 2f
+        val bc = when {
+            !cozy -> intArrayOf(0xFFB8C8FF.toInt(), 0xFF8C9CF4.toInt(), 0xFF5463C7.toInt())
+            style == "bed_race" -> intArrayOf(0xFFA8D0FF.toInt(), 0xFF4C8DFF.toInt(), 0xFF22509E.toInt())
+            style == "bed_canopy" -> intArrayOf(0xFFFFD0E4.toInt(), 0xFFFF8FB8.toInt(), 0xFFC24A7E.toInt())
+            style == "bed_cloud" -> intArrayOf(0xFFE8F4FF.toInt(), 0xFFB0D4FF.toInt(), 0xFF6A98D8.toInt())
+            else -> intArrayOf(0xFFB8C8FF.toInt(), 0xFF8C9CF4.toInt(), 0xFF5463C7.toInt())
+        }
         if (blanket > 0.01f) {
             val top = groundY - s * 0.3f - s * 0.13f
             val left = r - (r - (x - s * 0.36f)) * blanket
@@ -206,7 +215,7 @@ class PropRenderer : Painter() {
             path.lineTo(r + s * 0.02f, groundY - s * 0.12f)
             path.quadTo(left + (r - left) * 0.5f, groundY - s * 0.06f, left - s * 0.02f, groundY - s * 0.12f)
             path.close()
-            shaded(c, path, 0xFFB8C8FF.toInt(), 0xFF8C9CF4.toInt(), 0xFF5463C7.toInt(), outlineW = s * 0.008f)
+            shaded(c, path, bc[0], bc[1], bc[2], outlineW = s * 0.008f)
             c.save()
             c.clipPath(path)
             fill.color = Colors.alpha(Color.WHITE, 0.55f)
@@ -229,8 +238,118 @@ class PropRenderer : Painter() {
             c.restore()
         }
         if (cozy) {
-            box(c, r - s * 0.08f, groundY - s * 0.42f, r + s * 0.05f, groundY, s * 0.04f, 0xFFE9B384.toInt(), 0xFFB9774A.toInt())
+            when (style) {
+                "bed_cloud" -> {
+                    Shapes.cloud(path, r - s * 0.05f, groundY - s * 0.2f, s * 0.22f)
+                    shaded(c, path, Color.WHITE, 0xFFF0F6FF.toInt(), 0xFFB8CCE8.toInt(), outlineW = s * 0.006f)
+                }
+                "bed_race" -> {
+                    wheel(c, r - s * 0.2f, groundY - s * 0.07f, s * 0.1f, t)
+                    path.reset()
+                    path.addRoundRect(r - s * 0.12f, groundY - s * 0.32f, r + s * 0.08f, groundY - s * 0.1f, s * 0.06f, s * 0.06f, Path.Direction.CW)
+                    shaded(c, path, 0xFFFF8A8A.toInt(), 0xFFE0303F.toInt(), 0xFF8E1422.toInt(), outlineW = s * 0.006f)
+                    fill.color = 0xFFFFF2A0.toInt()
+                    c.drawCircle(r + s * 0.03f, groundY - s * 0.24f, s * 0.035f, fill)
+                }
+                "bed_canopy" -> {
+                    box(c, r - s * 0.06f, groundY - s * 1.05f, r + s * 0.02f, groundY, s * 0.03f, 0xFFFFFFFF.toInt(), 0xFFE0C8D8.toInt())
+                    path.reset()
+                    path.moveTo(r - s * 0.3f, groundY - s * 1.02f)
+                    path.quadTo(r - s * 0.05f, groundY - s * 0.7f, r + s * 0.02f, groundY - s * 0.45f)
+                    path.lineTo(r + s * 0.06f, groundY - s * 0.45f)
+                    path.lineTo(r + s * 0.06f, groundY - s * 1.02f)
+                    path.close()
+                    fill.shader = null
+                    fill.color = Colors.alpha(0xFFFFB3D1.toInt(), 0.7f)
+                    c.drawPath(path, fill)
+                    box(c, r - s * 0.07f, groundY - s * 1.1f, r + s * 0.03f, groundY - s * 1.04f, s * 0.02f, 0xFFFFE08A.toInt(), 0xFFC98C1B.toInt())
+                }
+                else -> box(c, r - s * 0.08f, groundY - s * 0.42f, r + s * 0.05f, groundY, s * 0.04f, 0xFFE9B384.toInt(), 0xFFB9774A.toInt())
+            }
         }
+    }
+
+    private fun wheel(c: Canvas, x: Float, y: Float, r: Float, t: Float) {
+        path.reset()
+        path.addCircle(x, y, r, Path.Direction.CW)
+        shaded(c, path, 0xFF6A6A7A.toInt(), 0xFF2A2A34.toInt(), 0xFF101014.toInt(), outlineW = r * 0.05f)
+        path.reset()
+        path.addCircle(x, y, r * 0.5f, Path.Direction.CW)
+        shaded(c, path, Color.WHITE, 0xFFC8D0E0.toInt(), 0xFF7A84A0.toInt(), outline = false)
+    }
+
+    private fun styledBedBack(c: Canvas, x: Float, groundY: Float, s: Float, l: Float, r: Float, style: String) {
+        when (style) {
+            "bed_cloud" -> {
+                Shapes.cloud(path, l + s * 0.12f, groundY - s * 0.55f, s * 0.3f)
+                shaded(c, path, Color.WHITE, 0xFFF0F6FF.toInt(), 0xFFB8CCE8.toInt(), outlineW = s * 0.006f)
+                box(c, l, groundY - s * 0.2f, r, groundY - s * 0.05f, s * 0.07f, 0xFFE8F2FF.toInt(), 0xFFB0C8E8.toInt())
+                for (k in 0..3) {
+                    path.reset()
+                    path.addCircle(l + s * 0.15f + k * (r - l - s * 0.3f) / 3f, groundY - s * 0.06f, s * 0.07f, Path.Direction.CW)
+                    shaded(c, path, Color.WHITE, 0xFFF0F6FF.toInt(), 0xFFB8CCE8.toInt(), outline = false)
+                }
+            }
+            "bed_race" -> {
+                path.reset()
+                path.moveTo(l - s * 0.04f, groundY - s * 0.5f)
+                path.lineTo(l + s * 0.2f, groundY - s * 0.5f)
+                path.lineTo(l + s * 0.2f, groundY - s * 0.45f)
+                path.lineTo(l + s * 0.06f, groundY - s * 0.42f)
+                path.lineTo(l + s * 0.06f, groundY - s * 0.2f)
+                path.lineTo(l, groundY - s * 0.2f)
+                path.close()
+                shaded(c, path, 0xFF6A6A7A.toInt(), 0xFF2A2A34.toInt(), 0xFF101014.toInt(), outlineW = s * 0.006f)
+                path.reset()
+                path.addRoundRect(l, groundY - s * 0.3f, r, groundY - s * 0.08f, s * 0.08f, s * 0.08f, Path.Direction.CW)
+                shaded(c, path, 0xFFFF8A8A.toInt(), 0xFFE0303F.toInt(), 0xFF8E1422.toInt(), outlineW = s * 0.006f)
+                fill.shader = null
+                fill.color = Color.WHITE
+                c.drawRect(l + s * 0.05f, groundY - s * 0.22f, r - s * 0.05f, groundY - s * 0.18f, fill)
+                fill.color = 0xFF1A1A24.toInt()
+                c.drawCircle(x, groundY - s * 0.19f, s * 0.05f, fill)
+                text.textSize = s * 0.07f
+                text.color = Color.WHITE
+                c.drawText("1", x, groundY - s * 0.165f, text)
+                wheel(c, l + s * 0.2f, groundY - s * 0.07f, s * 0.1f, 0f)
+                box(c, l + s * 0.04f, groundY - s * 0.36f, r - s * 0.04f, groundY - s * 0.26f, s * 0.05f, 0xFFFFFFFF.toInt(), 0xFFE3E4F4.toInt())
+                path.reset()
+                path.addRoundRect(l + s * 0.08f, groundY - s * 0.46f, l + s * 0.42f, groundY - s * 0.32f, s * 0.07f, s * 0.07f, Path.Direction.CW)
+                shaded(c, path, Color.WHITE, 0xFFF4F1FF.toInt(), 0xFFC9C3E8.toInt(), outlineW = s * 0.006f)
+                return
+            }
+            "bed_canopy" -> {
+                box(c, l - s * 0.04f, groundY - s * 1.05f, l + s * 0.04f, groundY, s * 0.03f, 0xFFFFFFFF.toInt(), 0xFFE0C8D8.toInt())
+                box(c, l - s * 0.06f, groundY - s * 1.12f, r + s * 0.04f, groundY - s * 1.03f, s * 0.03f, 0xFFFFE08A.toInt(), 0xFFC98C1B.toInt())
+                path.reset()
+                path.moveTo(l, groundY - s * 1.03f)
+                var px = l
+                val n = 5
+                val seg = (r - l) / n
+                for (k in 0 until n) {
+                    path.quadTo(px + seg / 2f, groundY - s * 0.9f, px + seg, groundY - s * 1.03f)
+                    px += seg
+                }
+                path.close()
+                shaded(c, path, 0xFFFFE0EE.toInt(), 0xFFFFB3D1.toInt(), 0xFFD86A9E.toInt(), outlineW = s * 0.005f)
+                path.reset()
+                path.moveTo(l + s * 0.04f, groundY - s * 1.02f)
+                path.quadTo(l + s * 0.1f, groundY - s * 0.7f, l + s * 0.04f, groundY - s * 0.45f)
+                path.lineTo(l - s * 0.06f, groundY - s * 0.45f)
+                path.lineTo(l - s * 0.06f, groundY - s * 1.02f)
+                path.close()
+                fill.shader = null
+                fill.color = Colors.alpha(0xFFFFB3D1.toInt(), 0.7f)
+                c.drawPath(path, fill)
+                box(c, l, groundY - s * 0.19f, r, groundY - s * 0.06f, s * 0.03f, 0xFFFFFFFF.toInt(), 0xFFE8D0DE.toInt())
+                box(c, l + s * 0.02f, groundY - s * 0.07f, l + s * 0.08f, groundY, s * 0.015f, 0xFFFFE08A.toInt(), 0xFFC98C1B.toInt())
+            }
+        }
+        // mattress & pillow
+        box(c, l + s * 0.02f, groundY - s * 0.3f, r - s * 0.02f, groundY - s * 0.16f, s * 0.06f, 0xFFFFFFFF.toInt(), 0xFFE3E4F4.toInt())
+        path.reset()
+        path.addRoundRect(l + s * 0.06f, groundY - s * 0.42f, l + s * 0.42f, groundY - s * 0.27f, s * 0.07f, s * 0.07f, Path.Direction.CW)
+        shaded(c, path, Color.WHITE, 0xFFF4F1FF.toInt(), 0xFFC9C3E8.toInt(), outlineW = s * 0.006f)
     }
 
     // ------------------------------------------------------------------ bath tub

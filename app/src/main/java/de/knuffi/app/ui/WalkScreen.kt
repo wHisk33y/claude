@@ -60,6 +60,7 @@ import de.knuffi.app.render.PetRenderer
 import de.knuffi.app.steps.StepTracker
 import de.knuffi.app.ui.components.ClayTextButton
 import de.knuffi.app.ui.components.EmojiTile
+import de.knuffi.app.ui.components.GlassIconButton
 import de.knuffi.app.ui.components.SectionHeader
 import de.knuffi.app.ui.components.SurfaceCard
 import de.knuffi.app.ui.components.lighter
@@ -75,7 +76,7 @@ import kotlin.math.max
 import kotlin.math.sin
 
 @Composable
-fun WalkScreen(state: GameState) {
+fun WalkScreen(state: GameState, onBack: () -> Unit) {
     val context = LocalContext.current
     val p = LocalPalette.current
     var hasPermission by remember { mutableStateOf(StepTracker.hasPermission(context)) }
@@ -102,16 +103,22 @@ fun WalkScreen(state: GameState) {
                     .shadow(10.dp, RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp))
                     .clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp)),
             )
-            Text(
-                "Gassi gehen",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    shadow = Shadow(Color(0x88000000), offset = Offset(0f, 3f), blurRadius = 10f),
-                ),
-                color = Color.White,
-                modifier = Modifier
+            Row(
+                Modifier
                     .statusBarsPadding()
-                    .padding(start = 20.dp, top = 10.dp),
-            )
+                    .padding(start = 12.dp, top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                GlassIconButton("⬅️", onBack)
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    "Gassi gehen",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        shadow = Shadow(Color(0x88000000), offset = Offset(0f, 3f), blurRadius = 10f),
+                    ),
+                    color = Color.White,
+                )
+            }
         }
         Column(Modifier.padding(horizontal = 16.dp)) {
             SurfaceCard(

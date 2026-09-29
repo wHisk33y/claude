@@ -19,6 +19,7 @@ class SceneModel {
     var look: PetLook? = null
     var needs: List<Need> = emptyList()
     var showBubble: Boolean = true
+    var furniture: Furnishing = Furnishing()
 }
 
 /**
@@ -66,12 +67,12 @@ class SceneRenderer {
         cacheKey = ""
     }
 
-    private fun ensureCache(w: Float, h: Float, roomId: String, kind: LayoutKind) {
-        val key = "${w.toInt()}x${h.toInt()}:$roomId:$kind"
+    private fun ensureCache(w: Float, h: Float, roomId: String, kind: LayoutKind, f: Furnishing) {
+        val key = "${w.toInt()}x${h.toInt()}:$roomId:$kind:${f.key}"
         if (key == cacheKey && cache != null) return
         cache?.recycle()
         val bmp = Bitmap.createBitmap(max(1, w.toInt()), max(1, h.toInt()), Bitmap.Config.ARGB_8888)
-        room.drawStatic(Canvas(bmp), layout, roomId)
+        room.drawStatic(Canvas(bmp), layout, roomId, f)
         cache = bmp
         cacheKey = key
     }
@@ -79,10 +80,11 @@ class SceneRenderer {
     fun draw(c: Canvas, w: Float, h: Float, kind: LayoutKind, m: SceneModel, d: PetDirector, ps: ParticleSystem?, t: Float) {
         configure(d, w, h, kind)
         val L = layout
-        ensureCache(w, h, m.room, kind)
+        val f = m.furniture
+        ensureCache(w, h, m.room, kind, f)
         room.drawBehind(c, L, m.room, m.hour, t, m.weather)
         cache?.let { c.drawBitmap(it, 0f, 0f, bitmapPaint) }
-        room.drawAnimated(c, L, m.room, m.hour, t)
+        room.drawAnimated(c, L, m.room, m.hour, t, f)
 
         val look = m.look
         val cozy = room.isCozy(m.room)
@@ -100,12 +102,12 @@ class SceneRenderer {
         val petInFront = z < 0.5f
 
         // Back props
-        props.bedBack(c, L.bedX * w, backY, bedS, cozy)
+        props.bedBack(c, L.bedX * w, backY, bedS, cozy, f.bed)
         props.bowlBack(c, L.bowlX * w, backY, propS)
         pr.food?.let { props.food(c, L.bowlX * w, backY, propS, it, pr.bites, pr.foodPop) }
         if (petInFront) {
             props.bowlFront(c, L.bowlX * w, backY, propS)
-            props.bedFront(c, L.bedX * w, backY, bedS, pr.blanket, cozy, t)
+            props.bedFront(c, L.bedX * w, backY, bedS, pr.blanket, cozy, t, f.bed)
         }
 
         // Poops on the floor
@@ -136,14 +138,14 @@ class SceneRenderer {
 
         if (!petInFront) {
             props.bowlFront(c, L.bowlX * w, backY, propS)
-            props.bedFront(c, L.bedX * w, backY, bedS, pr.blanket, cozy, t)
+            props.bedFront(c, L.bedX * w, backY, bedS, pr.blanket, cozy, t, f.bed)
         }
         if (pr.tub > 0.01f) props.tubFront(c, pr.tubX * w, L.groundY, L.petSize, pr.tub, if (pr.inTub) 1f else 0.5f, t)
         if (pr.ball) props.ball(c, pr.bx * w, L.groundY, pr.by * L.petSize, L.petSize * 0.13f, pr.brot, pr.ballAlpha)
         pr.pill?.let { props.floatingItem(c, pr.pillX * w, ground - pr.pillY * petSize, petSize * 0.2f, it, t) }
         for (i in 0 until m.poops.coerceAtMost(3)) props.stink(c, poopX(i) * w, poopBottom, poopR, t, i)
 
-        room.drawLighting(c, L, m.room, m.hour, t, m.lightsOff, m.darkUi)
+        room.drawLighting(c, L, m.room, m.hour, t, m.lightsOff, m.darkUi, f)
         ps?.draw(c, w, h)
 
         val bubble = d.bubble

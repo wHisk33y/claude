@@ -78,8 +78,12 @@ class RoomRenderer : Painter() {
     private val starField: FloatArray = Random(7).let { r -> FloatArray(300) { r.nextFloat() } }
     private val clear = Paint(Paint.ANTI_ALIAS_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR) }
     private val path3 = Path()
+    private val furniture = FurnitureRenderer()
     private var vignette: RadialGradient? = null
     private var vignetteKey = 0f
+
+    private fun lampX(L: SceneLayout) = L.w * 0.53f
+    private fun lampY(L: SceneLayout) = L.window.top + L.window.height() * 0.2f
 
     fun isCozy(room: String) = room == "room_cozy" || room !in setOf("room_forest", "room_ocean", "room_space", "room_candy")
 
@@ -285,18 +289,19 @@ class RoomRenderer : Painter() {
     }
 
     /** Cached static layer (transparent where the sky shows through). */
-    fun drawStatic(c: Canvas, L: SceneLayout, room: String) {
+    fun drawStatic(c: Canvas, L: SceneLayout, room: String, f: Furnishing = Furnishing()) {
         when (room) {
             "room_forest" -> staticForest(c, L)
             "room_ocean" -> staticOcean(c, L)
             "room_space" -> staticSpace(c, L)
             "room_candy" -> staticCandy(c, L)
-            else -> staticCozy(c, L)
+            else -> staticCozy(c, L, f)
         }
     }
 
     /** Animated parts that sit in front of the static layer but behind the pet. */
-    fun drawAnimated(c: Canvas, L: SceneLayout, room: String, hour: Float, t: Float) {
+    fun drawAnimated(c: Canvas, L: SceneLayout, room: String, hour: Float, t: Float, f: Furnishing = Furnishing()) {
+        if (isCozy(room)) f.event?.let { furniture.garland(c, L, it, t) }
         val w = L.w
         val h = L.h
         val dark = darkness(hour)
@@ -435,7 +440,7 @@ class RoomRenderer : Painter() {
     }
 
     /** Light, time of day and vignette on top of everything (except particles & UI). */
-    fun drawLighting(c: Canvas, L: SceneLayout, room: String, hour: Float, t: Float, lightsOff: Boolean, darkUi: Boolean) {
+    fun drawLighting(c: Canvas, L: SceneLayout, room: String, hour: Float, t: Float, lightsOff: Boolean, darkUi: Boolean, f: Furnishing = Furnishing()) {
         val w = L.w
         val h = L.h
         val dark = darkness(hour)
@@ -482,11 +487,13 @@ class RoomRenderer : Painter() {
             c.drawRect(0f, 0f, w, h, fill)
         }
         if (cozy && !lightsOff && dark > 0.15f) {
-            // warm lamp glow from the wall sconce
-            val lx = w * 0.53f
-            val ly = L.window.top + L.window.height() * 0.2f
+            // warm glow from the lamp
+            val lx = lampX(L)
+            val ly = lampY(L) + if (f.lamp == "lamp_lava") L.h * 0.02f else 0f
             val gr = w * 0.55f
-            shader(radial(lx, ly, gr, intArrayOf(Colors.alpha(0xFFFFD18A.toInt(), 0.42f * dark), Colors.alpha(0xFFFFB85C.toInt(), 0.12f * dark), Colors.alpha(0xFFFFB85C.toInt(), 0f)), floatArrayOf(0f, 0.45f, 1f)))
+            val glow = furniture.lampGlow(f.lamp)
+            val pulse = if (f.lamp == "lamp_lava") 0.85f + 0.15f * sin(t * 1.3f) else 1f
+            shader(radial(lx, ly, gr, intArrayOf(Colors.alpha(glow, 0.42f * dark * pulse), Colors.alpha(glow, 0.12f * dark), Colors.alpha(glow, 0f)), floatArrayOf(0f, 0.45f, 1f)))
             c.drawCircle(lx, ly, gr, fill)
             fill.shader = null
             c.save()
@@ -519,55 +526,14 @@ class RoomRenderer : Painter() {
 
     // ------------------------------------------------------------------ cozy room
 
-    private fun staticCozy(c: Canvas, L: SceneLayout) {
+    private fun staticCozy(c: Canvas, L: SceneLayout, f: Furnishing) {
         val w = L.w
         val h = L.h
         val fy = L.floorY
         val win = L.window
-        // wall
-        vgrad(c, 0f, 0f, w, fy, 0xFFFFF2E8.toInt(), 0xFFFFE0D2.toInt())
-        fill.shader = null
-        fill.color = Colors.alpha(Color.WHITE, 0.35f)
-        var sx = 0f
-        while (sx < w) {
-            c.drawRect(sx, 0f, sx + w * 0.035f, fy, fill)
-            sx += w * 0.1f
-        }
-        fill.color = Colors.alpha(0xFFFF9EC4.toInt(), 0.22f)
-        var row = 0
-        var py = h * 0.03f
-        while (py < fy - h * 0.14f) {
-            var px = if (row % 2 == 0) w * 0.05f else w * 0.1f
-            while (px < w) {
-                for (k in 0 until 4) {
-                    val a = k * PI.toFloat() / 2f
-                    c.drawCircle(px + cos(a) * w * 0.006f, py + sin(a) * w * 0.006f, w * 0.005f, fill)
-                }
-                px += w * 0.1f
-            }
-            py += h * 0.045f
-            row++
-        }
-        // wainscoting
         val wt = fy - (fy - win.bottom) * 0.55f
-        vgrad(c, 0f, wt, w, fy, 0xFFF9D9E7.toInt(), 0xFFEFC2D6.toInt())
-        val panels = 5
-        val pw = w / panels
-        for (i in 0 until panels) {
-            val l = i * pw + pw * 0.12f
-            val r = (i + 1) * pw - pw * 0.12f
-            val t = wt + (fy - wt) * 0.18f
-            val b = fy - (fy - wt) * 0.22f
-            fill.color = Colors.alpha(0xFFB5708F.toInt(), 0.18f)
-            c.drawRoundRect(l, t, r, b, w * 0.01f, w * 0.01f, fill)
-            fill.color = Colors.alpha(Color.WHITE, 0.45f)
-            c.drawRoundRect(l + w * 0.004f, t + w * 0.004f, r + w * 0.004f, b + w * 0.004f, w * 0.01f, w * 0.01f, fill)
-            fill.color = 0xFFF5D0E0.toInt()
-            c.drawRoundRect(l + w * 0.003f, t + w * 0.003f, r, b, w * 0.01f, w * 0.01f, fill)
-        }
-        box(c, 0f, wt - h * 0.01f, w, wt + h * 0.004f, h * 0.003f, 0xFFFFFFFF.toInt(), 0xFFEAD5E0.toInt())
-        fill.color = Colors.alpha(0xFF7A4060.toInt(), 0.12f)
-        c.drawRect(0f, wt + h * 0.004f, w, wt + h * 0.009f, fill)
+        val style = furniture.wallStyle(f.wall)
+        furniture.wall(c, L, f.wall, wt)
 
         // floor with perspective planks
         vgrad(c, 0f, fy, w, h, 0xFFEDBA8C.toInt(), 0xFFC4865A.toInt())
@@ -599,21 +565,7 @@ class RoomRenderer : Painter() {
         // baseboard
         box(c, 0f, fy - h * 0.018f, w, fy + h * 0.002f, 0f, 0xFFFFFFFF.toInt(), 0xFFEDE3EC.toInt())
 
-        // rug
-        val rx = w * 0.36f
-        val ry = rx * 0.2f
-        val rcx = w * 0.5f
-        val rcy = L.groundY + h * 0.005f
-        ellipseShadow(c, rcx, rcy + ry * 0.2f, rx * 1.05f, ry * 1.2f, 0.25f)
-        val rugColors = intArrayOf(0xFFFF9EC4.toInt(), 0xFFFFC7DC.toInt(), 0xFFB9A8FF.toInt(), 0xFFFFE3EF.toInt())
-        for ((i, col) in rugColors.withIndex()) {
-            val k = 1f - i * 0.2f
-            path.reset()
-            path.addOval(rcx - rx * k, rcy - ry * k, rcx + rx * k, rcy + ry * k, Path.Direction.CW)
-            shader(LinearGradient(0f, rcy - ry, 0f, rcy + ry, Colors.lighten(col, 0.15f), Colors.darken(col, 0.08f), Shader.TileMode.CLAMP))
-            c.drawPath(path, fill)
-            fill.shader = null
-        }
+        furniture.rug(c, L, f.rug)
 
         // window frame with a transparent hole for the sky
         val fw = w * 0.022f
@@ -653,9 +605,10 @@ class RoomRenderer : Painter() {
         shaded(c, path, 0xFF9BE3A8.toInt(), 0xFF4FB36A.toInt(), 0xFF2B7A40.toInt(), outlineW = w * 0.002f)
         fill.color = 0xFFFF7EB6.toInt()
         c.drawCircle(cx, cy - h * 0.088f, w * 0.008f, fill)
+        f.event?.let { furniture.sillItem(c, it, win.left + win.width() * 0.3f, cy, h * 0.05f) }
         // curtains
-        curtain(c, win.left - fw * 3.5f, win.left + win.width() * 0.12f, win.top - fw * 2f, win.bottom + fw * 3f, true, w)
-        curtain(c, win.right - win.width() * 0.12f, win.right + fw * 3.5f, win.top - fw * 2f, win.bottom + fw * 3f, false, w)
+        curtain(c, win.left - fw * 3.5f, win.left + win.width() * 0.12f, win.top - fw * 2f, win.bottom + fw * 3f, true, w, style)
+        curtain(c, win.right - win.width() * 0.12f, win.right + fw * 3.5f, win.top - fw * 2f, win.bottom + fw * 3f, false, w, style)
         box(c, win.left - fw * 5f, win.top - fw * 2.8f, win.right + fw * 5f, win.top - fw * 1.8f, fw, 0xFFD8A657.toInt(), 0xFF9C6A2A.toInt(), shadow = h * 0.004f)
         for (ex in floatArrayOf(win.left - fw * 5f, win.right + fw * 5f)) {
             path.reset()
@@ -672,34 +625,14 @@ class RoomRenderer : Painter() {
         val pad = w * 0.018f
         c.save()
         c.clipRect(pl + pad, pt + pad, pr - pad, pb - pad)
-        vgrad(c, pl + pad, pt + pad, pr - pad, pb - pad, 0xFF9FD8FF.toInt(), 0xFFFFE3F1.toInt())
-        fill.color = 0xFFFFD84A.toInt()
-        c.drawCircle(pr - pad - w * 0.04f, pt + pad + w * 0.035f, w * 0.022f, fill)
-        path.reset()
-        path.moveTo(pl, pb)
-        path.quadTo(pl + (pr - pl) * 0.3f, pt + (pb - pt) * 0.45f, pl + (pr - pl) * 0.6f, pb - (pb - pt) * 0.2f)
-        path.quadTo(pl + (pr - pl) * 0.8f, pt + (pb - pt) * 0.5f, pr, pb - (pb - pt) * 0.15f)
-        path.lineTo(pr, pb)
-        path.close()
-        shader(LinearGradient(0f, pt, 0f, pb, 0xFF8EDB9E.toInt(), 0xFF3F9E5C.toInt(), Shader.TileMode.CLAMP))
-        c.drawPath(path, fill)
-        fill.shader = null
+        furniture.picture(c, f.picture, pl + pad, pt + pad, pr - pad, pb - pad)
         c.restore()
         line.color = Colors.alpha(0xFF8A5A10.toInt(), 0.4f)
         line.strokeWidth = w * 0.003f
         c.drawRect(pl + pad, pt + pad, pr - pad, pb - pad, line)
 
-        // wall sconce (glow is drawn dynamically)
-        val lx = w * 0.53f
-        val ly = win.top + win.height() * 0.2f
-        box(c, lx - w * 0.006f, ly, lx + w * 0.006f, ly + h * 0.04f, 0f, 0xFFD8A657.toInt(), 0xFF9C6A2A.toInt())
-        path.reset()
-        path.moveTo(lx - w * 0.035f, ly - h * 0.03f)
-        path.lineTo(lx + w * 0.035f, ly - h * 0.03f)
-        path.lineTo(lx + w * 0.055f, ly + h * 0.012f)
-        path.lineTo(lx - w * 0.055f, ly + h * 0.012f)
-        path.close()
-        shaded(c, path, 0xFFFFF6DF.toInt(), 0xFFFFD9A3.toInt(), 0xFFE0A75E.toInt(), outlineW = w * 0.002f)
+        // lamp (glow is drawn dynamically)
+        furniture.lamp(c, L, f.lamp, lampX(L), lampY(L))
 
         // shelf with books
         val sl = w * 0.6f
@@ -725,34 +658,11 @@ class RoomRenderer : Painter() {
         shaded(c, path, 0xFFFFF4C2.toInt(), 0xFFFFC83D.toInt(), 0xFFC08000.toInt(), outlineW = w * 0.002f)
         box(c, tx - w * 0.012f, st - h * 0.012f, tx + w * 0.012f, st, w * 0.003f, 0xFFFFD86A.toInt(), 0xFFC08000.toInt())
 
-        // big plant in the corner
-        val px0 = w * 0.06f
-        val potTop = fy - h * 0.02f
-        for (i in 0 until 7) {
-            val a = -90f + (i - 3) * 24f
-            c.save()
-            c.rotate(a, px0, potTop)
-            path.reset()
-            path.addOval(px0, potTop - h * 0.028f, px0 + h * 0.16f, potTop + h * 0.028f, Path.Direction.CW)
-            val lc = if (i % 2 == 0) 0xFF52B86E.toInt() else 0xFF3E9E5A.toInt()
-            shaded(c, path, Colors.lighten(lc, 0.35f), lc, Colors.darken(lc, 0.3f), outlineW = w * 0.002f)
-            line.color = Colors.alpha(Color.WHITE, 0.35f)
-            line.strokeWidth = w * 0.003f
-            c.drawLine(px0 + h * 0.02f, potTop, px0 + h * 0.14f, potTop, line)
-            c.restore()
-        }
-        path.reset()
-        path.moveTo(px0 - w * 0.07f, potTop)
-        path.lineTo(px0 + w * 0.07f, potTop)
-        path.lineTo(px0 + w * 0.055f, potTop + h * 0.075f)
-        path.lineTo(px0 - w * 0.055f, potTop + h * 0.075f)
-        path.close()
-        ellipseShadow(c, px0, potTop + h * 0.075f, w * 0.08f, h * 0.01f, 0.3f)
-        shaded(c, path, 0xFFFFB38A.toInt(), 0xFFE5773F.toInt(), 0xFFA84E22.toInt(), outlineW = w * 0.003f)
-        box(c, px0 - w * 0.078f, potTop - h * 0.008f, px0 + w * 0.078f, potTop + h * 0.01f, w * 0.005f, 0xFFFFB38A.toInt(), 0xFFC45E2C.toInt())
+        // plant in the corner
+        furniture.plant(c, L, f.plant)
     }
 
-    private fun curtain(c: Canvas, l: Float, r: Float, t: Float, b: Float, left: Boolean, w: Float) {
+    private fun curtain(c: Canvas, l: Float, r: Float, t: Float, b: Float, left: Boolean, w: Float, style: WallStyle) {
         val tieY = t + (b - t) * 0.62f
         path.reset()
         if (left) {
@@ -769,10 +679,10 @@ class RoomRenderer : Painter() {
             path.lineTo(r, b)
         }
         path.close()
-        shader(LinearGradient(l, 0f, r, 0f, intArrayOf(0xFFFF8FB8.toInt(), 0xFFFFB3CF.toInt(), 0xFFE86B9E.toInt(), 0xFFFFA8C8.toInt(), 0xFFE0609A.toInt()), null, Shader.TileMode.MIRROR))
+        shader(LinearGradient(l, 0f, r, 0f, style.curtain, null, Shader.TileMode.MIRROR))
         c.drawPath(path, fill)
         fill.shader = null
-        line.color = Colors.alpha(0xFFB23F72.toInt(), 0.35f)
+        line.color = Colors.alpha(style.curtainLine, 0.35f)
         line.strokeWidth = w * 0.003f
         c.drawPath(path, line)
         // sash

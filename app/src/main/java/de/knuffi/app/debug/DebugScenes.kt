@@ -46,6 +46,18 @@ import de.knuffi.app.ui.PetPortrait
 import de.knuffi.app.ui.Route
 import de.knuffi.app.ui.Tab
 import de.knuffi.app.widget.WidgetUpdater
+import de.knuffi.core.Catalog
+import de.knuffi.core.Destination
+import de.knuffi.core.EggLine
+import de.knuffi.core.EventCalendar
+import de.knuffi.core.Garden
+import de.knuffi.core.LookStyle
+import de.knuffi.core.PassState
+import de.knuffi.core.Plot
+import de.knuffi.core.SeasonEvent
+import de.knuffi.core.Stickers
+import de.knuffi.core.Trip
+import de.knuffi.core.WeeklyState
 import de.knuffi.core.Counters
 import de.knuffi.core.DailyState
 import de.knuffi.core.Difficulty
@@ -69,6 +81,9 @@ import java.time.ZoneId
 object DebugScenes {
     data class Launch(val scene: String, val state: GameState, val hour: Float?)
 
+    /** Pretends a festival is running (room decorations in screenshots). */
+    var eventOverride: SeasonEvent? = null
+
     fun fromIntent(intent: Intent?): Launch? {
         val scene = intent?.getStringExtra("debug_scene") ?: return null
         val theme = when (intent.getStringExtra("debug_theme")) {
@@ -81,17 +96,35 @@ object DebugScenes {
             "sunset" -> 19.2f
             else -> 11f
         }
-        return Launch(scene, seed(theme, scene, form), hour)
+        eventOverride = when (scene) {
+            "halloween" -> SeasonEvent.HALLOWEEN
+            "winter" -> SeasonEvent.WINTERZAUBER
+            "easter" -> SeasonEvent.OSTERN
+            "summerfest" -> SeasonEvent.SOMMERFEST
+            else -> null
+        }
+        val look = if (intent.getStringExtra("debug_look") == "abenteuer" || scene.startsWith("adventure")) LookStyle.ABENTEUER else LookStyle.ZAUBER
+        return Launch(scene, seed(theme, scene, form, look), hour)
     }
 
     fun initialRoute(scene: String?): Route = when (scene) {
         "catch" -> Route.Game(MiniGame.CATCH)
         "memory" -> Route.Game(MiniGame.MEMORY)
         "whack" -> Route.Game(MiniGame.WHACK)
+        "runner" -> Route.Game(MiniGame.RUNNER)
+        "bubbles" -> Route.Game(MiniGame.BUBBLES)
+        "simon" -> Route.Game(MiniGame.SIMON)
         "settings" -> Route.Settings
-        "gallery" -> Route.Gallery
+        "gallery", "gallery1", "gallery2", "gallery3", "gallery4", "gallery5", "gallery6", "gallery7" -> Route.Gallery
         "widget" -> Route.WidgetPreview
         "wallpaper" -> Route.WallpaperPreview
+        "walk" -> Route.Walk
+        "kuschelhaus" -> Route.Kuschelhaus
+        "album", "stickers" -> Route.Album
+        "garden" -> Route.Garden
+        "trips" -> Route.Trips
+        "pass" -> Route.Pass
+        "eventshop" -> Route.EventShop
         else -> Route.Main
     }
 
@@ -99,7 +132,7 @@ object DebugScenes {
         "games" -> Tab.GAMES
         "shop" -> Tab.SHOP
         "goals" -> Tab.GOALS
-        "walk" -> Tab.WALK
+        "world" -> Tab.WORLD
         else -> Tab.HOME
     }
 
@@ -149,8 +182,8 @@ object DebugScenes {
         }
     }
 
-    private fun seed(theme: ThemeMode, scene: String, form: Form?): GameState {
-        val settings = Settings(themeMode = theme, overlayPet = scene == "overlay")
+    private fun seed(theme: ThemeMode, scene: String, form: Form?, look: LookStyle): GameState {
+        val settings = Settings(themeMode = theme, overlayPet = scene == "overlay", look = look, batteryHintSeen = true)
         if (scene == "onboarding") return GameState(settings = settings)
         val now = System.currentTimeMillis()
         val today = TimeUtil.epochDay(now, ZoneId.systemDefault())
@@ -162,6 +195,8 @@ object DebugScenes {
             "candy" -> Form.MOCHI_KOENIG
             "sick" -> Form.HOPSI
             "evolution" -> Form.STELLARIS
+            "adventure", "halloween" -> Form.MAGMO
+            "winter" -> Form.POLARFUCHS
             else -> Form.LUMI
         }
         var pet = Pet(
@@ -176,6 +211,7 @@ object DebugScenes {
             energy = 64.0,
             hygiene = 70.0,
             health = 92.0,
+            line = chosenForm.line,
         )
         pet = when (scene) {
             "sick" -> pet.copy(sick = true, poops = 2, hygiene = 22.0, satiety = 24.0, joy = 30.0)
@@ -205,19 +241,107 @@ object DebugScenes {
             equipped[Slot.HAT] = "hat_cap"
             equipped[Slot.NECK] = "neck_scarf"
         }
+        when (scene) {
+            "furniture" -> {
+                equipped[Slot.WALL] = "wall_stars"
+                equipped[Slot.RUG] = "rug_rainbow"
+                equipped[Slot.BED] = "bed_canopy"
+                equipped[Slot.PLANT] = "plant_sunflower"
+                equipped[Slot.LAMP] = "lamp_moon"
+                equipped[Slot.PICTURE] = "pic_rocket"
+            }
+            "furniture2" -> {
+                equipped[Slot.WALL] = "wall_wood"
+                equipped[Slot.RUG] = "rug_leaf"
+                equipped[Slot.BED] = "bed_race"
+                equipped[Slot.PLANT] = "plant_cactus"
+                equipped[Slot.LAMP] = "lamp_lava"
+                equipped[Slot.PICTURE] = "pic_heart"
+            }
+            "furniture3" -> {
+                equipped[Slot.WALL] = "wall_mint"
+                equipped[Slot.RUG] = "rug_star"
+                equipped[Slot.BED] = "bed_cloud"
+                equipped[Slot.PLANT] = "plant_bonsai"
+                equipped[Slot.LAMP] = "lamp_mushroom"
+                equipped[Slot.PICTURE] = "pic_dragon"
+            }
+            "halloween" -> equipped[Slot.HAT] = "hat_witch"
+            "winter" -> {
+                equipped[Slot.HAT] = "hat_santa"
+                equipped[Slot.NECK] = "neck_starscarf"
+            }
+            "adventure" -> {
+                equipped[Slot.HAT] = "hat_explorer"
+                equipped[Slot.NECK] = "neck_cape"
+            }
+        }
+        val zone = ZoneId.systemDefault()
+        val hour = 3_600_000L
+        val date = EventCalendar.date(now, zone)
+        fun other(f: Form, name: String, ago: Int, shiny: Boolean = false, level: Int = 12) = Pet(
+            name = name, form = f, bornAt = now - ago * day, hatchedAt = now - ago * day, level = level, line = f.line, shiny = shiny,
+        )
+        val resting = listOf(
+            other(Form.DELFINO, "Blubbi", 20),
+            other(Form.PEGASUS, "Sternchen", 14),
+            other(Form.REXI, "Rex", 9, shiny = true),
+        )
+        val album = buildSet {
+            for (f in EggLine.KNUFFEL.forms + EggLine.MEER.forms + EggLine.FEUER.forms) add(f.name)
+            for (f in EggLine.EINHORN.forms.take(5) + EggLine.URZEIT.forms.take(5) + EggLine.WALD.forms.take(3)) add(f.name)
+            add("REXI*")
+            add("LUMI*")
+            add(Form.AURELIUS.name)
+        }
+        val stickers = Stickers.all.withIndex().filter { (i, _) -> i % 3 != 2 }.associate { (i, st) -> st.id to (1 + i % 3) }
+        val garden = Garden(
+            listOf(
+                Plot(seed = "seed_carrot", plantedAt = now - 3 * hour, readyAt = now - 60_000L, waterings = 3),
+                Plot(seed = "seed_strawberry", plantedAt = now - hour, readyAt = now + 3 * hour, waterings = 1, lastWatered = now - hour),
+                Plot(),
+                Plot(seed = "seed_pumpkin", plantedAt = now - 2 * hour, readyAt = now + 5 * hour + 12 * 60_000L),
+            ),
+        )
+        val trips = listOf(
+            Trip(resting[0].id, Destination.STRAND, now - 2 * hour - 5 * 60_000L, now - 5 * 60_000L),
+            Trip(resting[1].id, Destination.ZAUBERWALD, now - hour, now + 2 * hour),
+        )
+        val weekly = WeeklyState(
+            week = TimeUtil.week(now, zone),
+            quests = listOf(
+                QuestProgress(QuestType.FEED, 20, 14),
+                QuestProgress(QuestType.HARVEST, 10, 10),
+                QuestProgress(QuestType.GAMES, 12, 5),
+            ),
+        )
         return GameState(
             onboarded = true,
             settings = settings,
+            resting = resting,
+            restSlots = 4,
+            eggs = mapOf(EggLine.FEUER to 1, EggLine.EINHORN to 2),
+            album = album,
+            stickers = stickers,
+            garden = garden,
+            trips = trips,
+            weekly = weekly,
+            pass = PassState(EventCalendar.passId(date), 1_900, (1..8).toSet()),
             difficulty = if (scene == "memorial") Difficulty.CLASSIC else Difficulty.RELAXED,
             pet = pet,
             coins = 1234,
-            inventory = mapOf("apple" to 3, "cake" to 1, "medicine" to 2, "candy" to 5, "cocoa" to 1, "bath" to 1),
-            owned = setOf("room_cozy", "room_forest", "room_ocean", "room_space", "room_candy", "hat_bow", "hat_cap", "hat_wizard", "face_round", "face_sun", "neck_scarf", "neck_bell"),
+            inventory = mapOf(
+                "apple" to 3, "cake" to 1, "medicine" to 2, "candy" to 5, "cocoa" to 1, "bath" to 1,
+                "seed_carrot" to 3, "seed_pumpkin" to 1, "glitter" to 1, "sticker_pack" to 1,
+            ),
+            owned = setOf("room_cozy", "room_forest", "room_ocean", "room_space", "room_candy", "hat_bow", "hat_cap", "hat_wizard", "face_round", "face_sun", "neck_scarf", "neck_bell") +
+                Catalog.defaultFurniture + equipped.values,
             equipped = equipped,
             counters = Counters(
                 feeds = 42, plays = 20, pets = 64, cleans = 9, gamesPlayed = 12, purchases = 7, bestCatch = 240,
                 bestMemoryMoves = 14, bestWhack = 31, totalSteps = 45_678, bestDaySteps = 8_000, coinsEarned = 2_345,
-                evolutions = 2, hatched = 1, maxLevel = 9, maxStage = 3, maxStreak = 4, quests = 11,
+                evolutions = 2, hatched = 4, maxLevel = 12, maxStage = 4, maxStreak = 4, quests = 11,
+                daysPlayed = 23, harvests = 6, trips = 3, shinies = 1,
             ),
             achievements = mapOf("HATCH" to now, "FEED_10" to now, "LEVEL_5" to now, "EVOLVE_CHILD" to now, "EVOLVE_TEEN" to now, "STREAK_3" to now, "GAMES_10" to now),
             daily = DailyState(
@@ -250,7 +374,34 @@ object DebugScenes {
     }
 
     @Composable
-    fun Gallery(state: GameState) {
+    fun Gallery(state: GameState, scene: String? = null) {
+        val page = scene?.removePrefix("gallery")?.toIntOrNull() ?: 0
+        if (page in 1..5) {
+            GalleryPage("Formen, Seite $page", Form.entries.chunked(24).getOrElse(page - 1) { emptyList() }.map { it.title to PetLook(it, Mood.HAPPY, line = it.line) })
+            return
+        }
+        if (page == 6) {
+            val base = PetLook(Form.HOPSI, Mood.HAPPY)
+            val hats = listOf("hat_explorer", "hat_tiara", "hat_pirate", "hat_flowercrown", "hat_straw", "hat_acorn", "hat_bobble", "hat_bunnyears", "hat_captain", "hat_witch", "hat_santa")
+            val faces = listOf("face_snorkel", "face_stars")
+            val necks = listOf("neck_cape", "neck_flowerchain", "neck_leafscarf", "neck_starscarf", "neck_heart")
+            GalleryPage(
+                "Neue Kleidung",
+                hats.map { it.removePrefix("hat_") to base.copy(hat = it) } +
+                    faces.map { it.removePrefix("face_") to base.copy(face = it) } +
+                    necks.map { it.removePrefix("neck_") to base.copy(neck = it) },
+            )
+            return
+        }
+        if (page == 7) {
+            GalleryPage(
+                "Eier & Schillernde",
+                EggLine.entries.map { it.title to PetLook(Form.EGG, Mood.HAPPY, line = it) } +
+                    listOf(Form.LUMI, Form.DELFINO, Form.PYRO, Form.PEGASUS, Form.REXI, Form.GALAXIA, Form.ROBORITTER, Form.TITANIA, Form.KUERBISKOENIG, Form.POLARFUCHS, Form.KARAMELLA, Form.WELTENBAUM)
+                        .map { "✨" + it.title to PetLook(it, Mood.HAPPY, line = it.line, shiny = true) },
+            )
+            return
+        }
         Column(
             Modifier
                 .fillMaxSize()
@@ -294,6 +445,29 @@ object DebugScenes {
                             Text(label, style = MaterialTheme.typography.labelSmall)
                         }
                     }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun GalleryPage(title: String, entries: List<Pair<String, PetLook>>) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .padding(12.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleLarge, color = LocalPalette.current.text)
+            for (row in entries.chunked(4)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    for ((label, look) in row) {
+                        Column(Modifier.width(88.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            PetPortrait(look, Modifier.size(84.dp), animated = false)
+                            Text(label, style = MaterialTheme.typography.labelSmall, color = LocalPalette.current.text, maxLines = 1)
+                        }
+                    }
+                    repeat(4 - row.size) { Spacer(Modifier.width(88.dp)) }
                 }
             }
         }

@@ -21,6 +21,7 @@ import de.knuffi.core.Action
 import de.knuffi.core.Catalog
 import de.knuffi.core.DailyRewards
 import de.knuffi.core.Difficulty
+import de.knuffi.core.EventCalendar
 import de.knuffi.core.GameState
 import de.knuffi.core.StepRewards
 import de.knuffi.core.TimeUtil
@@ -139,7 +140,50 @@ object Notifier {
                 }
             }
         }
+        if (!quiet) list += worldSpecs(state, now, zone)
         return list.filter { now - (state.notifyLog[it.key] ?: 0L) >= it.cooldownMs }.take(2)
+    }
+
+    /** Garden, trips, festivals and birthdays. Each fires once for each new occasion. */
+    private fun worldSpecs(state: GameState, now: Long, zone: ZoneId): List<Spec> {
+        val list = mutableListOf<Spec>()
+        val ready = state.garden.plots.filter { it.ready(now) }
+        if (ready.isNotEmpty() && ready.maxOf { it.readyAt } > (state.notifyLog["garden"] ?: 0L)) {
+            list += Spec(
+                "garden", CH_EVENTS, "🌻 Dein Garten ist reif!",
+                if (ready.size == 1) "Eine Pflanze wartet auf die Ernte." else "${ready.size} Pflanzen warten auf die Ernte.",
+                0L,
+            )
+        }
+        val back = state.trips.filter { now >= it.endsAt }
+        if (back.isNotEmpty() && back.maxOf { it.endsAt } > (state.notifyLog["trip"] ?: 0L)) {
+            val names = back.mapNotNull { t -> state.allPets.firstOrNull { it.id == t.petId }?.name }
+            val who = names.firstOrNull() ?: "Dein Haustier"
+            list += Spec(
+                "trip", CH_EVENTS, "🎒 $who ist zurück!",
+                if (names.size > 1) "${names.joinToString(" und ")} haben etwas vom Ausflug mitgebracht." else "$who hat etwas vom Ausflug mitgebracht. Schau nach!",
+                0L,
+            )
+        }
+        val event = EventCalendar.active(now, zone)
+        if (event != null) {
+            val key = "event_" + EventCalendar.key(event, EventCalendar.date(now, zone))
+            if (key !in state.notifyLog) {
+                list += Spec(key, CH_EVENTS, "${event.emoji} ${event.title} hat begonnen!", "Sammle ${event.tokenName} ${event.tokenEmoji} und hol dir das ${event.egg.title}!", 0L)
+            }
+        }
+        val pet = state.pet
+        if (pet != null && pet.alive && !pet.isEgg && pet.hatchedAt > 0L) {
+            val months = pet.ageDays(now) / 30
+            if (months >= 1 && "bday:${pet.id}:$months" !in state.milestones && "birthday_$months" !in state.notifyLog) {
+                list += Spec(
+                    "birthday_$months", CH_EVENTS, "🎂 ${pet.name} hat Geburtstag!",
+                    if (months % 12 == 0) "Ihr seid heute ${months / 12} ${if (months == 12) "Jahr" else "Jahre"} zusammen! Komm feiern." else "${pet.name} ist heute $months ${if (months == 1) "Monat" else "Monate"} bei dir. Komm feiern!",
+                    0L,
+                )
+            }
+        }
+        return list
     }
 
     /** Checks the current state and posts reminders if necessary. */

@@ -59,22 +59,32 @@ import de.knuffi.core.Achievement
 import de.knuffi.core.Action
 import de.knuffi.core.DailyRewards
 import de.knuffi.core.Engine
+import de.knuffi.core.EventCalendar
 import de.knuffi.core.GameState
 import de.knuffi.core.Quests
+import de.knuffi.core.SeasonPass
 import de.knuffi.core.TimeUtil
 
 @Composable
-fun GoalsScreen(state: GameState) {
+fun GoalsScreen(state: GameState, onOpenPass: () -> Unit) {
     val unlocked = Achievement.entries.count { state.isUnlocked(it) }
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = bottomBarSpace()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item { ScreenHeader("Ziele", "🏆", "Belohnungen, Aufgaben und Erfolge") }
+        item { ScreenHeader("Ziele", "🏆", "Belohnungen, Aufgaben, Pass und Erfolge") }
         item { DailyRewardCard(state, Modifier.staggered(0)) }
+        item { PassCard(state, Modifier.staggered(1), onOpenPass) }
         item { SectionHeader("Tagesaufgaben", "📋") }
         quests(state)
+        item {
+            val left = 8 - java.time.LocalDate.now(GameRepository.zone).dayOfWeek.value
+            SectionHeader("Wochenaufgaben", "🗓️") {
+                Pill(if (left <= 1) "Letzter Tag!" else "Noch $left Tage", color = LocalPalette.current.sky.copy(alpha = 0.2f))
+            }
+        }
+        weeklies(state)
         item {
             SectionHeader("Erfolge", "🏅") {
                 Pill("$unlocked / ${Achievement.entries.size}", color = LocalPalette.current.gold.copy(alpha = 0.25f))
@@ -158,6 +168,88 @@ private fun LazyListScope.quests(state: GameState) {
                     else -> Unit
                 }
             }
+        }
+    }
+}
+
+private fun LazyListScope.weeklies(state: GameState) {
+    val quests = state.weekly.quests
+    for ((i, q) in quests.withIndex()) {
+        item(key = "weekly_$i") {
+            val p = LocalPalette.current
+            SurfaceCard(Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    EmojiTile(q.type.emoji, size = 48.dp, color = if (q.done) p.mint else p.violet)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(q.type.label(q.target), style = MaterialTheme.typography.titleSmall, color = p.text)
+                        Spacer(Modifier.height(6.dp))
+                        GlossyBar(q.progress / q.target.toFloat(), p.violet, p.violetDeep, Modifier.fillMaxWidth(), height = 10.dp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "${TimeUtil.formatNumber(q.progress)} / ${TimeUtil.formatNumber(q.target)} · ${Quests.weeklyCoins(q.type)} 🪙 + ${Quests.weeklyXp(q.type)} XP",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = p.textMuted,
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    when {
+                        q.claimed -> DoneStamp()
+                        q.done -> ClayTextButton("Holen", { GameRepository.perform(Action.ClaimWeekly(i)) }, small = true, color = p.mint, deep = p.mintDeep)
+                        else -> Unit
+                    }
+                }
+            }
+        }
+    }
+    item(key = "weekly_bonus") {
+        val p = LocalPalette.current
+        val allClaimed = quests.isNotEmpty() && quests.all { it.claimed }
+        SurfaceCard(Modifier.fillMaxWidth(), color = if (p.dark) Color(0xFF2A3A5E) else Color(0xFFE3F1FF)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                EmojiTile("🏆", size = 48.dp, color = p.sky)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Wochenbonus", style = MaterialTheme.typography.titleSmall, color = p.text)
+                    Text(
+                        "Alle Wochenaufgaben geschafft: +${Quests.WEEKLY_BONUS_COINS} 🪙 und ein Stickerpäckchen",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = p.textMuted,
+                    )
+                }
+                when {
+                    state.weekly.bonusClaimed -> DoneStamp()
+                    allClaimed -> ClayTextButton("Holen", { GameRepository.perform(Action.ClaimWeeklyBonus) }, small = true, color = p.sky, deep = p.skyDeep)
+                    else -> Unit
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PassCard(state: GameState, modifier: Modifier = Modifier, onOpen: () -> Unit) {
+    val p = LocalPalette.current
+    val tier = SeasonPass.tier(state.pass.xp)
+    val open = (1..tier).count { it !in state.pass.claimed }
+    val season = EventCalendar.season(java.time.LocalDate.now(GameRepository.zone))
+    SurfaceCard(modifier.fillMaxWidth(), onClick = onOpen) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            EmojiTile(season.emoji, size = 52.dp, color = p.violet)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("${season.title}-Pass · Stufe $tier", style = MaterialTheme.typography.titleSmall, color = p.text)
+                Spacer(Modifier.height(6.dp))
+                GlossyBar(tier / SeasonPass.TIERS.toFloat(), p.violet, p.violetDeep, Modifier.fillMaxWidth(), height = 10.dp)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    if (open > 0) "$open Belohnung${if (open > 1) "en" else ""} bereit! 🎁" else "Sammle Pass-Punkte für tolle Belohnungen",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (open > 0) p.mintDeep else p.textMuted,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Text("›", style = MaterialTheme.typography.headlineMedium, color = p.textMuted)
         }
     }
 }
@@ -331,6 +423,11 @@ private fun StatsCard(state: GameState) {
                 "🪙" to ("Münzen verdient" to TimeUtil.formatNumber(c.coinsEarned)),
                 "🔥" to ("Längste Serie" to "${c.maxStreak} Tage"),
                 "🐣" to ("Ausgebrütete Eier" to "${c.hatched}"),
+                "📖" to ("Wesen entdeckt" to "${state.discoveredCount}"),
+                "✨" to ("Schillernde Wesen" to "${c.shinies}"),
+                "🧺" to ("Ernten" to "${c.harvests}"),
+                "🎒" to ("Ausflüge" to "${c.trips}"),
+                "📅" to ("Tage gespielt" to "${c.daysPlayed}"),
             )
             for ((i, row) in rows.withIndex()) {
                 val (emoji, pair) = row

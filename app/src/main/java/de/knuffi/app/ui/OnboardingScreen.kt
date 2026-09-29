@@ -16,6 +16,14 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.shadow
+import de.knuffi.app.ui.theme.KnuffiTheme
+import de.knuffi.core.EggLine
+import de.knuffi.core.LookStyle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -81,14 +89,25 @@ private val eggLook = PetLook(Form.EGG, Mood.HAPPY)
 
 @Composable
 fun OnboardingScreen() {
+    var look by rememberSaveable { mutableStateOf(LookStyle.ZAUBER) }
+    // The chosen look colours the rest of the onboarding right away.
+    KnuffiTheme(LocalPalette.current.dark, adventure = look == LookStyle.ABENTEUER) {
+        OnboardingContent(look) { look = it }
+    }
+}
+
+@Composable
+private fun OnboardingContent(look: LookStyle, onLook: (LookStyle) -> Unit) {
     var step by rememberSaveable { mutableIntStateOf(0) }
     var difficulty by rememberSaveable { mutableStateOf(Difficulty.RELAXED) }
+    var line by rememberSaveable { mutableStateOf(EggLine.KNUFFEL) }
     var name by rememberSaveable { mutableStateOf(OnboardingNames.random()) }
     val context = LocalContext.current
     val p = LocalPalette.current
+    val chosenEgg = remember(line) { PetLook(Form.EGG, Mood.HAPPY, line = line) }
 
     fun start() {
-        GameRepository.perform(Action.Start(difficulty, name.trim().ifBlank { OnboardingNames.random() }))
+        GameRepository.perform(Action.Start(difficulty, name.trim().ifBlank { OnboardingNames.random() }, look, line))
     }
 
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { start() }
@@ -118,8 +137,10 @@ fun OnboardingScreen() {
             ) {
                 when (s) {
                     0 -> Welcome { step = 1 }
-                    1 -> DifficultyPick(difficulty, onPick = { difficulty = it }, onBack = { step = 0 }) { step = 2 }
-                    else -> NamePick(name, onName = { name = it }, onBack = { step = 1 }) {
+                    1 -> LookPick(look, onPick = onLook, onBack = { step = 0 }) { step = 2 }
+                    2 -> EggPick(line, look, onPick = { line = it }, onBack = { step = 1 }) { step = 3 }
+                    3 -> DifficultyPick(difficulty, onPick = { difficulty = it }, onBack = { step = 2 }) { step = 4 }
+                    else -> NamePick(name, chosenEgg, onName = { name = it }, onBack = { step = 3 }) {
                         if (Build.VERSION.SDK_INT >= 33 && !Notifier.hasPermission(context)) {
                             notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         } else {
@@ -137,7 +158,7 @@ fun OnboardingScreen() {
                 .padding(bottom = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            for (i in 0..2) {
+            for (i in 0..4) {
                 val w by animateDpAsState(if (i == step) 26.dp else 8.dp, spring(dampingRatio = 0.6f), label = "dot")
                 Box(
                     Modifier
@@ -267,11 +288,97 @@ private fun DifficultyPick(selected: Difficulty, onPick: (Difficulty) -> Unit, o
 }
 
 @Composable
-private fun NamePick(name: String, onName: (String) -> Unit, onBack: () -> Unit, onDone: () -> Unit) {
+private fun LookPick(selected: LookStyle, onPick: (LookStyle) -> Unit, onBack: () -> Unit, onNext: () -> Unit) {
+    StepHeader(
+        "Welcher Look gefällt dir?",
+        "Alle Haustiere, Kleider und Möbel gibt es für alle. Der Look bestimmt nur die Farben und womit du startest. Du kannst ihn jederzeit ändern.",
+        onBack,
+    )
+    LookCard(
+        LookStyle.ZAUBER, "✨", "Zauber", "Rosa und Flieder. Einhörner, Feen und Blüten.",
+        listOf(Color(0xFFFF8FC8), Color(0xFFB99AFF)), selected == LookStyle.ZAUBER,
+    ) { onPick(LookStyle.ZAUBER) }
+    Spacer(Modifier.height(12.dp))
+    LookCard(
+        LookStyle.ABENTEUER, "🐉", "Abenteuer", "Blau und Grün. Drachen, Dinos und Roboter.",
+        listOf(Color(0xFF4C9BFF), Color(0xFF2EC4A0)), selected == LookStyle.ABENTEUER,
+    ) { onPick(LookStyle.ABENTEUER) }
+    Spacer(Modifier.height(20.dp))
+    ClayTextButton("Weiter", onNext, emoji = "➡️", modifier = Modifier.fillMaxWidth())
+}
+
+@Composable
+private fun LookCard(style: LookStyle, emoji: String, title: String, text: String, colors: List<Color>, selected: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(28.dp)
+    val eggs = remember(style) { EggLine.entries.filter { it.look == style }.map { PetLook(Form.EGG, Mood.HAPPY, line = it) } }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .shadow(if (selected) 14.dp else 4.dp, shape, ambientColor = colors[0], spotColor = colors[0])
+            .clip(shape)
+            .background(Brush.linearGradient(colors))
+            .border(if (selected) 3.dp else 1.dp, Color.White.copy(alpha = if (selected) 0.95f else 0.4f), shape)
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(emoji, fontSize = 34.sp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.headlineSmall, color = Color.White)
+                Text(text, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.92f))
+            }
+            if (selected) Text("✓", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+        }
+        Row(Modifier.fillMaxWidth().height(80.dp)) {
+            for (egg in eggs) PetPortrait(egg, Modifier.weight(1f).fillMaxHeight(), animated = false, sizeFactor = 0.8f, shadow = false)
+        }
+    }
+}
+
+@Composable
+private fun EggPick(selected: EggLine, look: LookStyle, onPick: (EggLine) -> Unit, onBack: () -> Unit, onNext: () -> Unit) {
+    val p = LocalPalette.current
+    StepHeader("Wähle dein erstes Ei", "Jede Ei-Sorte hat eine eigene Familie mit 8 Wesen. Die anderen Eier kannst du später sammeln.", onBack)
+    val lines = remember(look) {
+        EggLine.entries.filter { !it.eventOnly }.sortedBy { if (it == EggLine.KNUFFEL) 0 else if (it.look == look) 1 else if (it.look == null) 2 else 3 }
+    }
+    for (row in lines.chunked(3)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            for (l in row) {
+                val active = l == selected
+                val shape = RoundedCornerShape(22.dp)
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .clip(shape)
+                        .background(if (active) p.pink.copy(alpha = 0.22f) else p.glass)
+                        .border(if (active) 2.5.dp else 1.dp, if (active) p.pink else p.glassBorder, shape)
+                        .clickable { onPick(l) }
+                        .padding(vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    PetPortrait(remember(l) { PetLook(Form.EGG, Mood.HAPPY, line = l) }, Modifier.size(70.dp), animated = active, sizeFactor = 0.8f) { pose, t ->
+                        pose.eggWobble = sin(t * 3f) * 5f
+                    }
+                    Text(l.title, style = MaterialTheme.typography.labelMedium, color = p.text, maxLines = 1)
+                }
+            }
+            repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+        }
+        Spacer(Modifier.height(10.dp))
+    }
+    Text("${selected.emoji} ${selected.description}", style = MaterialTheme.typography.bodyMedium, color = p.textMuted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+    Spacer(Modifier.height(18.dp))
+    ClayTextButton("Dieses Ei nehmen", onNext, emoji = selected.emoji, modifier = Modifier.fillMaxWidth())
+}
+
+@Composable
+private fun NamePick(name: String, egg: PetLook, onName: (String) -> Unit, onBack: () -> Unit, onDone: () -> Unit) {
     val p = LocalPalette.current
     StepHeader("Wie soll es heißen?", "Gib deinem Haustier einen Namen, bevor es schlüpft.", onBack)
     Box(Modifier.size(200.dp), contentAlignment = Alignment.Center) {
-        PetPortrait(eggLook, Modifier.fillMaxSize(), sizeFactor = 0.6f) { pose, t ->
+        PetPortrait(egg, Modifier.fillMaxSize(), sizeFactor = 0.6f) { pose, t ->
             pose.eggWobble = sin(t * 3f) * 5f
         }
     }

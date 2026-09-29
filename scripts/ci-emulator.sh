@@ -33,14 +33,29 @@ run_scene() {
 
 # The CI emulator renders in software and is slow: give every screen time for its first frames.
 for theme in light dark; do
-  for scene in home shop goals games walk settings onboarding gallery widget wallpaper levelup sick egg catch memory whack; do
+  for scene in home world shop goals games walk settings onboarding kuschelhaus album garden trips pass widget wallpaper levelup sick egg catch memory whack runner bubbles simon adventure; do
     run_scene "$theme" "$scene"
     case $scene in
-      catch|whack|memory) shot "${theme}_${scene}" 12 ;;
+      catch|whack|memory|runner|bubbles) shot "${theme}_${scene}" 12 ;;
+      simon) shot "${theme}_${scene}" 14 ;;
       *) shot "${theme}_${scene}" 8 ;;
     esac
   done
 done
+
+# All creatures, clothes, eggs and shiny variants
+for page in 1 2 3 4 5 6 7; do
+  run_scene light "gallery$page"
+  shot "gallery_$page" 9
+done
+
+# Furniture, festivals and the new celebrations
+for scene in furniture furniture2 furniture3 halloween winter eventshop eggfound birthday tripback; do
+  run_scene light "$scene"
+  shot "light_${scene}" 8
+done
+run_scene dark winter
+shot dark_winter 8
 
 # Care animations and special moments (two shots each to catch different phases)
 for scene in feed bath ball heal love; do

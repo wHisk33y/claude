@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import de.knuffi.app.data.GameRepository
 import de.knuffi.app.render.EyeShape
@@ -69,6 +70,12 @@ import de.knuffi.app.render.PetRenderer
 import de.knuffi.app.ui.components.ClayTextButton
 import de.knuffi.app.ui.components.EmojiTile
 import de.knuffi.app.ui.theme.LocalPalette
+import de.knuffi.app.notify.Battery
+import de.knuffi.core.Action
+import de.knuffi.core.Catalog
+import de.knuffi.core.EggLine
+import de.knuffi.core.Stickers
+import de.knuffi.core.TripLoot
 import de.knuffi.core.Form
 import de.knuffi.core.GameEvent
 import de.knuffi.core.GameState
@@ -82,6 +89,9 @@ private sealed interface OverlayItem {
     data class LevelUp(val level: Int, val coins: Int) : OverlayItem
     data class Evolution(val from: Form, val to: Form) : OverlayItem
     data object Hatch : OverlayItem
+    data class EggFound(val line: EggLine, val reason: String) : OverlayItem
+    data class Birthday(val name: String, val months: Int, val coins: Int) : OverlayItem
+    data class TripBack(val name: String, val loot: TripLoot) : OverlayItem
 }
 
 private data class ToastItem(val id: Long, val emoji: String, val title: String?, val text: String)
@@ -98,6 +108,9 @@ fun BoxScope.OverlayHost(state: GameState, debugScene: String?) {
             "evolution" -> overlays.add(OverlayItem.Evolution(Form.LUMI, state.pet?.form ?: Form.STELLARIS))
             "hatch" -> overlays.add(OverlayItem.Hatch)
             "toast" -> toasts.add(ToastItem(-1, "🏆", "Erfolg freigeschaltet!", "Gourmet · +100 🪙"))
+            "eggfound" -> overlays.add(OverlayItem.EggFound(EggLine.FEUER, "Dein Haustier ist erwachsen geworden"))
+            "birthday" -> overlays.add(OverlayItem.Birthday(state.pet?.name ?: "Knuffi", 3, 100))
+            "tripback" -> overlays.add(OverlayItem.TripBack("Mochi", TripLoot(48, mapOf("seed_pumpkin" to 2, "apple" to 1), listOf("s_panda"), EggLine.WALD)))
         }
     }
 
@@ -119,8 +132,15 @@ fun BoxScope.OverlayHost(state: GameState, debugScene: String?) {
                 is GameEvent.Evolved -> overlays.add(OverlayItem.Evolution(e.from, e.to))
                 GameEvent.Hatched -> overlays.add(OverlayItem.Hatch)
                 is GameEvent.AchievementUnlocked -> toast(e.achievement.emoji, "Erfolg freigeschaltet!", "${e.achievement.title} · +${e.achievement.coins} 🪙")
-                is GameEvent.QuestDone -> toast(e.type.emoji, "Tagesaufgabe geschafft!", "Hol dir deine Belohnung unter 🏆 Ziele.")
+                is GameEvent.QuestDone -> toast(e.type.emoji, if (e.weekly) "Wochenaufgabe geschafft!" else "Tagesaufgabe geschafft!", "Hol dir deine Belohnung unter 🏆 Ziele.")
                 is GameEvent.Message -> toast("💬", null, e.text)
+                is GameEvent.EggFound -> overlays.add(OverlayItem.EggFound(e.line, e.reason))
+                is GameEvent.NewForm -> toast(if (e.shiny) "✨" else "📖", if (e.shiny) "Schillernd! Neu im Album" else "Neu im Album!", e.form.title)
+                is GameEvent.StickersGot -> toast("🎴", "Neue Sticker!", e.ids.mapNotNull { Stickers[it]?.emoji }.joinToString(" "))
+                is GameEvent.Harvested -> Catalog[e.itemId]?.let { toast(it.emoji, "Geerntet!", "${e.count}× ${it.name}") }
+                is GameEvent.TripReturned -> overlays.add(OverlayItem.TripBack(e.petName, e.loot))
+                is GameEvent.Birthday -> overlays.add(OverlayItem.Birthday(e.petName, e.months, e.coins))
+                is GameEvent.PassTierUp -> toast("🎫", "Pass-Stufe ${e.tier}!", "Deine Belohnung wartet unter 🌍 Welt.")
                 else -> Unit
             }
         }
@@ -152,6 +172,147 @@ fun BoxScope.OverlayHost(state: GameState, debugScene: String?) {
         is OverlayItem.LevelUp -> LevelUpOverlay(state, o.level, o.coins) { overlays.removeAt(0) }
         is OverlayItem.Evolution -> EvolutionOverlay(state, o.from, o.to) { overlays.removeAt(0) }
         OverlayItem.Hatch -> HatchOverlay(state) { overlays.removeAt(0) }
+        is OverlayItem.EggFound -> EggFoundOverlay(o.line, o.reason) { overlays.removeAt(0) }
+        is OverlayItem.Birthday -> BirthdayOverlay(state, o.name, o.months, o.coins) { overlays.removeAt(0) }
+        is OverlayItem.TripBack -> TripBackOverlay(o.name, o.loot) { overlays.removeAt(0) }
+    }
+    if (overlays.isEmpty()) BatteryHint(state)
+}
+
+/** Asks once (after a few days) to exempt the app from battery optimisation, so reminders arrive on time. */
+@Composable
+private fun BatteryHint(state: GameState) {
+    val context = LocalContext.current
+    val ignoring = remember { Battery.isIgnoring(context) }
+    val show = state.onboarded && state.settings.notifications && !state.settings.batteryHintSeen &&
+        state.counters.daysPlayed >= 2 && !ignoring
+    if (!show) return
+    fun seen() = GameRepository.perform(Action.UpdateSettings(state.settings.copy(batteryHintSeen = true)))
+    ConfirmDialog(
+        title = "🔋 Erinnerungen nicht verpassen",
+        text = "Manche Handys schicken Apps im Hintergrund schlafen. Dann kommen die Meldungen zu spät, wenn ${state.pet?.name ?: "dein Haustier"} Hunger hat. Erlaubst du Knuffi eine Ausnahme vom Akku-Sparen? Knuffi verbraucht dabei kaum Akku.",
+        confirm = "Erlauben",
+        onConfirm = {
+            seen()
+            Battery.request(context)
+        },
+        onDismiss = { seen() },
+    )
+}
+
+@Composable
+private fun EggFoundOverlay(line: EggLine, reason: String, onDone: () -> Unit) {
+    val p = LocalPalette.current
+    val appear = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 170f)) }
+    val look = remember(line) { PetLook(Form.EGG, Mood.HAPPY, line = line) }
+    Scrim(0.75f) {
+        Rays(p.gold, Modifier.size(460.dp))
+        ConfettiLayer(Modifier.fillMaxSize(), 40)
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.scale(appear.value).padding(24.dp)) {
+            PetPortrait(look, Modifier.size(200.dp), sizeFactor = 0.62f) { pose, t ->
+                pose.eggWobble = sin(t * 2.5f) * 6f
+                val ph = t % 2f
+                if (ph < 0.3f) pose.eggWobble += sin(ph * 60f) * 8f
+            }
+            ExtrudedTitle("Ein neues Ei!", Color.White, p.goldDeep)
+            Spacer(Modifier.height(6.dp))
+            Text("${line.emoji} ${line.title}", style = MaterialTheme.typography.titleLarge, color = p.gold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "$reason. Ausbrüten kannst du es im Kuschelhaus unter 🌍 Welt.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.White.copy(alpha = 0.9f),
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(20.dp))
+            ClayTextButton("Juhu!", onDone, emoji = "🥚", color = p.gold, deep = p.goldDeep)
+        }
+    }
+}
+
+@Composable
+private fun BirthdayOverlay(state: GameState, name: String, months: Int, coins: Int, onDone: () -> Unit) {
+    val p = LocalPalette.current
+    val appear = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 170f)) }
+    val look = PetLook.of(state)?.copy(mood = Mood.HAPPY, sleeping = false, hat = "hat_party")
+    Scrim(0.8f) {
+        Rays(p.pink, Modifier.size(460.dp))
+        ConfettiLayer(Modifier.fillMaxSize(), 90)
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.scale(appear.value).padding(24.dp)) {
+            Text("🎂", fontSize = 80.sp)
+            if (look != null && state.pet?.name == name) {
+                PetPortrait(look, Modifier.size(150.dp), sizeFactor = 0.8f) { pose, t ->
+                    val ph = t % 0.8f
+                    if (ph < 0.4f) pose.lift = sin(ph / 0.4f * Math.PI.toFloat()) * 0.25f
+                    pose.eyes = EyeShape.HAPPY
+                    pose.mouth = MouthShape.GRIN
+                    pose.armL = 1f
+                    pose.armR = 0.6f + 0.4f * sin(t * 6f)
+                }
+            }
+            ExtrudedTitle("Alles Gute!", Color.White, p.pinkDeep)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (months % 12 == 0) "$name und du seid heute ${months / 12} ${if (months == 12) "Jahr" else "Jahre"} zusammen! 🥳"
+                else "$name und du seid heute $months ${if (months == 1) "Monat" else "Monate"} zusammen!",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "+$coins 🪙",
+                style = MaterialTheme.typography.headlineSmall,
+                color = Color(0xFF4A3000),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(Brush.verticalGradient(listOf(Color(0xFFFFE9A6), p.gold)))
+                    .padding(horizontal = 18.dp, vertical = 4.dp),
+            )
+            Spacer(Modifier.height(22.dp))
+            ClayTextButton("Feiern!", onDone, emoji = "🎉")
+        }
+    }
+}
+
+@Composable
+private fun TripBackOverlay(name: String, loot: TripLoot, onDone: () -> Unit) {
+    val p = LocalPalette.current
+    val appear = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = 200f)) }
+    Scrim(0.75f) {
+        Rays(p.sky, Modifier.size(420.dp))
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.scale(appear.value).padding(24.dp)) {
+            Text("🎒", fontSize = 80.sp)
+            ExtrudedTitle("Zurück!", Color.White, p.skyDeep)
+            Spacer(Modifier.height(4.dp))
+            Text("$name hat etwas mitgebracht:", style = MaterialTheme.typography.titleMedium, color = Color.White, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(12.dp))
+            val entries = buildList {
+                add("🪙" to "${loot.coins} Münzen")
+                for ((id, n) in loot.items) Catalog[id]?.let { add(it.emoji to "${n}× ${it.name}") }
+                for (id in loot.stickers) Stickers[id]?.let { add(it.emoji to "Sticker: ${it.name}") }
+                loot.egg?.let { add(it.emoji to it.title) }
+            }
+            Column(
+                Modifier
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color.White.copy(alpha = 0.12f))
+                    .padding(horizontal = 18.dp, vertical = 10.dp),
+            ) {
+                for ((emoji, label) in entries) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 3.dp)) {
+                        Text(emoji, fontSize = 24.sp)
+                        Spacer(Modifier.width(10.dp))
+                        Text(label, style = MaterialTheme.typography.titleSmall, color = Color.White)
+                    }
+                }
+            }
+            Spacer(Modifier.height(22.dp))
+            ClayTextButton("Danke!", onDone, emoji = "💖", color = p.sky, deep = p.skyDeep)
+        }
     }
 }
 
@@ -322,7 +483,7 @@ private fun HatchOverlay(state: GameState, onDone: () -> Unit) {
             ExtrudedTitle("Geschlüpft!", Color.White, p.pinkDeep)
             Spacer(Modifier.height(6.dp))
             Text(
-                "Willkommen, ${state.pet?.name}! Kümmere dich gut um dein neues Knuffel. Wie es sich entwickelt, hängt ganz von dir ab.",
+                "Willkommen, ${state.pet?.name}! ${if (state.pet?.shiny == true) "Wow, es schillert! ✨ " else ""}Kümmere dich gut um dein neues ${state.pet?.form?.title ?: "Haustier"}. Wie es sich entwickelt, hängt ganz von dir ab.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.White.copy(alpha = 0.9f),
                 textAlign = TextAlign.Center,
