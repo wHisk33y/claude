@@ -252,4 +252,199 @@ class EngineTest {
         assertNotNull(back)
         assertEquals(s, back)
     }
+
+    @Test
+    fun linesHaveCompleteFamilyTrees() {
+        assertEquals(100, Form.creatures.size)
+        for (line in EggLine.entries) {
+            assertNotNull("$line baby", Form.find(line, Role.BABY))
+            assertNotNull("$line legend", Form.find(line, Role.LEGEND))
+            if (line != EggLine.KNUFFEL) {
+                for (r in listOf(Role.CHILD, Role.TEEN, Role.TEEN_B, Role.ADULT_SPORTY, Role.ADULT_FOODIE, Role.ADULT_BALANCED)) {
+                    assertNotNull("$line $r", Form.find(line, r))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun evolutionFollowsEggLine() {
+        val egg = Pet(name = "x", bornAt = 0, line = EggLine.WALD)
+        assertEquals(Form.MOOSI, Leveling.nextForm(egg))
+        val baby = egg.copy(form = Form.MOOSI, care = CareLog(moodSum = 700.0, moodHours = 10.0))
+        assertEquals(Form.ZWEIGI, Leveling.nextForm(baby))
+        val child = egg.copy(form = Form.ZWEIGI, care = CareLog(moodSum = 700.0, moodHours = 10.0))
+        assertEquals(Form.FARNI, Leveling.nextForm(child))
+        assertEquals(Form.KNORRI, Leveling.nextForm(child.copy(care = CareLog(mistakes = 6))))
+        val teen = egg.copy(form = Form.FARNI, care = CareLog(activity = 20, food = 3, moodSum = 700.0, moodHours = 10.0))
+        assertEquals(Form.HIRSCHLING, Leveling.nextForm(teen))
+        val perfect = teen.copy(care = CareLog(activity = 20, food = 3, moodSum = 85.0 * 80, moodHours = 80.0))
+        assertEquals(Form.WELTENBAUM, Leveling.nextForm(perfect))
+        assertEquals(Form.SCHATTLING, Leveling.nextForm(teen.copy(care = CareLog(mistakes = 9))))
+    }
+
+    @Test
+    fun hatchingNewEggMovesPetToKuschelhausAndSwitchingBack() {
+        var s = started()
+        s = s.copy(eggs = mapOf(EggLine.FEUER to 1))
+        val first = s.pet!!
+        s = Engine.perform(s, Action.HatchEgg(EggLine.FEUER, "Funki"), t0 + hour, zone).state
+        assertEquals(EggLine.FEUER, s.pet!!.line)
+        assertTrue(s.pet!!.isEgg)
+        assertEquals(listOf(first.id), s.resting.map { it.id })
+        assertEquals(0, s.eggCount(EggLine.FEUER))
+        repeat(Engine.HATCH_TAPS) { s = Engine.perform(s, Action.HatchTap, t0 + hour, zone).state }
+        assertEquals(Form.FUNKI, s.pet!!.form)
+        assertTrue(Form.FUNKI.name in s.album)
+        // Resting pets don't change while the other one is active.
+        val restingBefore = s.resting.first()
+        s = Engine.tick(s, t0 + 10 * hour, zone).state
+        assertEquals(restingBefore, s.resting.first())
+        s = Engine.perform(s, Action.SwitchPet(first.id), t0 + 10 * hour, zone).state
+        assertEquals(first.id, s.pet!!.id)
+        assertEquals(Form.FUNKI, s.resting.first().form)
+    }
+
+    @Test
+    fun kuschelhausCapacityIsRespected() {
+        var s = started()
+        s = s.copy(restSlots = 0, eggs = mapOf(EggLine.MEER to 1))
+        s = Engine.perform(s, Action.HatchEgg(EggLine.MEER, "Blubb"), t0, zone).state
+        assertEquals(EggLine.KNUFFEL, s.pet!!.line)
+        assertEquals(1, s.eggCount(EggLine.MEER))
+    }
+
+    @Test
+    fun glitterMakesShinyHatch() {
+        var s = Engine.perform(GameState(), Action.Start(Difficulty.RELAXED, "Glitzi", LookStyle.ZAUBER, EggLine.EINHORN), t0, zone).state
+        s = s.copy(inventory = s.inventory + (Catalog.GLITTER to 1))
+        s = Engine.perform(s, Action.UseItem(Catalog.GLITTER), t0, zone).state
+        repeat(Engine.HATCH_TAPS) { s = Engine.perform(s, Action.HatchTap, t0, zone).state }
+        assertEquals(Form.PONYCHEN, s.pet!!.form)
+        assertTrue(s.pet!!.shiny)
+        assertTrue(s.discovered(Form.PONYCHEN, shiny = true))
+        assertEquals(1, s.counters.shinies)
+    }
+
+    @Test
+    fun gardenPlantWaterHarvest() {
+        var s = started()
+        val seeds = s.count("seed_carrot")
+        s = Engine.perform(s, Action.Plant(0, "seed_carrot"), t0, zone).state
+        assertEquals(seeds - 1, s.count("seed_carrot"))
+        assertFalse(s.garden.plots[0].ready(t0))
+        val before = s.garden.plots[0].readyAt
+        s = Engine.perform(s, Action.Water(0), t0 + 60_000, zone).state
+        assertTrue(s.garden.plots[0].readyAt < before)
+        val nope = Engine.perform(s, Action.Harvest(0), t0 + 90_000, zone).state
+        assertEquals(0, nope.count("carrot"))
+        s = Engine.perform(s, Action.Harvest(0), t0 + 3 * hour, zone).state
+        assertEquals(2, s.count("carrot"))
+        assertTrue(s.garden.plots[0].empty)
+        assertEquals(1, s.counters.harvests)
+    }
+
+    @Test
+    fun tripsBringLoot() {
+        var s = started()
+        s = s.copy(eggs = mapOf(EggLine.WALD to 1))
+        val traveller = s.pet!!.id
+        s = Engine.perform(s, Action.HatchEgg(EggLine.WALD, "Moosi"), t0, zone).state
+        s = Engine.perform(s, Action.StartTrip(traveller, Destination.WIESE), t0, zone).state
+        assertNotNull(s.onTrip(traveller))
+        // can't switch to a travelling pet
+        val blocked = Engine.perform(s, Action.SwitchPet(traveller), t0, zone).state
+        assertEquals(EggLine.WALD, blocked.pet!!.line)
+        val coins = s.coins
+        val early = Engine.perform(s, Action.ClaimTrip(traveller), t0 + 30 * 60_000, zone).state
+        assertNotNull(early.onTrip(traveller))
+        val o = Engine.perform(s, Action.ClaimTrip(traveller), t0 + 2 * hour, zone)
+        assertTrue(o.state.coins > coins)
+        assertEquals(null, o.state.onTrip(traveller))
+        assertTrue(o.events.any { it is GameEvent.TripReturned })
+        val trip = Trip(traveller, Destination.MOND, 5, 10)
+        assertEquals(Trips.loot(trip), Trips.loot(trip))
+    }
+
+    @Test
+    fun weeklyQuestsAndPass() {
+        var s = started()
+        assertEquals(3, s.weekly.quests.size)
+        assertTrue(s.weekly.quests.all { it.target == it.type.weekly })
+        s = s.copy(weekly = s.weekly.copy(quests = listOf(QuestProgress(QuestType.PET, 3))))
+        var now = t0
+        repeat(3) {
+            now += 2_000
+            s = Engine.perform(s, Action.Stroke, now, zone).state
+        }
+        assertTrue(s.weekly.quests[0].done)
+        val passXp = s.pass.xp
+        s = Engine.perform(s, Action.ClaimWeekly(0), now, zone).state
+        assertTrue(s.weekly.quests[0].claimed)
+        assertTrue(s.pass.xp > passXp)
+        // Pass tier 10 gives an egg
+        s = s.copy(pass = s.pass.copy(xp = 10 * SeasonPass.XP_PER_TIER))
+        val eggs = s.totalEggs
+        s = Engine.perform(s, Action.ClaimPass(10), now, zone).state
+        assertEquals(eggs + 1, s.totalEggs)
+        val again = Engine.perform(s, Action.ClaimPass(10), now, zone).state
+        assertEquals(eggs + 1, again.totalEggs)
+        val tooHigh = Engine.perform(s, Action.ClaimPass(11), now, zone).state
+        assertFalse(11 in tooHigh.pass.claimed)
+    }
+
+    @Test
+    fun calendarEvents() {
+        assertEquals(java.time.LocalDate.of(2027, 3, 28), EventCalendar.easter(2027))
+        assertEquals(java.time.LocalDate.of(2026, 4, 5), EventCalendar.easter(2026))
+        assertEquals(SeasonEvent.HALLOWEEN, EventCalendar.active(java.time.LocalDate.of(2026, 10, 31)))
+        assertEquals(SeasonEvent.WINTERZAUBER, EventCalendar.active(java.time.LocalDate.of(2026, 12, 24)))
+        assertEquals(null, EventCalendar.active(java.time.LocalDate.of(2026, 9, 29)))
+        val (next, days) = EventCalendar.next(java.time.LocalDate.of(2026, 9, 29))
+        assertEquals(SeasonEvent.HALLOWEEN, next)
+        assertEquals(18L, days)
+        assertEquals("2026-WINTER", EventCalendar.passId(java.time.LocalDate.of(2027, 2, 10)))
+    }
+
+    @Test
+    fun eventTokensBuyEventEgg() {
+        val halloween = ZonedDateTime.of(2026, 10, 25, 10, 0, 0, 0, zone).toInstant().toEpochMilli()
+        var s = Engine.perform(GameState(), Action.Start(Difficulty.RELAXED, "Mochi"), halloween, zone).state
+        assertEquals("HALLOWEEN-2026", s.event.key)
+        assertTrue(s.event.tokens > 0)
+        s = s.copy(event = s.event.copy(tokens = 100))
+        s = Engine.perform(s, Action.BuyEventOffer("egg_grusel"), halloween, zone).state
+        assertEquals(1, s.eggCount(EggLine.GRUSEL))
+        assertEquals(60, s.event.tokens)
+        assertEquals(1, s.counters.eventsJoined)
+    }
+
+    @Test
+    fun stickerPackAndMigration() {
+        var s = started().copy(inventory = mapOf(Catalog.STICKER_PACK to 1))
+        s = Engine.perform(s, Action.UseItem(Catalog.STICKER_PACK), t0, zone).state
+        assertEquals(3, s.stickers.values.sum())
+        // Old saves without album/furniture get migrated.
+        val old = s.copy(album = emptySet(), owned = setOf("room_cozy"), equipped = mapOf(Slot.ROOM to "room_cozy"))
+        val migrated = Engine.tick(old, t0, zone).state
+        assertTrue(Form.BABY.name in migrated.album)
+        assertTrue("rug_round" in migrated.owned)
+        assertEquals("rug_round", migrated.equipped[Slot.RUG])
+    }
+
+    @Test
+    fun secondEggAppearsAtLevelFour() {
+        var s = started()
+        var now = t0
+        var found = false
+        repeat(8) {
+            now += 10 * 60_000L
+            s = s.copy(pet = s.pet!!.copy(energy = 100.0, satiety = 90.0, joy = 90.0, hygiene = 90.0))
+            val o = Engine.perform(s, Action.GameFinished(MiniGame.RUNNER, 900), now, zone)
+            s = o.state
+            if (o.events.any { it is GameEvent.EggFound }) found = true
+        }
+        assertTrue(found)
+        assertEquals(1, s.totalEggs)
+    }
 }

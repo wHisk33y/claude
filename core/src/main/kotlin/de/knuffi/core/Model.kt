@@ -17,33 +17,8 @@ enum class Difficulty(val title: String, val description: String) {
     ),
     CLASSIC(
         "Klassisch",
-        "Werte sinken schneller. Wird es zu lange vernachlässigt, reist es zu den Sternen und du beginnst mit einem neuen Ei.",
+        "Werte sinken schneller. Wird es zu lange vernachlässigt, reist es zu den Sternen.",
     ),
-}
-
-@Serializable
-enum class Stage(val title: String, val minLevel: Int) {
-    EGG("Ei", 0),
-    BABY("Baby", 1),
-    CHILD("Kind", 3),
-    TEEN("Teenager", 7),
-    ADULT("Erwachsen", 13),
-}
-
-@Serializable
-enum class Form(val stage: Stage, val title: String, val description: String) {
-    EGG(Stage.EGG, "Ei", "Etwas bewegt sich darin …"),
-    BABY(Stage.BABY, "Knuffel", "Ein winziges, flauschiges Wesen."),
-    HOPSI(Stage.CHILD, "Hopsi", "Fröhlich und verspielt, mit langen Hüpfohren."),
-    GRUMMEL(Stage.CHILD, "Grummel", "Etwas stachelig … aber mit gutem Herz."),
-    FLITZER(Stage.TEEN, "Flitzer", "Sportlich und immer in Bewegung."),
-    MAMPFI(Stage.TEEN, "Mampfi", "Rund, gemütlich und immer hungrig."),
-    LUMI(Stage.TEEN, "Lumi", "Ausgeglichen, mit leuchtender Antenne."),
-    STACHLI(Stage.TEEN, "Stachli", "Launisch und stachelig."),
-    DRAKO(Stage.ADULT, "Drako", "Ein stolzer kleiner Drache."),
-    STELLARIS(Stage.ADULT, "Stellaris", "Ein Sternenwesen voller Magie."),
-    MOCHI_KOENIG(Stage.ADULT, "Mochi-König", "Rund, weich und königlich."),
-    SCHATTLING(Stage.ADULT, "Schattling", "Ein kleiner Geist: vernachlässigt, aber treu."),
 }
 
 enum class Mood(val title: String) {
@@ -97,7 +72,12 @@ data class Pet(
     val nextPoopAt: Long = 0,
     val care: CareLog = CareLog(),
     val alive: Boolean = true,
+    val line: EggLine = EggLine.KNUFFEL,
+    /** Rare colour variant ("schillernd"). */
+    val shiny: Boolean = false,
 ) {
+    /** Pets are identified by their birth time. */
+    val id: Long get() = bornAt
     val isEgg: Boolean get() = form == Form.EGG
     val stage: Stage get() = form.stage
     val average: Double get() = (satiety + joy + energy + hygiene + health) / 5.0
@@ -143,6 +123,9 @@ data class Counters(
     val bestCatch: Int = 0,
     val bestMemoryMoves: Int = 0,
     val bestWhack: Int = 0,
+    val bestRunner: Int = 0,
+    val bestBubbles: Int = 0,
+    val bestSimon: Int = 0,
     val totalSteps: Long = 0,
     val bestDaySteps: Int = 0,
     val coinsEarned: Long = 0,
@@ -152,9 +135,22 @@ data class Counters(
     val maxStage: Int = 0,
     val maxStreak: Int = 0,
     val quests: Int = 0,
+    val weeklies: Int = 0,
     val nightOwl: Boolean = false,
     val perfectCare: Boolean = false,
     val sleeps: Int = 0,
+    val daysPlayed: Int = 0,
+    val plantings: Int = 0,
+    val harvests: Int = 0,
+    val waterings: Int = 0,
+    val trips: Int = 0,
+    val eggsFound: Int = 0,
+    val shinies: Int = 0,
+    val legends: Int = 0,
+    val birthdays: Int = 0,
+    val eventsJoined: Int = 0,
+    val passTiers: Int = 0,
+    val outfits: Int = 0,
 )
 
 @Serializable
@@ -178,6 +174,13 @@ data class DailyState(
 )
 
 @Serializable
+data class WeeklyState(
+    val week: Long = -1,
+    val quests: List<QuestProgress> = emptyList(),
+    val bonusClaimed: Boolean = false,
+)
+
+@Serializable
 data class StepState(
     val lastSensor: Float = -1f,
     val day: Long = -1,
@@ -196,6 +199,8 @@ data class Settings(
     val haptics: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val overlayPet: Boolean = false,
+    val look: LookStyle = LookStyle.ZAUBER,
+    val batteryHintSeen: Boolean = false,
 )
 
 @Serializable
@@ -205,6 +210,7 @@ data class Memorial(
     val level: Int,
     val bornAt: Long,
     val endedAt: Long,
+    val shiny: Boolean = false,
 )
 
 @Serializable
@@ -213,14 +219,30 @@ enum class Slot(val title: String) {
     FACE("Gesicht"),
     NECK("Hals"),
     ROOM("Zimmer"),
+    WALL("Tapete"),
+    RUG("Teppich"),
+    BED("Bett"),
+    PLANT("Pflanze"),
+    LAMP("Lampe"),
+    PICTURE("Bild"),
 }
 
 @Serializable
 data class GameState(
-    val version: Int = 1,
+    val version: Int = 3,
     val onboarded: Boolean = false,
     val difficulty: Difficulty = Difficulty.RELAXED,
+    /** The active pet. */
     val pet: Pet? = null,
+    /** Pets resting in the "Kuschelhaus". They don't change while resting. */
+    val resting: List<Pet> = emptyList(),
+    val restSlots: Int = 3,
+    /** Eggs waiting to be hatched. */
+    val eggs: Map<EggLine, Int> = emptyMap(),
+    /** Discovered forms ("FORM" and "FORM*" for shiny ones). */
+    val album: Set<String> = emptySet(),
+    val stickers: Map<String, Int> = emptyMap(),
+    val stickerSetsDone: Set<String> = emptySet(),
     val coins: Int = 0,
     val inventory: Map<String, Int> = emptyMap(),
     val owned: Set<String> = emptySet(),
@@ -228,16 +250,29 @@ data class GameState(
     val counters: Counters = Counters(),
     val achievements: Map<String, Long> = emptyMap(),
     val daily: DailyState = DailyState(),
+    val weekly: WeeklyState = WeeklyState(),
     val steps: StepState = StepState(),
     val settings: Settings = Settings(),
     val memorials: List<Memorial> = emptyList(),
+    val garden: Garden = Garden(),
+    val trips: List<Trip> = emptyList(),
+    val pass: PassState = PassState(),
+    val event: EventState = EventState(),
+    /** One-time rewards and celebrations that already happened. */
+    val milestones: Set<String> = emptySet(),
     val cooldowns: Map<String, Long> = emptyMap(),
     val notifyLog: Map<String, Long> = emptyMap(),
     val lastSimulated: Long = 0,
 ) {
     fun count(itemId: String): Int = inventory[itemId] ?: 0
+    fun eggCount(line: EggLine): Int = eggs[line] ?: 0
     fun isUnlocked(achievement: Achievement): Boolean = achievements.containsKey(achievement.name)
     val room: String get() = equipped[Slot.ROOM] ?: Catalog.DEFAULT_ROOM
+    val totalEggs: Int get() = eggs.values.sum()
+    val allPets: List<Pet> get() = listOfNotNull(pet) + resting
+    fun onTrip(petId: Long): Trip? = trips.firstOrNull { it.petId == petId }
+    fun discovered(form: Form, shiny: Boolean = false): Boolean = (if (shiny) "${form.name}*" else form.name) in album
+    val discoveredCount: Int get() = Form.creatures.count { it.name in album }
 }
 
 @Serializable
@@ -245,6 +280,9 @@ enum class MiniGame(val title: String, val emoji: String, val description: Strin
     CATCH("Futterfang", "🧺", "Fange leckeres Essen und weiche den Bomben aus!"),
     MEMORY("Memory", "🃏", "Finde alle Paare mit möglichst wenigen Zügen."),
     WHACK("Blitz-Tap", "⚡", "Tippe schnell auf dein Haustier, wenn es auftaucht. Aber nicht auf die Gewitterwolken!"),
+    RUNNER("Hüpf-Lauf", "🏃", "Tippe zum Springen! Weiche Hindernissen aus und sammle Münzen."),
+    BUBBLES("Blubberblasen", "🫧", "Lass die Blasen in der richtigen Farbe platzen."),
+    SIMON("Melodie", "🎵", "Merke dir die Reihenfolge und spiel sie nach."),
 }
 
 enum class ReactionKind { EAT, PLAY, PET, CLEAN, HEAL, SLEEP, WAKE, REFUSE, DRINK, BUY, GAME }
@@ -253,13 +291,21 @@ sealed interface GameEvent {
     data class LevelUp(val level: Int, val coins: Int) : GameEvent
     data class Evolved(val from: Form, val to: Form) : GameEvent
     data class AchievementUnlocked(val achievement: Achievement) : GameEvent
-    data class QuestDone(val type: QuestType) : GameEvent
+    data class QuestDone(val type: QuestType, val weekly: Boolean = false) : GameEvent
     data class Message(val text: String) : GameEvent
     data class CoinsGained(val amount: Int) : GameEvent
     data class XpGained(val amount: Int) : GameEvent
     data class Reaction(val kind: ReactionKind, val itemId: String? = null) : GameEvent
     data object Hatched : GameEvent
     data class Died(val memorial: Memorial) : GameEvent
+    data class EggFound(val line: EggLine, val reason: String) : GameEvent
+    data class NewForm(val form: Form, val shiny: Boolean) : GameEvent
+    data class StickersGot(val ids: List<String>) : GameEvent
+    data class Harvested(val itemId: String, val count: Int) : GameEvent
+    data class TripReturned(val petName: String, val loot: TripLoot) : GameEvent
+    data class Birthday(val petName: String, val months: Int, val coins: Int) : GameEvent
+    data class PassTierUp(val tier: Int) : GameEvent
+    data class TokensGained(val amount: Int) : GameEvent
 }
 
 data class Outcome(val state: GameState, val events: List<GameEvent> = emptyList())
