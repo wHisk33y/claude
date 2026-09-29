@@ -219,7 +219,11 @@ private fun PlotCard(plot: Plot, now: Long, modifier: Modifier = Modifier, onSow
                 Text(countdown(plot.readyAt - now), style = MaterialTheme.typography.labelSmall, color = if (p.dark) Color.White else p.text, maxLines = 1)
                 val canWater = plot.waterings < Garden.MAX_WATERINGS && now - plot.lastWatered >= Garden.WATER_COOLDOWN_MS
                 ClayTextButton(
-                    if (plot.waterings >= Garden.MAX_WATERINGS) "✓" else "💧",
+                    when {
+                        plot.waterings >= Garden.MAX_WATERINGS -> "✓"
+                        !canWater -> "Feucht"
+                        else -> "Gießen"
+                    },
                     onWater,
                     small = true,
                     enabled = canWater,
