@@ -447,4 +447,51 @@ class EngineTest {
         assertTrue(found)
         assertEquals(1, s.totalEggs)
     }
+
+    private fun withLevels(s: GameState, care: Int, sleep: Int) =
+        s.copy(settings = s.settings.copy(careLevel = care, sleepLevel = sleep))
+
+    @Test
+    fun careLevelChangesHowFastNeedsGrow() {
+        val base = started()
+        val calm = Engine.tick(withLevels(base, 0, CareTuning.NORMAL), t0 + 4 * hour, zone).state.pet!!
+        val normal = Engine.tick(withLevels(base, CareTuning.NORMAL, CareTuning.NORMAL), t0 + 4 * hour, zone).state.pet!!
+        val busy = Engine.tick(withLevels(base, CareTuning.MAX, CareTuning.NORMAL), t0 + 4 * hour, zone).state.pet!!
+        assertTrue(calm.satiety > normal.satiety && normal.satiety > busy.satiety)
+        assertTrue(calm.joy > normal.joy && normal.joy > busy.joy)
+        assertTrue(calm.hygiene > normal.hygiene && normal.hygiene > busy.hygiene)
+        // Energy only depends on the sleep setting.
+        assertEquals(normal.energy, busy.energy, 0.001)
+    }
+
+    @Test
+    fun sleepLevelChangesNapLengthAndTiredness() {
+        val base = started()
+        val tired = base.copy(pet = base.pet!!.copy(energy = 17.0))
+        fun hoursAsleep(level: Int): Int {
+            var s = Engine.tick(withLevels(tired, CareTuning.NORMAL, level), t0 + 60_000L, zone).state
+            assertTrue(s.pet!!.sleeping)
+            var h = 0
+            while (s.pet!!.sleeping && h < 24) {
+                h++
+                s = Engine.tick(s, t0 + h * hour, zone).state
+            }
+            return h
+        }
+        assertTrue(hoursAsleep(0) < hoursAsleep(CareTuning.NORMAL))
+        assertTrue(hoursAsleep(CareTuning.NORMAL) < hoursAsleep(CareTuning.MAX))
+        assertTrue(CareTuning.napHours(0) < 2.5 && CareTuning.napHours(CareTuning.NORMAL) > 4.0)
+
+        val awakeLow = Engine.tick(withLevels(base, CareTuning.NORMAL, 0), t0 + 4 * hour, zone).state.pet!!
+        val awakeNormal = Engine.tick(withLevels(base, CareTuning.NORMAL, CareTuning.NORMAL), t0 + 4 * hour, zone).state.pet!!
+        assertTrue(awakeLow.energy > awakeNormal.energy)
+    }
+
+    @Test
+    fun playingCostsLessEnergyWithLittleSleep() {
+        val base = started()
+        val low = Engine.perform(withLevels(base, CareTuning.NORMAL, 0), Action.Play, t0, zone).state.pet!!
+        val normal = Engine.perform(withLevels(base, CareTuning.NORMAL, CareTuning.NORMAL), Action.Play, t0, zone).state.pet!!
+        assertTrue(low.energy > normal.energy)
+    }
 }

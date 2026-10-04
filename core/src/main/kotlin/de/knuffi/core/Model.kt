@@ -201,7 +201,42 @@ data class Settings(
     val overlayPet: Boolean = false,
     val look: LookStyle = LookStyle.ZAUBER,
     val batteryHintSeen: Boolean = false,
+    /** How much care the pet needs, 0 (very little) to 4 (a lot). See [CareTuning]. */
+    val careLevel: Int = CareTuning.NORMAL,
+    /** How much the pet sleeps, 0 (hardly) to 4 (a lot). See [CareTuning]. */
+    val sleepLevel: Int = CareTuning.NORMAL,
 )
+
+/** Player-adjustable pace of the needs and of sleep. Level 2 is the original balance. */
+object CareTuning {
+    const val MIN = 0
+    const val MAX = 4
+    const val NORMAL = 2
+
+    val careTitles = listOf("Sehr wenig", "Wenig", "Normal", "Viel", "Sehr viel")
+    val sleepTitles = listOf("Kaum", "Wenig", "Normal", "Viel", "Sehr viel")
+
+    private val needFactors = doubleArrayOf(0.5, 0.75, 1.0, 1.45, 1.9)
+    private val tireFactors = doubleArrayOf(0.45, 0.7, 1.0, 1.25, 1.5)
+    private val restFactors = doubleArrayOf(2.3, 1.6, 1.0, 0.85, 0.7)
+
+    private fun idx(level: Int) = level.coerceIn(MIN, MAX)
+
+    /** Speed of hunger, boredom, dirt and poops. */
+    fun needs(level: Int): Double = needFactors[idx(level)]
+
+    /** Speed at which energy drops while awake (and what playing costs). */
+    fun tiring(level: Int): Double = tireFactors[idx(level)]
+
+    /** Speed at which energy comes back while sleeping. */
+    fun resting(level: Int): Double = restFactors[idx(level)]
+
+    /** Roughly how long a full sleep lasts, from falling asleep exhausted to waking up rested. */
+    fun napHours(level: Int): Double = (100.0 - Engine.FALL_ASLEEP_ENERGY) / (Engine.SLEEP_RECOVERY_PER_HOUR * resting(level))
+
+    /** Roughly how long the pet stays awake during the day after a full sleep. */
+    fun awakeHours(level: Int): Double = (100.0 - Engine.FALL_ASLEEP_ENERGY) / (Engine.DAY_TIRING_PER_HOUR * tiring(level))
+}
 
 @Serializable
 data class Memorial(

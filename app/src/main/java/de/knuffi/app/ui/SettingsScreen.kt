@@ -61,6 +61,7 @@ import de.knuffi.app.ui.components.SegmentedControl
 import de.knuffi.app.ui.components.SurfaceCard
 import de.knuffi.app.ui.theme.LocalPalette
 import de.knuffi.core.Action
+import de.knuffi.core.CareTuning
 import de.knuffi.core.Difficulty
 import de.knuffi.core.GameState
 import de.knuffi.core.Settings
@@ -226,6 +227,29 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
                     }
                 }
                 Spacer(Modifier.height(8.dp))
+            }
+
+            SectionHeader("Pflegebedarf", "🎚️")
+            SurfaceCard(Modifier.fillMaxWidth()) {
+                LevelSlider(
+                    title = "Wie viel Pflege braucht ${state.pet?.name ?: "dein Haustier"}?",
+                    level = s.careLevel,
+                    labels = CareTuning.careTitles,
+                    describe = ::careDescription,
+                ) { update(GameRepository.state.value.settings.copy(careLevel = it)) }
+                Spacer(Modifier.height(14.dp))
+                LevelSlider(
+                    title = "Wie viel schläft es?",
+                    level = s.sleepLevel,
+                    labels = CareTuning.sleepTitles,
+                    describe = ::sleepDescription,
+                ) { update(GameRepository.state.value.settings.copy(sleepLevel = it)) }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Gilt für alle deine Haustiere und lässt sich jederzeit ändern.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = p.textMuted,
+                )
             }
 
             SectionHeader("Benachrichtigungen", "🔔")
@@ -405,6 +429,57 @@ fun ConfirmDialog(title: String, text: String, confirm: String, onConfirm: () ->
         containerColor = p.surface,
         shape = RoundedCornerShape(28.dp),
     )
+}
+
+private fun hoursText(h: Double): String {
+    val half = (h * 2).roundToInt() / 2.0
+    val text = if (half % 1.0 == 0.0) "${half.toInt()}" else "${half.toInt()},5"
+    return "$text Std"
+}
+
+private fun careDescription(level: Int): String = when (level) {
+    0 -> "Hunger, Langeweile und Schmutz kommen nur halb so schnell. Gut, wenn du wenig Zeit hast."
+    1 -> "Etwas gemütlicher als normal."
+    2 -> "Die normale Mischung."
+    3 -> "Dein Haustier braucht öfter Essen, Spiel und Pflege. Es gibt mehr zu tun!"
+    else -> "Fast doppelt so viel zu tun wie normal. Für echte Tierprofis!"
+}
+
+private fun sleepDescription(level: Int): String =
+    "Ein Schläfchen dauert etwa ${hoursText(CareTuning.napHours(level))}. " +
+        "Danach bleibt es tagsüber etwa ${hoursText(CareTuning.awakeHours(level))} wach (abends wird es schneller müde)."
+
+/** A five-step slider with the current level as a pill and a short explanation. */
+@Composable
+private fun LevelSlider(title: String, level: Int, labels: List<String>, describe: (Int) -> String, onChange: (Int) -> Unit) {
+    val p = LocalPalette.current
+    var value by remember(level) { mutableFloatStateOf(level.toFloat()) }
+    val shown = value.roundToInt().coerceIn(CareTuning.MIN, CareTuning.MAX)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = MaterialTheme.typography.titleSmall, color = p.text, modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(8.dp))
+        Pill(labels[shown], color = p.pink.copy(alpha = 0.18f))
+    }
+    Slider(
+        value = value,
+        onValueChange = { value = it.roundToInt().toFloat() },
+        onValueChangeFinished = { if (value.roundToInt() != level) onChange(value.roundToInt()) },
+        valueRange = CareTuning.MIN.toFloat()..CareTuning.MAX.toFloat(),
+        steps = CareTuning.MAX - CareTuning.MIN - 1,
+        colors = SliderDefaults.colors(
+            thumbColor = p.pink,
+            activeTrackColor = p.pink,
+            inactiveTrackColor = p.track,
+            activeTickColor = Color.White.copy(alpha = 0.6f),
+            inactiveTickColor = p.textMuted.copy(alpha = 0.4f),
+        ),
+    )
+    Row {
+        Text("weniger", style = MaterialTheme.typography.labelSmall, color = p.textMuted, modifier = Modifier.weight(1f))
+        Text("mehr", style = MaterialTheme.typography.labelSmall, color = p.textMuted)
+    }
+    Spacer(Modifier.height(4.dp))
+    Text(describe(shown), style = MaterialTheme.typography.bodySmall, color = p.textMuted)
 }
 
 @Composable

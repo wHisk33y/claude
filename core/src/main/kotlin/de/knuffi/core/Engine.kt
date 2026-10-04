@@ -3,6 +3,7 @@ package de.knuffi.core
 import java.time.ZoneId
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.random.Random
 
 sealed interface Action {
@@ -65,6 +66,9 @@ object Engine {
     const val HATCH_TAPS = 5
     const val MAX_REST_SLOTS = 12
     const val SHINY_ODDS = 16
+    const val FALL_ASLEEP_ENERGY = 18.0
+    const val SLEEP_RECOVERY_PER_HOUR = 18.0
+    const val DAY_TIRING_PER_HOUR = 4.5
 
     private const val FLAG_SATIETY = 1
     private const val FLAG_JOY = 2
@@ -239,6 +243,9 @@ object Engine {
         private fun step(p0: Pet, dt: Long, t: Long, zone: ZoneId, classic: Boolean): Pet {
             val h = dt / 3_600_000.0
             val m = if (classic) 1.4 else 1.0
+            val n = CareTuning.needs(s.settings.careLevel)
+            val tire = CareTuning.tiring(s.settings.sleepLevel)
+            val rest = CareTuning.resting(s.settings.sleepLevel)
             var p = p0
             var satiety = p.satiety
             var joy = p.joy
@@ -251,21 +258,21 @@ object Engine {
             var nextPoopAt = p.nextPoopAt
 
             if (sleeping) {
-                satiety -= 2.5 * h * m
-                joy -= 0.5 * h * m
-                hygiene -= 1.0 * h * m
-                energy += 18.0 * h
+                satiety -= 2.5 * h * m * n
+                joy -= 0.5 * h * m * n
+                hygiene -= 1.0 * h * m * n
+                energy += SLEEP_RECOVERY_PER_HOUR * h * rest
                 if (energy >= 100.0) {
                     energy = 100.0
                     sleeping = false
                 }
             } else {
                 val night = TimeUtil.isNight(t, zone)
-                satiety -= 6.0 * h * m
-                joy -= 5.0 * h * m
-                energy -= (if (night) 9.0 else 4.5) * h * m
-                hygiene -= (2.5 + 3.0 * poops) * h * m
-                if (energy < 18.0) {
+                satiety -= 6.0 * h * m * n
+                joy -= 5.0 * h * m * n
+                energy -= (if (night) 2 * DAY_TIRING_PER_HOUR else DAY_TIRING_PER_HOUR) * h * m * tire
+                hygiene -= (2.5 + 3.0 * poops) * h * m * n
+                if (energy < FALL_ASLEEP_ENERGY) {
                     // Falls asleep on its own when exhausted.
                     sleeping = true
                 }
@@ -278,7 +285,7 @@ object Engine {
 
             if (sick) {
                 health -= 2.5 * h * m
-                joy -= 2.0 * h * m
+                joy -= 2.0 * h * m * n
             }
             val critical = listOf(satiety, joy, hygiene).count { it < 15.0 }
             if (critical > 0) {
@@ -774,6 +781,9 @@ object Engine {
             emit(GameEvent.Reaction(ReactionKind.REFUSE))
         }
 
+        /** Energy cost of an activity, scaled by the chosen sleep need. */
+        private fun tiring(energy: Int): Int = (energy * CareTuning.tiring(s.settings.sleepLevel)).roundToInt()
+
         private fun Pet.applyEffect(e: Effect): Pet = copy(
             satiety = (satiety + e.satiety).coerceIn(0.0, 100.0),
             joy = (joy + e.joy).coerceIn(0.0, 100.0),
@@ -811,7 +821,7 @@ object Engine {
             val care = p.care.copy(food = p.care.food + if (item.snack) 2 else 1)
             p = p.copy(
                 care = care,
-                nextPoopAt = if (p.nextPoopAt == 0L && p.poops < 3) now + 3L * 3_600_000L else p.nextPoopAt,
+                nextPoopAt = if (p.nextPoopAt == 0L && p.poops < 3) now + (3 * 3_600_000L / CareTuning.needs(s.settings.careLevel)).toLong() else p.nextPoopAt,
             )
             s = s.copy(pet = p, counters = s.counters.copy(feeds = s.counters.feeds + 1))
             emit(GameEvent.Reaction(ReactionKind.EAT, item.id))
@@ -918,7 +928,7 @@ object Engine {
             }
             val counted = cooldownReady("play", now, 8_000L)
             s = s.copy(
-                pet = pet.applyEffect(Effect(joy = 15, energy = -7, satiety = -4, hygiene = -2)).let {
+                pet = pet.applyEffect(Effect(joy = 15, energy = tiring(-7), satiety = -4, hygiene = -2)).let {
                     if (counted) it.copy(care = it.care.copy(activity = it.care.activity + 1)) else it
                 },
                 counters = if (counted) s.counters.copy(plays = s.counters.plays + 1) else s.counters,
@@ -994,7 +1004,7 @@ object Engine {
             val reward = gameReward(game, score)
             val c = s.counters
             s = s.copy(
-                pet = pet.applyEffect(Effect(joy = 12, energy = -10, satiety = -5, hygiene = -3)).let {
+                pet = pet.applyEffect(Effect(joy = 12, energy = tiring(-10), satiety = -5, hygiene = -3)).let {
                     it.copy(care = it.care.copy(activity = it.care.activity + 2))
                 },
                 counters = c.copy(

@@ -44,6 +44,9 @@ Eine neue Version lässt sich einfach über die alte installieren, dein Spielsta
   Lampen und Bilder.
 - **Werte**: Sattheit, Laune, Energie, Hygiene und Gesundheit. Die Werte sinken in Echtzeit, auch wenn
   die App geschlossen ist. Dein Haustier schläft, wird krank und macht Häufchen 💩.
+- **Pflegebedarf und Schlafbedarf** (je ein Schieberegler in den Einstellungen): Wer mehr zu tun haben möchte,
+  stellt die Pflege höher, dann kommen Hunger, Langeweile und Schmutz schneller. Mit weniger Schlaf werden
+  die Nickerchen kürzer und das Haustier bleibt länger wach.
 - **Schwierigkeit** (umschaltbar): *Entspannt* (kann nicht sterben) oder *Klassisch* (schnellerer Verfall,
   bei Vernachlässigung reist das Haustier zu den Sternen, danach gibt es ein neues Ei).
 - **Sechs Minispiele** mit Countdown, Combos, Sternen und Effekten:
