@@ -33,10 +33,12 @@ data class Furnishing(
     val offsets: Map<Slot, Float> = emptyMap(),
     /** Plants in the garden beds: "" or "emoji|growth|ready". */
     val plants: List<String> = emptyList(),
+    /** Season outside (only for the garden). */
+    val season: de.knuffi.core.Season? = null,
 ) {
     val key: String
         get() = "$wall|$rug|$bed|$plant|$lamp|$picture|${event?.name}|$toy|$trophies|$deco|${house?.name}|" +
-            doors.joinToString(",") { "${it.to.name}${it.side.name}" } + "|" + offsets.entries.joinToString(",") { "${it.key.name}${(it.value * 1000).toInt()}" }
+            doors.joinToString(",") { "${it.to.name}${it.side.name}" } + "|" + offsets.entries.joinToString(",") { "${it.key.name}${(it.value * 1000).toInt()}" } + "|${season?.name}"
 
     /** The bed stands in the bedroom (or in the classic room). */
     val hasBed: Boolean get() = house == null || house == de.knuffi.core.RoomKind.BEDROOM
@@ -74,6 +76,7 @@ data class Furnishing(
                 doors = doors,
                 offsets = state.furnitureOffsets,
                 plants = plants,
+                season = if (house == de.knuffi.core.RoomKind.GARDEN) de.knuffi.core.EventCalendar.season(java.time.LocalDate.now()) else null,
             )
         }
 

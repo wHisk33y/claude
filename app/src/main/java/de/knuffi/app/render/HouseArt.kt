@@ -504,18 +504,43 @@ class HouseArt : Painter() {
     // ------------------------------------------------------------------ garden
 
     /** The garden: the back of the house with its doors, grass, a swing, a pool and flower beds. */
-    fun gardenStatic(c: Canvas, L: SceneLayout) {
+    fun gardenStatic(c: Canvas, L: SceneLayout, season: de.knuffi.core.Season? = null) {
         fixtureRects.clear()
         val w = L.w
         val h = L.h
         val fy = L.floorY
         val wallTop = fy - h * 0.34f
+        val winter = season == de.knuffi.core.Season.WINTER
+        val autumn = season == de.knuffi.core.Season.AUTUMN
+        val leaves = when {
+            winter -> intArrayOf(0xFFFFFFFF.toInt(), 0xFFE0E8F4.toInt(), 0xFF9AA8C0.toInt())
+            autumn -> intArrayOf(0xFFFFD08A.toInt(), 0xFFE8883A.toInt(), 0xFFA8501E.toInt())
+            else -> intArrayOf(0xFFA8E0A0.toInt(), 0xFF6ABF6A.toInt(), 0xFF3A8A4A.toInt())
+        }
+        val grassTop = when (season) {
+            de.knuffi.core.Season.WINTER -> 0xFFF6FAFF.toInt()
+            de.knuffi.core.Season.AUTUMN -> 0xFFC8D07A.toInt()
+            de.knuffi.core.Season.SUMMER -> 0xFFB8E46A.toInt()
+            else -> 0xFFA8E07A.toInt()
+        }
+        val grassBottom = when (season) {
+            de.knuffi.core.Season.WINTER -> 0xFFC8D8EA.toInt()
+            de.knuffi.core.Season.AUTUMN -> 0xFF8A9A4A.toInt()
+            de.knuffi.core.Season.SUMMER -> 0xFF6AAE3A.toInt()
+            else -> 0xFF5AAE4A.toInt()
+        }
+        val flowers = when (season) {
+            de.knuffi.core.Season.WINTER -> listOf("❄️", "⛄", "❄️", "🌲", "❄️")
+            de.knuffi.core.Season.AUTUMN -> listOf("🍂", "🍁", "🎃", "🍄", "🍂")
+            de.knuffi.core.Season.SUMMER -> listOf("🌻", "🌼", "🌱", "🌻", "🌿")
+            else -> listOf("🌷", "🌼", "🌱", "🌸", "🌿")
+        }
         // distant trees behind the house
         for (k in 0 until 6) {
             val tx = w * (0.05f + k * 0.18f)
             path.reset()
             path.addCircle(tx, wallTop - h * 0.02f, w * 0.09f, Path.Direction.CW)
-            shaded(c, path, 0xFFA8E0A0.toInt(), 0xFF6ABF6A.toInt(), 0xFF3A8A4A.toInt(), outline = false)
+            shaded(c, path, leaves[0], leaves[1], leaves[2], outline = false)
         }
         // the house wall with a roof edge
         vgrad(c, 0f, wallTop, w, fy, 0xFFFFF2D8.toInt(), 0xFFF2DCB8.toInt())
@@ -528,6 +553,7 @@ class HouseArt : Painter() {
             y += h * 0.028f
         }
         box(c, -w * 0.02f, wallTop - h * 0.035f, w * 1.02f, wallTop + h * 0.008f, w * 0.01f, 0xFFE8806A.toInt(), 0xFFB8503E.toInt(), shadow = h * 0.008f)
+        if (winter) box(c, -w * 0.02f, wallTop - h * 0.045f, w * 1.02f, wallTop - h * 0.026f, w * 0.01f, 0xFFFFFFFF.toInt(), 0xFFE0EAF6.toInt())
         // windows between the doors
         for (wx in floatArrayOf(0.5f, 0.1f, 0.9f)) {
             val cx = w * wx
@@ -543,7 +569,7 @@ class HouseArt : Painter() {
             c.drawText("🌸🌼🌸", cx, top + h * 0.108f, emoji)
         }
         // lawn
-        vgrad(c, 0f, fy, w, h, 0xFFA8E07A.toInt(), 0xFF5AAE4A.toInt())
+        vgrad(c, 0f, fy, w, h, grassTop, grassBottom)
         fill.shader = null
         fill.color = Colors.alpha(Color.WHITE, 0.08f)
         for (k in 0 until 6) {
@@ -564,7 +590,7 @@ class HouseArt : Painter() {
         var fx = w * 0.03f
         var k = 0
         while (fx < w) {
-            c.drawText(listOf("🌷", "🌼", "🌱", "🌸", "🌿")[k % 5], fx, fy + h * 0.012f, emoji)
+            c.drawText(flowers[k % 5], fx, fy + h * 0.012f, emoji)
             fx += w * 0.075f
             k++
         }
@@ -582,9 +608,11 @@ class HouseArt : Painter() {
         path.addCircle(tx, fy - h * 0.16f, w * 0.1f, Path.Direction.CW)
         path.addCircle(tx - w * 0.07f, fy - h * 0.12f, w * 0.07f, Path.Direction.CW)
         path.addCircle(tx + w * 0.06f, fy - h * 0.11f, w * 0.07f, Path.Direction.CW)
-        shaded(c, path, 0xFFB8F0A0.toInt(), 0xFF6ABF6A.toInt(), 0xFF2E7A3E.toInt(), outlineW = w * 0.003f)
-        fill.color = 0xFFFF5A6E.toInt()
-        for ((ax, ay) in listOf(-0.05f to -0.15f, 0.03f to -0.18f, 0.07f to -0.11f, -0.08f to -0.1f)) c.drawCircle(tx + w * ax, fy + h * ay, w * 0.012f, fill)
+        shaded(c, path, leaves[0], leaves[1], leaves[2], outlineW = w * 0.003f)
+        if (!winter) {
+            fill.color = if (autumn) 0xFFE8503E.toInt() else 0xFFFF5A6E.toInt()
+            for ((ax, ay) in listOf(-0.05f to -0.15f, 0.03f to -0.18f, 0.07f to -0.11f, -0.08f to -0.1f)) c.drawCircle(tx + w * ax, fy + h * ay, w * 0.012f, fill)
+        }
         // the paddling pool
         val px = w * 0.72f
         val py = L.groundY + h * 0.045f

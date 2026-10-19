@@ -316,7 +316,7 @@ class RoomRenderer : Painter() {
             "room_candy" -> staticCandy(c, L)
             "room_beach" -> staticBeach(c, L)
             "room_castle" -> staticCastle(c, L)
-            Furnishing.GARDEN -> houseArt.gardenStatic(c, L)
+            Furnishing.GARDEN -> houseArt.gardenStatic(c, L, f.season)
             else -> staticCozy(c, L, f)
         }
         // The cosy room draws its fixtures and doors itself, behind the furniture.
