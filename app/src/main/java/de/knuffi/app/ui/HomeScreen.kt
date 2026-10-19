@@ -183,7 +183,8 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
             roomBar = {
                 RoomBar(state, pet, voice, editMode, onHouse = { onOpen(Route.House) }, onEdit = {
                     // in 3D the room is furnished on its own page
-                    if (house3dOn(state)) onOpen(Route.Furnish(de.knuffi.core.House.shownRoom(state), fromHouse = false)) else editMode = !editMode
+                    val shown = de.knuffi.core.House.shownRoom(state)
+                    if (house3dOn(state) && shown?.outdoor != true) onOpen(Route.Furnish(shown, fromHouse = false)) else editMode = !editMode
                 })
             },
         )

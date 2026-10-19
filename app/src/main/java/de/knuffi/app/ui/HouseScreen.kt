@@ -93,7 +93,7 @@ fun HouseScreen(state: GameState, onBack: () -> Unit, onEnter: () -> Unit, onFur
     val unlocked = House.unlocked(state)
     val pet = state.pet
     val petLook = remember(state.pet, state.equipped) { PetLook.of(state)?.copy(sleeping = false) }
-    val in3d = house3dOn(state)
+    val in3d = rememberHouse3dOn(state)
     var chosen by remember { mutableStateOf<RoomKind?>(null) }
 
     fun go(target: RoomKind) {
@@ -377,25 +377,27 @@ private fun Residents(state: GameState) {
         )
         for (pet in pets) {
             val lives = pet.id in state.house.home
-            val look = remember(pet, state.equipped) { PetLook.of(pet, state).copy(sleeping = false, hat = null, face = null, neck = null, back = null) }
-            Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                PetPortrait(look, Modifier.size(46.dp), animated = false)
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(pet.name, style = MaterialTheme.typography.titleSmall, color = p.text)
-                    val room = state.house.residents[pet.id]
-                    Text(
-                        when {
-                            !lives -> "im Kuschelhaus"
-                            state.onTrip(pet.id) != null -> "gerade auf Reisen"
-                            room != null -> "wohnt im Haus · ${room.emoji} ${room.title}"
-                            else -> "wohnt im Haus"
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (lives) p.mintDeep else p.textMuted,
-                    )
+            androidx.compose.runtime.key(pet.id) {
+                val look = remember(pet, state.equipped) { PetLook.of(pet, state).copy(sleeping = false, hat = null, face = null, neck = null, back = null) }
+                Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    PetPortrait(look, Modifier.size(46.dp), animated = false)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(pet.name, style = MaterialTheme.typography.titleSmall, color = p.text)
+                        val room = state.house.residents[pet.id]
+                        Text(
+                            when {
+                                !lives -> "im Kuschelhaus"
+                                state.onTrip(pet.id) != null -> "gerade auf Reisen"
+                                room != null -> "wohnt im Haus · ${room.emoji} ${room.title}"
+                                else -> "wohnt im Haus"
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (lives) p.mintDeep else p.textMuted,
+                        )
+                    }
+                    KSwitch(lives) { GameRepository.perform(Action.SetResident(pet.id, it)) }
                 }
-                KSwitch(lives) { GameRepository.perform(Action.SetResident(pet.id, it)) }
             }
         }
     }

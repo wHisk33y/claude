@@ -78,6 +78,18 @@ import kotlin.math.max
 /** True if the house and rooms are shown in 3D right now. */
 fun house3dOn(state: GameState): Boolean = state.settings.house3d && Room3d.available
 
+/** Like [house3dOn], but notices when 3D stops working while the page is open. */
+@Composable
+fun rememberHouse3dOn(state: GameState): Boolean {
+    val available by androidx.compose.runtime.produceState(Room3d.available) {
+        while (true) {
+            value = Room3d.available
+            kotlinx.coroutines.delay(400)
+        }
+    }
+    return state.settings.house3d && available
+}
+
 /** Keeps the camera and the picture of a 3D view between frames. */
 private class View3State(val orbit: OrbitView) {
     val layer = Layer3()
