@@ -214,7 +214,8 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
                 Text(
                     if (!s.house3d) "Die gezeichneten Zimmer wie bisher."
                     else if (de.knuffi.app.render.house3d.Room3d.available) "Haus und Zimmer in 3D: Möbel stellst du frei auf den Boden und drehst sie, das Haus kannst du von allen Seiten ansehen."
-                    else "3D klappt auf diesem Gerät leider nicht, deshalb siehst du die gezeichneten Zimmer.",
+                    else "3D klappt auf diesem Gerät gerade nicht, deshalb siehst du die gezeichneten Zimmer. Schalte auf „Gezeichnet“ und wieder auf „3D-Zimmer“, um es neu zu versuchen." +
+                        (de.knuffi.app.render.house3d.Room3d.lastProblem?.let { "\n($it)" } ?: ""),
                     style = MaterialTheme.typography.bodySmall,
                     color = p.textMuted,
                 )

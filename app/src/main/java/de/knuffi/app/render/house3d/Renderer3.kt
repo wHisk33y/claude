@@ -60,6 +60,10 @@ class Renderer3(private val gl: Gl, private val source: TextureSource) {
     private var readBuf: ByteBuffer? = null
 
     private val lightVP = FloatArray(16)
+
+    /** The last OpenGL error seen (0: none). */
+    var lastError = 0
+        private set
     private val nrm = FloatArray(9)
 
     /** Throws if the shaders do not work here. */
@@ -227,6 +231,9 @@ class Renderer3(private val gl: Gl, private val source: TextureSource) {
     /** Renders [scene] seen by [cam]; returns RGBA pixels (top row first, premultiplied). */
     fun render(scene: Scene3, cam: Camera3, opt: RenderOptions = RenderOptions()): ByteBuffer {
         init()
+        // forget errors of earlier pictures
+        var guard = 0
+        while (gl.error() != Gl.NO_ERROR && guard++ < 8) Unit
         frame++
         val w = cam.width
         val h = cam.height
@@ -338,8 +345,9 @@ class Renderer3(private val gl: Gl, private val source: TextureSource) {
         buf.clear()
         gl.readRgba(w, h, buf)
         gl.bindFramebuffer(Gl.FRAMEBUFFER, 0)
+        // an error of a single call is remembered, but the picture is still used
         val err = gl.error()
-        check(err == Gl.NO_ERROR) { "gl error $err" }
+        if (err != Gl.NO_ERROR) lastError = err
         evict()
         buf.position(0)
         buf.limit(need)
@@ -365,7 +373,7 @@ class Renderer3(private val gl: Gl, private val source: TextureSource) {
     }
 
     private fun evict() {
-        if (meshes.size > 900) {
+        if (meshes.size > 400) {
             val old = meshes.entries.filter { frame - it.value.used > 30 }
             for (e in old) {
                 gl.deleteBuffer(e.value.vbo)

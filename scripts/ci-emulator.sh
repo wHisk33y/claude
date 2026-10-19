@@ -74,6 +74,18 @@ run_scene dark gardenroom
 shot dark_gardenroom 12
 run_scene dark house
 shot dark_house 12
+# Furnishing with real finger drags, then back to the home screen: the room must stay in 3D
+run_scene light furnish
+sleep 12
+for sw in "540 1150 330 1000" "760 1350 520 1250" "380 900 640 1080" "540 1300 700 1150"; do
+  timeout 20 adb shell input swipe $sw 700 || true
+  sleep 3
+done
+shot light_furnish_moved 2
+timeout 20 adb shell input keyevent KEYCODE_BACK || true
+shot light_furnish_home 10
+timeout 20 adb logcat -d -s Room3d:W > "$OUT/room3d_log.txt" || true
+
 # ... and drawn, as before
 for scene in house kitchenroom bedroom classic; do
   run_scene light "$scene" --es debug_flat 1

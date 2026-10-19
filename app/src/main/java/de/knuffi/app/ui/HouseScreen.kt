@@ -142,7 +142,12 @@ fun HouseScreen(state: GameState, onBack: () -> Unit, onEnter: () -> Unit, onFur
                 { GameRepository.perform(Action.UpdateSettings(GameRepository.current.settings.copy(house3d = it == 0))) },
             )
             if (state.settings.house3d && !de.knuffi.app.render.house3d.Room3d.available) {
-                Text("3D klappt auf diesem Gerät leider nicht, deshalb siehst du die gezeichneten Zimmer.", style = MaterialTheme.typography.bodySmall, color = p.textMuted)
+                Text(
+                    "3D klappt gerade nicht, deshalb siehst du die gezeichneten Zimmer. Schalte auf „Gezeichnet“ und wieder auf „3D“, um es neu zu versuchen." +
+                        (de.knuffi.app.render.house3d.Room3d.lastProblem?.let { "\n($it)" } ?: ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = p.textMuted,
+                )
             }
             if (!houseOn) {
                 SurfaceCard(Modifier.fillMaxWidth()) {

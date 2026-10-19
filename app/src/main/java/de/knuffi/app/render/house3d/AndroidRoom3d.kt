@@ -76,14 +76,30 @@ class Layer3 {
 object Room3d {
     private const val TAG = "Room3d"
 
-    /** Set from the settings. */
+    /** Set from the settings; switching 3D on again gives it a new try after a failure. */
     @Volatile
     var wanted = true
+        set(value) {
+            if (value && !field) {
+                failed = false
+                failures = 0
+            }
+            field = value
+        }
 
     @Volatile
     private var failed = false
 
+    /** Failures in a row; a single hiccup does not switch 3D off. */
+    @Volatile
+    private var failures = 0
+
     val available: Boolean get() = wanted && !failed
+
+    /** What went wrong last (shown in the settings when 3D had to be switched off). */
+    @Volatile
+    var lastProblem: String? = null
+        private set
 
     private class Job(val scene: Scene3, val cam: Camera3, val opt: RenderOptions, val token: Any?, val prepare: (() -> Unit)?)
 
@@ -134,10 +150,39 @@ object Room3d {
             buf.position(0)
             bmp.copyPixelsFromBuffer(buf)
             layer.deliver(bmp, job.token)
+            failures = 0
         } catch (t: Throwable) {
-            Log.w(TAG, "3D house disabled", t)
-            failed = true
+            failures++
+            lastProblem = (t::class.java.simpleName + ": " + (t.message ?: "")).take(160)
+            Log.w(TAG, "3D picture failed ($failures)", t)
+            // start over with a fresh context; only give up if it keeps failing
+            reset()
+            if (failures >= 3) {
+                Log.w(TAG, "3D house disabled")
+                failed = true
+            } else {
+                synchronized(pending) {
+                    if (!pending.containsKey(layer)) {
+                        pending[layer] = job
+                        handler.postDelayed({ run(layer) }, 300L)
+                    }
+                }
+            }
         }
+    }
+
+    /** Throws away the context and everything in it. */
+    private fun reset() {
+        renderer = null
+        runCatching {
+            if (display != EGL14.EGL_NO_DISPLAY) {
+                EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
+                if (surface != EGL14.EGL_NO_SURFACE) EGL14.eglDestroySurface(display, surface)
+                if (context != EGL14.EGL_NO_CONTEXT) EGL14.eglDestroyContext(display, context)
+            }
+        }
+        surface = EGL14.EGL_NO_SURFACE
+        context = EGL14.EGL_NO_CONTEXT
     }
 
     private fun ensure(): Boolean {

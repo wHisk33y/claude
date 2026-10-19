@@ -140,7 +140,67 @@ object Room3 {
 
     // ------------------------------------------------------------------ building
 
+    /** Everything of a room except the furniture (built once and kept, furniture moves often). */
+    private class Shell(
+        val items: List<Item3>,
+        val doors: List<DoorPlace>,
+        val fixtures: List<FixturePlace>,
+        val blocked: List<Rect2>,
+        val fullWalls: Map<DoorSide, Item3>,
+    )
+
+    private data class ShellKey(val spec: RoomSpec, val mode: Mode, val wallH: Int, val baked: Boolean, val exterior: Set<DoorSide>)
+
+    private val shells = object : LinkedHashMap<ShellKey, Shell>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<ShellKey, Shell>?): Boolean = size > 24
+    }
+
     fun build(spec: RoomSpec, mode: Mode, homeWallH: Float = TEX_H, baked: Boolean = mode == Mode.HOUSE, wallFlags: WallFlags = WallFlags()): RoomModel {
+        val kind = spec.kind
+        val w = width(kind)
+        val d = ROOM_D
+        val outdoor = kind == RoomKind.GARDEN
+        val key = ShellKey(spec.copy(furniture = emptyMap(), spots = emptyMap(), showBed = false), mode, (homeWallH * 100).toInt(), baked, wallFlags.exterior)
+        val shell = synchronized(shells) { shells.getOrPut(key) { shell(spec, mode, homeWallH, baked, wallFlags) } }
+        val items = ArrayList<Item3>(shell.items)
+        val doors = shell.doors
+        val fullWalls = shell.fullWalls
+        val blocked = shell.blocked
+        /** Things on a wall are shown with the wall (in the house only when it is high). */
+        fun attach(item: Item3, side: DoorSide) {
+            if (mode == Mode.HOME) return
+            val wall = fullWalls[side]
+            if (wall == null) item.hidden = true else item.linkedTo = wall
+        }
+
+        // ---------------------------------------------------------------- furniture
+        val placed = LinkedHashMap<Slot, Placed>()
+        if (!outdoor) {
+            val taken = ArrayList<Rect2>(blocked)
+            for (slot in ORDER) {
+                val id = spec.furniture[slot] ?: continue
+                if (slot == Slot.BED && !spec.showBed) continue
+                val piece = Furniture3.piece(id)
+                val spot = spec.spots[slot]
+                val (x, z, turn, y) = if (spot != null) {
+                    val (sx, sz, sy) = spotToRoom(spot, w, d, piece)
+                    val (cx, cz) = clampInside(piece, sx, sz, spot.turn, w, d)
+                    Quad4(cx, cz, if (piece.onWall) 0f else spot.turn, sy)
+                } else {
+                    defaultSpot(slot, piece, w, d, kind, taken, doors)
+                }
+                val item = Item3(piece.model, M4.place(x, if (piece.onWall) y else 0f, if (piece.onWall) -d / 2f else z, turn * MeshBuilder.DEG), "slot:${slot.name}")
+                if (piece.onWall) attach(item, DoorSide.NORTH)
+                val p = Placed(slot, piece, x, if (piece.onWall) -d / 2f else z, turn, y, item)
+                placed[slot] = p
+                items += item
+                if (!piece.flat && !piece.onWall) taken += p.rect
+            }
+        }
+        return RoomModel(spec, w, d, items, placed, doors, shell.fixtures, blocked)
+    }
+
+    private fun shell(spec: RoomSpec, mode: Mode, homeWallH: Float, baked: Boolean, wallFlags: WallFlags): Shell {
         val kind = spec.kind
         val w = width(kind)
         val d = ROOM_D
@@ -204,32 +264,7 @@ object Room3 {
             f.blocks?.let { blocked += it }
         }
         for (dp in doors) blocked += doorZone(dp, w, d)
-
-        // ---------------------------------------------------------------- furniture
-        val placed = LinkedHashMap<Slot, Placed>()
-        if (!outdoor) {
-            val taken = ArrayList<Rect2>(blocked)
-            for (slot in ORDER) {
-                val id = spec.furniture[slot] ?: continue
-                if (slot == Slot.BED && !spec.showBed) continue
-                val piece = Furniture3.piece(id)
-                val spot = spec.spots[slot]
-                val (x, z, turn, y) = if (spot != null) {
-                    val (sx, sz, sy) = spotToRoom(spot, w, d, piece)
-                    val (cx, cz) = clampInside(piece, sx, sz, spot.turn, w, d)
-                    Quad4(cx, cz, if (piece.onWall) 0f else spot.turn, sy)
-                } else {
-                    defaultSpot(slot, piece, w, d, kind, taken, doors)
-                }
-                val item = Item3(piece.model, M4.place(x, if (piece.onWall) y else 0f, if (piece.onWall) -d / 2f else z, turn * MeshBuilder.DEG), "slot:${slot.name}")
-                if (piece.onWall) attach(item, DoorSide.NORTH)
-                val p = Placed(slot, piece, x, if (piece.onWall) -d / 2f else z, turn, y, item)
-                placed[slot] = p
-                items += item
-                if (!piece.flat && !piece.onWall) taken += p.rect
-            }
-        }
-        return RoomModel(spec, w, d, items, placed, doors, fixtures, blocked)
+        return Shell(items, doors, fixtures, blocked, fullWalls)
     }
 
     data class Quad4(val x: Float, val z: Float, val turn: Float, val y: Float)
