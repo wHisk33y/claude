@@ -149,6 +149,11 @@ class HouseTest {
         var s = started()
         val friend = Pet(name = "Blubbi", form = Form.DELFINO, bornAt = t0 - 50_000, hatchedAt = t0 - 50_000, level = 8, line = EggLine.MEER)
         s = s.copy(resting = listOf(friend))
+        s = Engine.tick(s, t0 + 500, zone).state
+        // nobody moves in on their own
+        assertNull(s.house.residents[friend.id])
+        s = Engine.perform(s, Action.SetResident(friend.id, true), t0 + 800, zone).state
+        assertTrue(friend.id in s.house.home)
         s = Engine.tick(s, t0 + 1000, zone).state
         val room = s.house.residents[friend.id]
         assertNotNull(room)
@@ -166,6 +171,52 @@ class HouseTest {
         s = s.copy(trips = listOf(Trip(friend.id, Destination.STRAND, t, t + 3_600_000L)))
         s = Engine.tick(s, t + 1000, zone).state
         assertNull(s.house.residents[friend.id])
+        // moving back out of the house
+        s = s.copy(trips = emptyList())
+        s = Engine.tick(s, t + 2000, zone).state
+        assertNotNull(s.house.residents[friend.id])
+        s = Engine.perform(s, Action.SetResident(friend.id, false), t + 3000, zone).state
+        assertNull(s.house.residents[friend.id])
+        assertTrue(House.residentsIn(s, s.house.current).none { it.id == friend.id })
+        // unknown pets are ignored
+        val before = s
+        s = Engine.perform(s, Action.SetResident(424242L, true), t + 4000, zone).state
+        assertEquals(before.house.home, s.house.home)
+    }
+
+    @Test
+    fun furnitureIsPlacedFreelyIn3d() {
+        var s = rich(started())
+        val room = s.house.current
+        s = Engine.perform(s, Action.PlaceFurniture(room, Slot.BED, Spot(0.3f, 0.2f, 90f)), t0 + 1000, zone).state
+        assertEquals(Spot(0.3f, 0.2f, 90f), House.spots(s, room)[Slot.BED])
+        // limits and turning
+        s = Engine.perform(s, Action.PlaceFurniture(room, Slot.DECO, Spot(1.4f, -0.5f, -45f)), t0 + 2000, zone).state
+        assertEquals(Spot(1f, 0f, 315f), House.spots(s, room)[Slot.DECO])
+        // walls and the room itself cannot be placed
+        s = Engine.perform(s, Action.PlaceFurniture(room, Slot.WALL, Spot(0.5f, 0.5f)), t0 + 3000, zone).state
+        assertNull(House.spots(s, room)[Slot.WALL])
+        // every room keeps its own places, rooms not built yet cannot be furnished
+        s = Engine.perform(s, Action.PlaceFurniture(RoomKind.KITCHEN, Slot.PLANT, Spot(0.1f, 0.1f)), t0 + 4000, zone).state
+        s = Engine.perform(s, Action.PlaceFurniture(RoomKind.CRAFT, Slot.PLANT, Spot(0.1f, 0.1f)), t0 + 4500, zone).state
+        assertEquals(Spot(0.1f, 0.1f), House.spots(s, RoomKind.KITCHEN)[Slot.PLANT])
+        assertNull(House.spots(s, room)[Slot.PLANT])
+        assertTrue(House.spots(s, RoomKind.CRAFT).isEmpty())
+        // walking to another room keeps the places
+        s = Engine.perform(s, Action.GoToRoom(RoomKind.KITCHEN), t0 + 5000, zone).state
+        assertEquals(Spot(0.3f, 0.2f, 90f), House.spots(s, room)[Slot.BED])
+        assertEquals(RoomKind.KITCHEN, House.shownRoom(s))
+        // the classic room has its own places
+        s = Engine.perform(s, Action.PlaceFurniture(null, Slot.TOY, Spot(0.7f, 0.4f)), t0 + 6000, zone).state
+        assertEquals(Spot(0.7f, 0.4f), House.spots(s, null)[Slot.TOY])
+        s = Engine.perform(s, Action.UpdateSettings(s.settings.copy(houseMode = false)), t0 + 7000, zone).state
+        assertNull(House.shownRoom(s))
+        // starting over
+        s = Engine.perform(s, Action.ResetPlaces(room), t0 + 8000, zone).state
+        assertTrue(House.spots(s, room).isEmpty())
+        assertEquals(Spot(0.7f, 0.4f), House.spots(s, null)[Slot.TOY])
+        s = Engine.perform(s, Action.ResetPlaces(null), t0 + 9000, zone).state
+        assertTrue(House.spots(s, null).isEmpty())
     }
 
     @Test
@@ -322,6 +373,9 @@ class HouseTest {
         var s = rich(started())
         s = Engine.perform(s, Action.BuildRoom(RoomKind.BATH), t0 + 1000, zone).state
         s = Engine.perform(s, Action.MoveFurniture(Slot.TOY, -0.1f), t0 + 1500, zone).state
+        s = Engine.perform(s, Action.PlaceFurniture(RoomKind.BATH, Slot.RUG, Spot(0.4f, 0.6f, 45f)), t0 + 1600, zone).state
+        s = Engine.perform(s, Action.PlaceFurniture(null, Slot.LAMP, Spot(0.2f, 0.1f)), t0 + 1700, zone).state
+        s = s.copy(house = s.house.copy(home = setOf(7L, 9L)))
         s = s.copy(
             familyEggs = listOf(FamilyEgg(5, EggLine.MEER, listOf(1, 2), listOf("A", "B"), "LUMI")),
             songs = listOf(Song("Hallo", listOf(SongNote(Instrument.DRUMS, 1, 0)))),

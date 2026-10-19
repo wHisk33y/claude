@@ -105,6 +105,12 @@ sealed interface Action {
     data class BuildRoom(val room: RoomKind) : Action
     data class MoveFurniture(val slot: Slot, val dx: Float) : Action
     data object ResetFurniture : Action
+    /** Puts a piece of furniture somewhere in a 3D room ([room] null: the classic room). */
+    data class PlaceFurniture(val room: RoomKind?, val slot: Slot, val spot: Spot) : Action
+    /** Puts all furniture of a 3D room back to where it started. */
+    data class ResetPlaces(val room: RoomKind?) : Action
+    /** A pet from the Kuschelhaus moves into the house (or back out). */
+    data class SetResident(val petId: Long, val lives: Boolean) : Action
     data class HatchFamilyEgg(val id: Long, val name: String) : Action
     data object DustDuplicates : Action
     data class CraftCard(val form: Form) : Action
@@ -1011,6 +1017,9 @@ object Engine {
                 is Action.BuildRoom -> buildRoom(action.room, now)
                 is Action.MoveFurniture -> moveFurniture(action.slot, action.dx)
                 Action.ResetFurniture -> s = s.copy(furnitureOffsets = emptyMap())
+                is Action.PlaceFurniture -> s = House.place(s, action.room, action.slot, action.spot)
+                is Action.ResetPlaces -> s = House.resetPlaces(s, action.room)
+                is Action.SetResident -> setResident(action.petId, action.lives, now)
                 is Action.HatchFamilyEgg -> hatchFamilyEgg(action.id, action.name, now)
                 Action.DustDuplicates -> dustDuplicates()
                 is Action.CraftCard -> craftCard(action.form)
@@ -2460,6 +2469,18 @@ object Engine {
             emit(GameEvent.RoomBuilt(k))
             addXp(20, now)
             feel(Emotion.AUFGEREGT, now)
+        }
+
+        private fun setResident(id: Long, lives: Boolean, now: Long) {
+            val pet = s.resting.firstOrNull { it.id == id } ?: return
+            val home = s.house.home
+            if (lives == (id in home)) return
+            s = s.copy(house = s.house.copy(home = if (lives) home + id else home - id))
+            s = House.updateResidents(s, now)
+            if (lives && House.enabled(s)) {
+                val room = s.house.residents[id]
+                message(if (room != null) "${pet.name} wohnt jetzt im Haus (${room.title}). 🏠" else "${pet.name} wohnt jetzt im Haus. 🏠")
+            }
         }
 
         private fun moveFurniture(slot: Slot, dx: Float) {

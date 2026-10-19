@@ -48,6 +48,14 @@ enum class DoorSide { WEST, EAST, NORTH, SOUTH;
 /** A door from room [from] to room [to]. [pos] is where it sits along the wall (0..1 across the room). */
 data class Door(val from: RoomKind, val to: RoomKind, val side: DoorSide, val pos: Float)
 
+/**
+ * Where a piece of furniture stands in a 3D room: [x] across the room (0 left, 1 right),
+ * [d] from the back wall (0) to the front (1) and [turn] in degrees. Pictures hang on the back
+ * wall, for them [d] is the height (0 low, 1 high).
+ */
+@Serializable
+data class Spot(val x: Float, val d: Float, val turn: Float = 0f)
+
 /** Furniture of one room (and how far each piece was moved, in screen widths). */
 @Serializable
 data class RoomState(
@@ -69,6 +77,12 @@ data class HouseState(
     /** Where the pets from the Kuschelhaus are right now. */
     val residents: Map<Long, RoomKind> = emptyMap(),
     val lastWander: Long = 0,
+    /** The pets from the Kuschelhaus that live in the house (the others stay in the Kuschelhaus). */
+    val home: Set<Long> = emptySet(),
+    /** Furniture placed by hand in the 3D rooms (missing pieces stand where they start). */
+    val spots: Map<RoomKind, Map<Slot, Spot>> = emptyMap(),
+    /** The same for the classic single room. */
+    val classicSpots: Map<Slot, Spot> = emptyMap(),
 )
 
 object House {
@@ -260,13 +274,16 @@ object House {
         return s.resting.filter { s.house.residents[it.id] == k }
     }
 
-    /** Gives every pet from the Kuschelhaus a room and lets them wander from time to time. */
+    /** The pets from the Kuschelhaus that may live in the house (chosen by the player). */
+    fun mayLiveHere(s: GameState, p: Pet): Boolean = !p.isEgg && p.alive && p.id in s.house.home
+
+    /** Gives every pet living in the house a room and lets them wander from time to time. */
     fun updateResidents(s: GameState, now: Long): GameState {
         if (!enabled(s)) return s
         val un = unlocked(s).toList().sortedBy { it.ordinal }
         if (un.isEmpty()) return s
         val visitors = listOfNotNull(s.visit, s.visit2).map { it.petId }.toSet()
-        val home = s.resting.filter { !it.isEgg && it.alive && s.onTrip(it.id) == null }
+        val home = s.resting.filter { (mayLiveHere(s, it) || it.id in visitors) && !it.isEgg && it.alive && s.onTrip(it.id) == null }
         val ids = home.map { it.id }.toSet()
         var res = s.house.residents.filter { (id, room) -> id in ids && room in un }
         for (p in home) if (p.id !in res) res = res + (p.id to un[Random(p.id).nextInt(un.size)])
@@ -286,6 +303,38 @@ object House {
         }
         if (res == s.house.residents && last == s.house.lastWander) return s
         return s.copy(house = s.house.copy(residents = res, lastWander = last))
+    }
+
+    // ------------------------------------------------------------------ 3D furniture
+
+    /** Furniture that can be placed freely in a 3D room. */
+    val PLACEABLE: List<Slot> = listOf(Slot.RUG, Slot.BED, Slot.PLANT, Slot.LAMP, Slot.PICTURE, Slot.TOY, Slot.DECO)
+
+    /** The hand-placed furniture of a room ([room] null: the classic room). */
+    fun spots(s: GameState, room: RoomKind?): Map<Slot, Spot> =
+        if (room == null) s.house.classicSpots else s.house.spots[room] ?: emptyMap()
+
+    /** The room shown at the moment (null: the classic room). */
+    fun shownRoom(s: GameState): RoomKind? = if (enabled(s)) s.house.current else null
+
+    fun place(s: GameState, room: RoomKind?, slot: Slot, spot: Spot): GameState {
+        if (slot !in PLACEABLE) return s
+        if (room != null && room !in unlocked(s)) return s
+        val turn = ((spot.turn % 360f) + 360f) % 360f
+        val clean = Spot(spot.x.coerceIn(0f, 1f), spot.d.coerceIn(0f, 1f), turn)
+        val h = s.house
+        return s.copy(
+            house = if (room == null) {
+                h.copy(classicSpots = h.classicSpots + (slot to clean))
+            } else {
+                h.copy(spots = h.spots + (room to ((h.spots[room] ?: emptyMap()) + (slot to clean))))
+            },
+        )
+    }
+
+    fun resetPlaces(s: GameState, room: RoomKind?): GameState {
+        val h = s.house
+        return s.copy(house = if (room == null) h.copy(classicSpots = emptyMap()) else h.copy(spots = h.spots - room))
     }
 
     /** Keeps everything consistent: the right mode, a sleeping pet in its bed, residents in rooms. */

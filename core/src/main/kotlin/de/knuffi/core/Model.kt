@@ -306,6 +306,8 @@ data class Settings(
     val houseMode: Boolean = true,
     /** Saves a backup into Downloads/Knuffi once a week. */
     val autoBackup: Boolean = true,
+    /** The house and its rooms in 3D (false: the drawn rooms). */
+    val house3d: Boolean = true,
 )
 
 /** Player-adjustable pace of the needs and of sleep. Level 2 is the original balance. */
