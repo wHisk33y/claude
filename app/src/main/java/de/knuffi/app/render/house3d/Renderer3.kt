@@ -246,6 +246,10 @@ class Renderer3(private val gl: Gl, private val source: TextureSource) {
             val lb = b.transformed(lv)
             val lp = M4.ortho(lb.x0 - 0.05f, lb.x1 + 0.05f, lb.y0 - 0.05f, lb.y1 + 0.05f, -lb.z1 - 0.1f, -lb.z0 + 0.1f)
             M4.mul(lp, lv, lightVP)
+            // the shadow map must not be bound for reading while it is drawn into
+            gl.activeTexture(Gl.TEXTURE0 + 1)
+            gl.bindTexture(0)
+            gl.activeTexture(Gl.TEXTURE0)
             gl.bindFramebuffer(Gl.FRAMEBUFFER, shadowFbo)
             gl.viewport(shadowSize, shadowSize)
             gl.clearDepth()

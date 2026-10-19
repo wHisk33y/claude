@@ -593,6 +593,9 @@ fun PetScene(
         d.wishText = if (interactive) wishText else null
         r.furnishing = m.furniture
         r.configure(d, w, h, kind)
+        // visitors use the same doors as the pet (drawn or 3D)
+        handle.guest.doorPoints = d.doorPoints
+        handle.guest2.doorPoints = d.doorPoints
         d.update(t, look, needs, ps, r.headNX, r.headNY)
         if (interactive) handle.pollTravel()
         // Guests: visitors follow the pet through the door, newcomers walk in through one.

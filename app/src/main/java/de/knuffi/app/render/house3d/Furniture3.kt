@@ -30,7 +30,7 @@ internal fun col(v: Long): Int = v.toInt()
 object Furniture3 {
     private val cache = HashMap<String, Piece>()
 
-    fun piece(id: String): Piece = cache.getOrPut(id) { make(id) }
+    fun piece(id: String): Piece = synchronized(cache) { cache.getOrPut(id) { make(id) } }
 
     /** The slot a furniture id belongs to (by its prefix). */
     fun slotOf(id: String): Slot? = when {
