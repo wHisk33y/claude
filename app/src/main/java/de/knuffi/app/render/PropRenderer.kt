@@ -195,7 +195,7 @@ class PropRenderer : Painter() {
         }
     }
 
-    fun bedFront(c: Canvas, x: Float, groundY: Float, s: Float, blanket: Float, cozy: Boolean, t: Float, style: String = "bed_classic") {
+    fun bedFront(c: Canvas, x: Float, groundY: Float, s: Float, blanket: Float, cozy: Boolean, t: Float, style: String = "bed_classic", blanketOnly: Boolean = false) {
         val w = s * 1.36f
         val l = x - w / 2f
         val r = x + w / 2f
@@ -239,6 +239,7 @@ class PropRenderer : Painter() {
             c.drawLine(left + s * 0.02f, top + s * 0.07f, r, top + s * 0.07f, line)
             c.restore()
         }
+        if (blanketOnly) return
         if (cozy) {
             when (style) {
                 "bed_cloud" -> {

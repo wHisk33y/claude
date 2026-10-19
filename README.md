@@ -126,8 +126,19 @@ Eine neue Version lässt sich einfach über die alte installieren, dein Spielsta
   Einstellungen kannst du zwischen *Ganzes Haus* und dem klassischen *Ein Zimmer* umschalten, beides bleibt erhalten.
 - **Garten zum Hineingehen**: Durch die Hintertür geht es nach draußen, mit Schaukel, Planschbecken, Baum und
   Beeten, in denen deine Pflanzen aus dem Garten wachsen. Himmel und Wetter ändern sich mit der Tageszeit.
-- **Mitbewohner**: Die Haustiere aus dem Kuschelhaus wohnen in den Zimmern und wandern ab und zu durch die Türen.
-- **Möbel frei verschieben**: Mit ✏️ ziehst du Pflanze, Lampe, Bild, Teppich, Spielecke, Sitzecke und Bett zur Seite.
+- **Mitbewohner**: In der Hausübersicht wählst du mit einem Schalter pro Tier aus, wer aus dem Kuschelhaus mit ins
+  Haus zieht. Diese Haustiere wohnen dann in den Zimmern und wandern ab und zu durch die Türen, alle anderen bleiben
+  im Kuschelhaus.
+- **Haus und Zimmer in 3D**: Die Zimmer werden mit OpenGL ES 3 als echte 3D-Räume gerendert, mit weichem Licht und
+  Schatten; jedes Möbelstück aus dem Shop gibt es als 3D-Modell. Die Draufsicht ist ein kleines 3D-Puppenhaus, das
+  du mit dem Finger drehst und mit zwei Fingern zoomst. Die Wände zwischen den Zimmern sind niedrig, damit du in jedes
+  Zimmer hineinschauen kannst. Mit ✏️ (oder *Einrichten* in der Hausübersicht) stellst du Möbel frei auf den Boden,
+  schiebst sie nach vorne oder hinten, drehst sie und hängst Bilder an die Wand; Möbel können sich nicht
+  überlappen und versperren keine Türen. Das Haustier läuft vor und hinter den Möbeln entlang und schläft in seinem
+  Bett, wo immer es steht. In den Einstellungen (*Zimmer-Grafik*) und in der Hausübersicht schaltest du zwischen
+  *3D* und den gezeichneten Zimmern um; ohne 3D-Unterstützung wird automatisch gezeichnet.
+- **Möbel verschieben (gezeichnet)**: In den gezeichneten Zimmern ziehst du mit ✏️ Pflanze, Lampe, Bild, Teppich,
+  Spielecke, Sitzecke und Bett zur Seite.
 - **Nachwuchs**: Haustiere, die beste Freunde sind, bekommen manchmal zusammen ein Ei. Das Kleine hat Farben von
   beiden (Kleintiere erben das Fell).
 - **Musikzimmer**: Klavier, Xylophon und Trommeln spielen, Lieder aufnehmen und wieder anhören. Dein Haustier tanzt mit.
@@ -174,6 +185,7 @@ Eine neue Version lässt sich einfach über die alte installieren, dein Spielsta
 core/   Reine Kotlin-Spiellogik (Simulation, Ei-Familien, Quests, Pass, Feste, Garten, Ausflüge, Shop) + Unit-Tests
 app/    Android-App (Jetpack Compose)
   render/   Canvas-Grafik-Engine: Haustier, Posen, Verhalten, Zimmer, Requisiten, Partikel
+    house3d/  3D-Haus (OpenGL ES 3, eigener Thread): Möbel-Modelle, Zimmer, Puppenhaus, Licht und Schatten
   ui/       Bildschirme, Minispiele, Overlays, Theme (hell/dunkel)
   screen/   Live-Hintergrund und schwebendes Haustier
   widget/   Homescreen-Widget (RemoteViews, animiert per ViewFlipper)

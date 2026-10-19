@@ -18,7 +18,18 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /** Where the doors of a room are, in scene units (x across, z depth: 0 front, 1 back wall). */
-object DoorGeo {
+/** Where the pet goes to walk through a door, in its own coordinates (x: screen fraction, z: depth). */
+interface DoorPoints {
+    /** The spot behind the door where the pet disappears. */
+    fun outX(d: Door): Float
+    fun outZ(d: Door): Float
+
+    /** A spot inside the room in front of the door. */
+    fun inX(d: Door): Float
+    fun inZ(d: Door): Float
+}
+
+object DoorGeo : DoorPoints {
     private fun wideX(d: Door): Float = 0.5f + (d.pos - 0.5f) * 0.8f
 
     /** Screen x of a door in the back wall. */
@@ -26,28 +37,26 @@ object DoorGeo {
 
     fun southX(d: Door): Float = if (d.from.cols == 1) 0.5f else wideX(d)
 
-    /** The spot behind the door where the pet disappears. */
-    fun outX(d: Door): Float = when (d.side) {
+    override fun outX(d: Door): Float = when (d.side) {
         DoorSide.WEST -> -0.14f
         DoorSide.EAST -> 1.14f
         DoorSide.NORTH -> northX(d)
         DoorSide.SOUTH -> southX(d)
     }
 
-    fun outZ(d: Door): Float = when (d.side) {
+    override fun outZ(d: Door): Float = when (d.side) {
         DoorSide.WEST, DoorSide.EAST -> 0.55f
         DoorSide.NORTH -> 1.08f
         DoorSide.SOUTH -> -0.5f
     }
 
-    /** A spot inside the room in front of the door. */
-    fun inX(d: Door): Float = when (d.side) {
+    override fun inX(d: Door): Float = when (d.side) {
         DoorSide.WEST -> 0.28f
         DoorSide.EAST -> 0.72f
         else -> outX(d).coerceIn(0.26f, 0.74f)
     }
 
-    fun inZ(d: Door): Float = when (d.side) {
+    override fun inZ(d: Door): Float = when (d.side) {
         DoorSide.WEST, DoorSide.EAST -> 0.5f
         DoorSide.NORTH -> 0.62f
         DoorSide.SOUTH -> 0.12f

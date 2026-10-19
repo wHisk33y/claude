@@ -28,8 +28,9 @@ shot() {
 
 run_scene() {
   local theme=$1 scene=$2
+  shift 2
   timeout 30 adb shell am force-stop $DEBUG_PKG || true
-  if ! timeout 60 adb shell am start -W -n "$DEBUG_PKG/$ACT" --es debug_scene "$scene" --es debug_theme "$theme" > /dev/null; then
+  if ! timeout 60 adb shell am start -W -n "$DEBUG_PKG/$ACT" --es debug_scene "$scene" --es debug_theme "$theme" "$@" > /dev/null; then
     echo "::warning::scene $scene did not start in time"
     timeout 120 adb wait-for-device || true
   fi
@@ -64,13 +65,20 @@ done
 run_scene dark tricks
 shot dark_tricks 8
 
-# The house: overview, every room, the classic room, music and cards
-for scene in house kitchenroom bathroom bedroom playroom musicroom gardenroom craftroom classic music cards; do
+# The house in 3D: overview, every room, the classic room, furnishing, music and cards
+for scene in house kitchenroom bathroom bedroom playroom musicroom gardenroom craftroom classic furnish music cards; do
   run_scene light "$scene"
-  shot "light_${scene}" 9
+  shot "light_${scene}" 12
 done
 run_scene dark gardenroom
-shot dark_gardenroom 9
+shot dark_gardenroom 12
+run_scene dark house
+shot dark_house 12
+# ... and drawn, as before
+for scene in house kitchenroom bedroom classic; do
+  run_scene light "$scene" --es debug_flat 1
+  shot "flat_${scene}" 9
+done
 
 # Furniture, festivals and the new celebrations
 for scene in furniture furniture2 furniture3 halloween winter eventshop eggfound birthday tripback; do

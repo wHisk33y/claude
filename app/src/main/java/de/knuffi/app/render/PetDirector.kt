@@ -119,6 +119,15 @@ class PetDirector(seed: Int = 7) {
     var maxX = 0.7f
     var bowlX = 0.17f
     var bedX = 0.8f
+
+    /** Depth of the bed (1: the back lane; in the 3D rooms wherever it stands). */
+    var bedZ = 1f
+
+    /** How high the pet lies in bed (in pet sizes). */
+    var bedLift = 0.26f
+
+    /** Where doors are for walking through them (the drawn rooms or the 3D rooms). */
+    var doorPoints: DoorPoints = DoorGeo
     var hasBowl = true
     var hasBed = true
     var hasTub = true
@@ -305,12 +314,12 @@ class PetDirector(seed: Int = 7) {
     fun enterFrom(door: Door) {
         onThroughDoor = null
         act = Act.Idle(0.1f)
-        x = DoorGeo.outX(door)
-        z = DoorGeo.outZ(door)
+        x = doorPoints.outX(door)
+        z = doorPoints.outZ(door)
         targetX = x
         targetZ = z
         fade = 0f
-        facing = if (DoorGeo.inX(door) >= x) 1f else -1f
+        facing = if (doorPoints.inX(door) >= x) 1f else -1f
         start(Act.Door(door, false))
     }
 
@@ -784,11 +793,11 @@ class PetDirector(seed: Int = 7) {
             is Act.Daydream -> Unit
             is Act.Door -> {
                 if (a.exit) {
-                    targetX = DoorGeo.outX(a.door)
-                    targetZ = DoorGeo.outZ(a.door)
+                    targetX = doorPoints.outX(a.door)
+                    targetZ = doorPoints.outZ(a.door)
                 } else {
-                    targetX = DoorGeo.inX(a.door)
-                    targetZ = DoorGeo.inZ(a.door)
+                    targetX = doorPoints.inX(a.door)
+                    targetZ = doorPoints.inZ(a.door)
                 }
                 speed = 0.3f
             }
@@ -1205,8 +1214,8 @@ class PetDirector(seed: Int = 7) {
                 val p = (el / a.dur).coerceIn(0f, 1f)
                 if (hasBed) {
                     x += (bedX - x) * min(1f, dt * 6f)
-                    z += (1f - z) * min(1f, dt * 6f)
-                    yOffset = 0.26f * easeOut(p)
+                    z += (bedZ - z) * min(1f, dt * 6f)
+                    yOffset = bedLift * easeOut(p)
                 }
                 pose.lying = easeOut(p)
                 props.blanket = if (hasBed) ((p - 0.4f) / 0.6f).coerceIn(0f, 1f) else 0f
@@ -1216,8 +1225,8 @@ class PetDirector(seed: Int = 7) {
             is Act.Sleeping -> {
                 if (hasBed) {
                     x = bedX
-                    z = 1f
-                    yOffset = 0.26f
+                    z = bedZ
+                    yOffset = bedLift
                 }
                 props.blanket = if (hasBed) 1f else 0f
                 pose.lying = 1f
@@ -1233,8 +1242,8 @@ class PetDirector(seed: Int = 7) {
                 val out = ((p - 0.25f) / 0.3f).coerceIn(0f, 1f)
                 pose.lying = 1f - easeOut(out)
                 if (hasBed) {
-                    yOffset = 0.26f * (1f - out)
-                    z = 1f - out
+                    yOffset = bedLift * (1f - out)
+                    z = bedZ * (1f - out)
                     if (out > 0f) x += (0.55f - x) * min(1f, dt * 3f)
                 }
                 if (p > 0.55f) {
@@ -2019,7 +2028,7 @@ class PetDirector(seed: Int = 7) {
         val d = a.door
         if (a.exit) {
             // fade out on the last steps to the door
-            val dist = abs(DoorGeo.outX(d) - x) + abs(DoorGeo.outZ(d) - z) * 0.4f
+            val dist = abs(doorPoints.outX(d) - x) + abs(doorPoints.outZ(d) - z) * 0.4f
             if (dist < 0.14f) fade = min(fade, dist / 0.14f)
             if (!walking) fade = max(0f, fade - dt * 4f)
             if (fade <= 0.02f && !a.done) {

@@ -132,7 +132,7 @@ object DebugScenes {
                 skins = de.knuffi.core.Skins.costumes.map { it.id }.toSet(),
                 petKind = if (pet.isCat) de.knuffi.core.PetKind.CAT else state.petKind,
                 settings = (if (scene == "toys") state.settings.copy(toyLadder = 4, toyPlanes = 4, toyFootprints = 4, toyPaint = 4) else state.settings)
-                    .copy(overlayPinned = intent.getStringExtra("debug_pinned") != null, graphics3d = intent.getStringExtra("debug_2d") == null),
+                    .copy(overlayPinned = intent.getStringExtra("debug_pinned") != null, graphics3d = intent.getStringExtra("debug_2d") == null, house3d = intent.getStringExtra("debug_flat") == null),
                 inventory = state.inventory + mapOf("carrot" to 2, "pumpkin" to 1, "flour" to 3, "milk" to 2, "strawberry" to 2, "tomato" to 2, "cheese" to 1),
                 finds = mapOf("f_shell" to 2, "f_snail" to 1, "f_pebble" to 1, "f_clover" to 1, "f_feather_blue" to 1),
                 visit = if (scene == "visit" || scene == "visit2") de.knuffi.core.Visit(state.resting.first().id, System.currentTimeMillis() + 3_600_000L) else null,
@@ -170,9 +170,19 @@ object DebugScenes {
             s = s.copy(familyEggs = listOf(de.knuffi.core.FamilyEgg(now, a.line, listOf(a.id, s.pet?.id ?: 0L), listOf(a.name, s.pet?.name ?: "Mochi"), s.pet?.form?.name, null, now)))
         }
         s = de.knuffi.core.House.normalize(s, now)
-        if (scene == "house" || scene in roomScenes) {
+        if (scene == "house" || scene == "furnish" || scene in roomScenes) {
             for (k in de.knuffi.core.RoomKind.entries) s = de.knuffi.core.House.build(s, k)
+            // two friends from the Kuschelhaus live in the house
+            s = s.copy(house = s.house.copy(home = s.resting.filter { it.alive && !it.isEgg }.take(2).map { it.id }.toSet()))
             s = de.knuffi.core.House.normalize(s, now + 1)
+        }
+        if (scene == "furnish") {
+            // a living room furnished by hand
+            val L = de.knuffi.core.RoomKind.LIVING
+            s = s.copy(equipped = s.equipped + (Slot.DECO to "deco_sofa") + (Slot.TOY to "toy_horse"), owned = s.owned + "deco_sofa" + "toy_horse")
+            s = de.knuffi.core.House.place(s, L, Slot.DECO, de.knuffi.core.Spot(0.32f, 0.12f, 0f))
+            s = de.knuffi.core.House.place(s, L, Slot.TOY, de.knuffi.core.Spot(0.78f, 0.62f, 315f))
+            s = de.knuffi.core.House.place(s, L, Slot.PLANT, de.knuffi.core.Spot(0.88f, 0.1f, 0f))
         }
         roomScenes[scene]?.let { s = de.knuffi.core.House.goTo(s, it) }
         return s
@@ -202,6 +212,7 @@ object DebugScenes {
         "race" -> Route.Game(MiniGame.RACE)
         "tricks" -> Route.Tricks
         "house" -> Route.House
+        "furnish" -> Route.Furnish(de.knuffi.core.RoomKind.LIVING, fromHouse = false)
         "music" -> Route.Music
         "cards" -> Route.Cards
         "adventuremap" -> Route.Adventure

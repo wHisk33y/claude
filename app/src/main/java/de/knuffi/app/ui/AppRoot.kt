@@ -117,6 +117,9 @@ sealed interface Route {
     data object House : Route
     data object Music : Route
     data object Cards : Route
+
+    /** Furnishing a room in 3D ([room] null: the classic room). */
+    data class Furnish(val room: de.knuffi.core.RoomKind?, val fromHouse: Boolean) : Route
 }
 
 /** Space that scrolling pages keep free at the bottom for the floating navigation bar. */
@@ -198,6 +201,7 @@ private fun MainNavigation(state: GameState, debug: DebugScenes.Launch?) {
     // Sub pages of the world hub go back to the hub, everything else to the main screen.
     val parent: Route = when (route) {
         Route.Trips -> if (backToKuschelhaus) Route.Kuschelhaus else Route.Main
+        is Route.Furnish -> if ((route as Route.Furnish).fromHouse) Route.House else Route.Main
         else -> Route.Main
     }
     BackHandler(enabled = route != Route.Main || tab != Tab.HOME) {
@@ -278,7 +282,8 @@ private fun MainNavigation(state: GameState, debug: DebugScenes.Launch?) {
             Route.House -> HouseScreen(state, onBack = { route = Route.Main }, onEnter = {
                 tab = Tab.HOME
                 route = Route.Main
-            })
+            }, onFurnish = { route = Route.Furnish(it, fromHouse = true) })
+            is Route.Furnish -> FurnishScreen(state, r.room, onBack = { route = if (r.fromHouse) Route.House else Route.Main })
             Route.Music -> MusicScreen(state, onBack = { route = Route.Main })
             Route.Cards -> CardsScreen(state, onBack = { route = Route.Main })
         }

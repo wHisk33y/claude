@@ -203,6 +203,22 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
                     color = p.textMuted,
                 )
                 Spacer(Modifier.height(16.dp))
+                Text("Zimmer-Grafik", style = MaterialTheme.typography.titleSmall, color = p.text)
+                Spacer(Modifier.height(10.dp))
+                SegmentedControl(
+                    listOf("🧊 3D-Zimmer", "✏️ Gezeichnet"),
+                    if (s.house3d) 0 else 1,
+                    { update(s.copy(house3d = it == 0)) },
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    if (!s.house3d) "Die gezeichneten Zimmer wie bisher."
+                    else if (de.knuffi.app.render.house3d.Room3d.available) "Haus und Zimmer in 3D: Möbel stellst du frei auf den Boden und drehst sie, das Haus kannst du von allen Seiten ansehen."
+                    else "3D klappt auf diesem Gerät leider nicht, deshalb siehst du die gezeichneten Zimmer.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = p.textMuted,
+                )
+                Spacer(Modifier.height(16.dp))
                 Text("Haustier-Grafik", style = MaterialTheme.typography.titleSmall, color = p.text)
                 Spacer(Modifier.height(10.dp))
                 SegmentedControl(

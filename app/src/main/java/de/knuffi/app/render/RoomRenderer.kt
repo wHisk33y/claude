@@ -518,13 +518,25 @@ class RoomRenderer : Painter() {
     }
 
     /** Light, time of day and vignette on top of everything (except particles & UI). */
-    fun drawLighting(c: Canvas, L: SceneLayout, room: String, hour: Float, t: Float, lightsOff: Boolean, darkUi: Boolean, f: Furnishing = Furnishing()) {
+    fun drawLighting(
+        c: Canvas,
+        L: SceneLayout,
+        room: String,
+        hour: Float,
+        t: Float,
+        lightsOff: Boolean,
+        darkUi: Boolean,
+        f: Furnishing = Furnishing(),
+        window3: RectF? = null,
+        lamp3: android.graphics.PointF? = null,
+        noLamp: Boolean = false,
+    ) {
         val w = L.w
         val h = L.h
         val dark = darkness(hour)
         val cozy = isCozy(room)
         if (cozy) {
-            val win = L.window
+            val win = window3 ?: L.window
             val shaftA = if (lightsOff) 0.1f else 0.24f * (1f - dark) + 0.08f * dark
             if (shaftA > 0.01f) {
                 val warm = when {
@@ -564,10 +576,10 @@ class RoomRenderer : Painter() {
             fill.color = Colors.alpha(0xFF141035.toInt(), overlay)
             c.drawRect(0f, 0f, w, h, fill)
         }
-        if (cozy && !lightsOff && dark > 0.15f) {
+        if (cozy && !lightsOff && dark > 0.15f && !noLamp) {
             // warm glow from the lamp
-            val lx = lampX(L) + f.offset(de.knuffi.core.Slot.LAMP) * L.w
-            val ly = lampY(L) + if (f.lamp == "lamp_lava") L.h * 0.02f else 0f
+            val lx = lamp3?.x ?: (lampX(L) + f.offset(de.knuffi.core.Slot.LAMP) * L.w)
+            val ly = lamp3?.y ?: (lampY(L) + if (f.lamp == "lamp_lava") L.h * 0.02f else 0f)
             val gr = w * 0.55f
             val glow = furniture.lampGlow(f.lamp)
             val pulse = if (f.lamp == "lamp_lava") 0.85f + 0.15f * sin(t * 1.3f) else 1f
@@ -610,7 +622,6 @@ class RoomRenderer : Painter() {
         val fy = L.floorY
         val win = L.window
         val wt = fy - (fy - win.bottom) * 0.55f
-        val style = furniture.wallStyle(f.wall)
         furniture.wall(c, L, f.wall, wt)
 
         // floor with perspective planks
@@ -644,7 +655,75 @@ class RoomRenderer : Painter() {
         box(c, 0f, fy - h * 0.018f, w, fy + h * 0.002f, 0f, 0xFFFFFFFF.toInt(), 0xFFEDE3EC.toInt())
 
         moved(c, L, f, de.knuffi.core.Slot.RUG) { furniture.rug(c, L, f.rug) }
+        windowWithCurtains(c, L, f)
 
+        // picture frame
+        c.save()
+        c.translate(f.offset(de.knuffi.core.Slot.PICTURE) * w, 0f)
+        val pl = w * 0.6f
+        val pr = w * 0.86f
+        val pt = win.top
+        val pb = win.top + (win.height()) * 0.55f
+        box(c, pl, pt, pr, pb, w * 0.01f, 0xFFFFE08A.toInt(), 0xFFC98C1B.toInt(), shadow = h * 0.008f)
+        val pad = w * 0.018f
+        c.save()
+        c.clipRect(pl + pad, pt + pad, pr - pad, pb - pad)
+        furniture.picture(c, f.picture, pl + pad, pt + pad, pr - pad, pb - pad)
+        c.restore()
+        line.color = Colors.alpha(0xFF8A5A10.toInt(), 0.4f)
+        line.strokeWidth = w * 0.003f
+        c.drawRect(pl + pad, pt + pad, pr - pad, pb - pad, line)
+        c.restore()
+
+        // lamp (glow is drawn dynamically)
+        moved(c, L, f, de.knuffi.core.Slot.LAMP) { furniture.lamp(c, L, f.lamp, lampX(L), lampY(L)) }
+
+        // In the house a door to the next room may take the place of the shelf.
+        val northDoor = L.kind == LayoutKind.HOME && f.doors.any { it.side == de.knuffi.core.DoorSide.NORTH }
+        if (!northDoor) shelf(c, L, f, pb, wt)
+
+        // fixtures of the room (kitchen, bath …) and the doors, behind the furniture
+        f.house?.let { houseArt.fixtures(c, L, it) }
+        if (L.kind == LayoutKind.HOME && f.doors.isNotEmpty()) houseArt.doors(c, L, f.doors, false)
+
+        // plant in the corner
+        moved(c, L, f, de.knuffi.core.Slot.PLANT) { furniture.plant(c, L, f.plant) }
+
+        // toy corner
+        moved(c, L, f, de.knuffi.core.Slot.TOY) { furniture.toy(c, L, f.toy, f.trophies) }
+
+        // cosy corner (sofa, piano, ...)
+        moved(c, L, f, de.knuffi.core.Slot.DECO) { furniture.deco(c, L, f.deco) }
+    }
+
+    /**
+     * The back wall of the cosy room for the 3D rooms: wallpaper, window (with a hole for the sky),
+     * curtains, the shelf and the decoration of a festival. Nothing that can be moved.
+     */
+    fun drawCozyWall(c: Canvas, L: SceneLayout, f: Furnishing, shelf: Boolean) {
+        val fy = L.floorY
+        val win = L.window
+        val wt = fy - (fy - win.bottom) * 0.55f
+        furniture.wall(c, L, f.wall, wt)
+        box(c, 0f, fy - L.h * 0.018f, L.w, fy + L.h * 0.002f, 0f, 0xFFFFFFFF.toInt(), 0xFFEDE3EC.toInt())
+        windowWithCurtains(c, L, f)
+        if (shelf) shelf(c, L, f, win.top + win.height() * 0.55f, wt)
+        f.event?.let { furniture.garland(c, L, it, 0f) }
+    }
+
+    /** Only the wallpaper (side walls of the 3D rooms). */
+    fun drawWallpaper(c: Canvas, L: SceneLayout, wall: String) {
+        val fy = L.floorY
+        val win = L.window
+        furniture.wall(c, L, wall, fy - (fy - win.bottom) * 0.55f)
+        box(c, 0f, fy - L.h * 0.018f, L.w, fy + L.h * 0.002f, 0f, 0xFFFFFFFF.toInt(), 0xFFEDE3EC.toInt())
+    }
+
+    private fun windowWithCurtains(c: Canvas, L: SceneLayout, f: Furnishing) {
+        val w = L.w
+        val h = L.h
+        val win = L.window
+        val style = furniture.wallStyle(f.wall)
         // window frame with a transparent hole for the sky
         val fw = w * 0.022f
         box(c, win.left - fw, win.top - fw, win.right + fw, win.bottom + fw, w * 0.02f, 0xFFFFFFFF.toInt(), 0xFFE8DDE6.toInt(), shadow = h * 0.008f)
@@ -693,44 +772,6 @@ class RoomRenderer : Painter() {
             path.addCircle(ex, win.top - fw * 2.3f, fw * 1.1f, Path.Direction.CW)
             shaded(c, path, 0xFFFFF1B8.toInt(), 0xFFFFC83D.toInt(), 0xFFB57B00.toInt(), outlineW = w * 0.002f)
         }
-
-        // picture frame
-        c.save()
-        c.translate(f.offset(de.knuffi.core.Slot.PICTURE) * w, 0f)
-        val pl = w * 0.6f
-        val pr = w * 0.86f
-        val pt = win.top
-        val pb = win.top + (win.height()) * 0.55f
-        box(c, pl, pt, pr, pb, w * 0.01f, 0xFFFFE08A.toInt(), 0xFFC98C1B.toInt(), shadow = h * 0.008f)
-        val pad = w * 0.018f
-        c.save()
-        c.clipRect(pl + pad, pt + pad, pr - pad, pb - pad)
-        furniture.picture(c, f.picture, pl + pad, pt + pad, pr - pad, pb - pad)
-        c.restore()
-        line.color = Colors.alpha(0xFF8A5A10.toInt(), 0.4f)
-        line.strokeWidth = w * 0.003f
-        c.drawRect(pl + pad, pt + pad, pr - pad, pb - pad, line)
-        c.restore()
-
-        // lamp (glow is drawn dynamically)
-        moved(c, L, f, de.knuffi.core.Slot.LAMP) { furniture.lamp(c, L, f.lamp, lampX(L), lampY(L)) }
-
-        // In the house a door to the next room may take the place of the shelf.
-        val northDoor = L.kind == LayoutKind.HOME && f.doors.any { it.side == de.knuffi.core.DoorSide.NORTH }
-        if (!northDoor) shelf(c, L, f, pb, wt)
-
-        // fixtures of the room (kitchen, bath …) and the doors, behind the furniture
-        f.house?.let { houseArt.fixtures(c, L, it) }
-        if (L.kind == LayoutKind.HOME && f.doors.isNotEmpty()) houseArt.doors(c, L, f.doors, false)
-
-        // plant in the corner
-        moved(c, L, f, de.knuffi.core.Slot.PLANT) { furniture.plant(c, L, f.plant) }
-
-        // toy corner
-        moved(c, L, f, de.knuffi.core.Slot.TOY) { furniture.toy(c, L, f.toy, f.trophies) }
-
-        // cosy corner (sofa, piano, ...)
-        moved(c, L, f, de.knuffi.core.Slot.DECO) { furniture.deco(c, L, f.deco) }
     }
 
     private fun shelf(c: Canvas, L: SceneLayout, f: Furnishing, pb: Float, wt: Float) {

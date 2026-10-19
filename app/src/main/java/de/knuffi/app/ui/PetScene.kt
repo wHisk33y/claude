@@ -242,6 +242,10 @@ fun PetScene(
     val furniture = remember(state.equipped, state.settings.look, state.house, state.furnitureOffsets, state.garden, state.lastSimulated / 120_000L) {
         Furnishing.of(state, DebugScenes.eventOverride ?: Engine.activeEvent(System.currentTimeMillis(), ZoneId.systemDefault()))
     }
+    // the room in 3D (home screen only, if switched on)
+    val spec3 = remember(furniture, state.house, state.room, state.settings.house3d, kind) {
+        if (kind == LayoutKind.HOME && state.settings.house3d) de.knuffi.app.render.house3d.Specs3.home(state, furniture) else null
+    }
     val editState by rememberUpdatedState(editMode)
     val fixtureCb by rememberUpdatedState(onFixture)
     val dark = LocalPalette.current.dark
@@ -563,6 +567,7 @@ fun PetScene(
         val w = size.width
         val h = size.height
         m.room = Furnishing.roomId(state)
+        m.room3 = if (de.knuffi.app.render.house3d.Room3d.available) spec3 else null
         handle.editPreview?.let { (slot, off) ->
             val until = handle.editPreviewUntil
             if (until != 0L && (System.currentTimeMillis() > until || kotlin.math.abs((furniture.offsets[slot] ?: 0f) - off) < 0.002f)) handle.editPreview = null

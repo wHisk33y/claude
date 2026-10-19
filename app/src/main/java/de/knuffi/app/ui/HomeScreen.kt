@@ -181,7 +181,10 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
             state, pet, onOpenSettings, Modifier.align(Alignment.TopCenter).onSizeChanged { hudPx = it.height },
             onMood = { moodSheet = true }, onOpen = onOpen, onWish = { fulfil(it) },
             roomBar = {
-                RoomBar(state, pet, voice, editMode, onHouse = { onOpen(Route.House) }, onEdit = { editMode = !editMode })
+                RoomBar(state, pet, voice, editMode, onHouse = { onOpen(Route.House) }, onEdit = {
+                    // in 3D the room is furnished on its own page
+                    if (house3dOn(state)) onOpen(Route.Furnish(de.knuffi.core.House.shownRoom(state), fromHouse = false)) else editMode = !editMode
+                })
             },
         )
 

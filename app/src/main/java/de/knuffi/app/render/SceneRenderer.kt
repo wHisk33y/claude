@@ -42,6 +42,9 @@ class SceneModel {
     /** Furniture can be moved by finger; [editActive] is the piece being dragged. */
     var editMode: Boolean = false
     var editActive: de.knuffi.core.Slot? = null
+
+    /** The room in 3D (null: the drawn room). */
+    var room3: de.knuffi.app.render.house3d.RoomSpec? = null
 }
 
 /**
@@ -71,13 +74,32 @@ class SceneRenderer {
     /** The furniture of the room (set before [configure], so the pet knows where the bed is). */
     var furnishing = Furnishing()
 
+    /** The 3D room, if the room is shown in 3D (set before [configure]). */
+    var spec3: de.knuffi.app.render.house3d.RoomSpec? = null
+    private val home3 = de.knuffi.app.render.house3d.HomeRoom3()
+
+    /** True while this frame shows the 3D room. */
+    private var in3d = false
+    private val dst = RectF()
+
+    /** Screen y of the floor and size of a pet at depth [z]. */
+    private fun floorAt(z: Float): Float {
+        val v = home3.view
+        return if (in3d && v != null) v.floorY(z) else layout.groundY + (layout.backGroundY - layout.groundY) * z
+    }
+
+    private fun sizeAt(z: Float, base: Float): Float {
+        val v = home3.view
+        return if (in3d && v != null) base * v.petScale * v.scale(z) else base * (1f - 0.2f * z)
+    }
+
     /** The door at (x, y), if any. */
     fun hitDoor(x: Float, y: Float): de.knuffi.core.Door? =
-        room.houseArt.doorRects.firstOrNull { it.second.contains(x, y) }?.first
+        if (in3d) home3.doorRects.firstOrNull { it.second.contains(x, y) }?.first else room.houseArt.doorRects.firstOrNull { it.second.contains(x, y) }?.first
 
     /** A fixture of the room at (x, y): "piano", "cards", "kitchen", "tub", "beds", "pool" or null. */
     fun hitFixture(x: Float, y: Float): String? =
-        room.houseArt.fixtureRects.firstOrNull { it.second.contains(x, y) }?.first
+        if (in3d) home3.fixtureRects.firstOrNull { it.second.contains(x, y) }?.first else room.houseArt.fixtureRects.firstOrNull { it.second.contains(x, y) }?.first
 
     /** The movable furniture at (x, y), if any. */
     fun hitFurniture(x: Float, y: Float): de.knuffi.core.Slot? = room.houseArt.hitFurniture(layout, furnishing, x, y)
@@ -85,6 +107,12 @@ class SceneRenderer {
     /** Things in the cosy room that react to taps: "picture", "window", "lamp" or null. */
     fun hitObject(x: Float, y: Float, room: String): String? {
         if (!this.room.isCozy(room)) return null
+        if (in3d) {
+            home3.pictureRect?.let { if (it.contains(x, y)) return "picture" }
+            home3.windowRect?.let { if (it.contains(x, y)) return "window" }
+            home3.lampPoint?.let { if (kotlin.math.hypot(x - it.x, y - it.y) < layout.w * 0.08f) return "lamp" }
+            return null
+        }
         val L = layout
         val win = L.window
         val pl = L.w * 0.6f
@@ -122,8 +150,32 @@ class SceneRenderer {
         d.maxX = layout.maxX
         d.bowlX = layout.bowlX
         d.bedX = layout.bedX + furnishing.offset(de.knuffi.core.Slot.BED)
+        d.bedZ = 1f
+        d.bedLift = 0.26f
+        d.doorPoints = DoorGeo
         d.hasBed = furnishing.hasBed
         d.hasBowl = furnishing.hasBowl
+        val spec = spec3
+        in3d = false
+        if (spec != null && kind == LayoutKind.HOME && de.knuffi.app.render.house3d.Room3d.available) {
+            home3.prepare(layout, spec)
+            val v = home3.view
+            val m = home3.model
+            if (v != null && m != null) {
+                in3d = true
+                d.doorPoints = home3.doorPoints
+                val bed = m.placed[de.knuffi.core.Slot.BED]
+                d.hasBed = bed != null
+                if (bed != null) {
+                    val (bx, bz) = v.toPet(bed.x, bed.z)
+                    d.bedX = bx
+                    d.bedZ = bz
+                    d.bedLift = bed.piece.sleepY * v.s0 / (layout.petSize * v.petScale)
+                }
+            }
+        } else if (spec == null) {
+            home3.release()
+        }
         // On the home screen the ladder reaches almost up to the clock.
         d.toys.ladderHeight = if (kind == LayoutKind.WALLPAPER) max(1.55f, (layout.groundY - h * 0.2f) / layout.petSize) else 1.55f
     }
@@ -132,6 +184,7 @@ class SceneRenderer {
         cache?.recycle()
         cache = null
         cacheKey = ""
+        home3.release()
     }
 
     private fun ensureCache(w: Float, h: Float, roomId: String, kind: LayoutKind, f: Furnishing) {
@@ -153,13 +206,29 @@ class SceneRenderer {
 
     fun draw(c: Canvas, w: Float, h: Float, kind: LayoutKind, m: SceneModel, d: PetDirector, ps: ParticleSystem?, t: Float, guest: PetDirector? = null, friends: FriendPlay? = null, guest2: PetDirector? = null) {
         furnishing = m.furniture
+        spec3 = m.room3
         configure(d, w, h, kind)
         val L = layout
         val f = m.furniture
-        ensureCache(w, h, m.room, kind, f)
-        room.drawBehind(c, L, m.room, m.hour, t, m.weather)
-        cache?.let { c.drawBitmap(it, 0f, 0f, bitmapPaint) }
-        room.drawAnimated(c, L, m.room, m.hour, t, f)
+        val back3 = if (in3d) home3.backImage() else null
+        if (in3d && back3 == null) in3d = false
+        if (back3 != null) {
+            // the 3D room: the sky behind the window (or the whole sky outside), then the room
+            if (room.isCozy(m.room)) {
+                val wr = home3.windowRect
+                if (wr != null) room.drawSky(c, wr.left - 4f, wr.top - 4f, wr.right + 4f, wr.bottom + 4f, m.hour, t, m.weather)
+            } else {
+                room.drawBehind(c, L, m.room, m.hour, t, m.weather)
+            }
+            dst.set(0f, 0f, w, h)
+            c.drawBitmap(back3, null, dst, bitmapPaint)
+            if (!room.isCozy(m.room) && m.room != Furnishing.GARDEN) room.drawAnimated(c, L, m.room, m.hour, t, f.copy(event = null))
+        } else {
+            ensureCache(w, h, m.room, kind, f)
+            room.drawBehind(c, L, m.room, m.hour, t, m.weather)
+            cache?.let { c.drawBitmap(it, 0f, 0f, bitmapPaint) }
+            room.drawAnimated(c, L, m.room, m.hour, t, f)
+        }
 
         val toys = d.toys
         // Paint on the wall sits behind everything else.
@@ -178,12 +247,12 @@ class SceneRenderer {
         val pr = d.props
         val propS = L.propSize
         val bedS = propS * 0.92f
-        val backY = L.backGroundY
+        val backY = floorAt(1f)
 
         // Footprints and paint on the floor
         val life = de.knuffi.core.ToyTuning.footprintSeconds(d.toyConfig.footprints)
         for (fp in toys.footprints) {
-            val fy = L.groundY + (backY - L.groundY) * fp.z + L.petSize * 0.01f
+            val fy = floorAt(fp.z) + L.petSize * 0.01f
             val age = (t - fp.born) / life.coerceAtLeast(0.1f)
             toyArt.footprint(c, fp, fp.x * w, fy, L.petSize * 0.055f * (1f - 0.2f * fp.z), (1f - age).coerceIn(0f, 1f))
         }
@@ -199,20 +268,20 @@ class SceneRenderer {
 
         // Pet placement with depth
         val z = d.z
-        val petSize = L.petSize * (1f - 0.2f * z)
-        val floorY = L.groundY + (backY - L.groundY) * z
+        val petSize = sizeAt(z, L.petSize)
+        val floorY = floorAt(z)
         val ground = floorY - d.yOffset * petSize
         val px = d.x * w
         val petInFront = z < 0.5f
 
         // Back props (in the house: the bed only in the bedroom, the bowl only in the kitchen)
         val bedPx = d.bedX * w
-        if (f.hasBed) props.bedBack(c, bedPx, backY, bedS, cozy, f.bed)
+        if (f.hasBed && !in3d) props.bedBack(c, bedPx, backY, bedS, cozy, f.bed)
         if (f.hasBowl) props.bowlBack(c, L.bowlX * w, backY, propS)
         pr.food?.let { props.food(c, L.bowlX * w, backY, propS, it, pr.bites, pr.foodPop) }
         if (petInFront) {
             if (f.hasBowl) props.bowlFront(c, L.bowlX * w, backY, propS)
-            if (f.hasBed) props.bedFront(c, bedPx, backY, bedS, pr.blanket, cozy, t, f.bed)
+            if (f.hasBed && !in3d) props.bedFront(c, bedPx, backY, bedS, pr.blanket, cozy, t, f.bed)
         }
 
         // Poops on the floor
@@ -253,8 +322,8 @@ class SceneRenderer {
             guest2.minX = L.minX
             guest2.maxX = L.maxX
             val gz = guest2.z
-            val gs = L.petSize * 0.8f * (1f - 0.2f * gz)
-            val gFloor = L.groundY + (backY - L.groundY) * gz
+            val gs = sizeAt(gz, L.petSize * 0.8f)
+            val gFloor = floorAt(gz)
             val layer = fadeLayer(c, guest2.fade)
             if (guest2.showsShadow) guestPet2.drawShadow(c, guest2.x * w, gFloor, gs, guest2.pose, gl2)
             guestPet2.draw(c, guest2.x * w, gFloor - guest2.yOffset * gs, gs, gl2, guest2.pose)
@@ -267,8 +336,8 @@ class SceneRenderer {
             guest.minX = L.minX
             guest.maxX = L.maxX
             val gz = guest.z
-            val gs = L.petSize * 0.85f * (1f - 0.2f * gz)
-            val gFloor = L.groundY + (backY - L.groundY) * gz
+            val gs = sizeAt(gz, L.petSize * 0.85f)
+            val gFloor = floorAt(gz)
             val layer = fadeLayer(c, guest.fade)
             if (guest.showsShadow) guestPet.drawShadow(c, guest.x * w, gFloor, gs, guest.pose, gl)
             guestPet.draw(c, guest.x * w, gFloor - guest.yOffset * gs, gs, gl, guest.pose)
@@ -293,7 +362,19 @@ class SceneRenderer {
             centerNY = petBounds.centerY() / h
         }
 
-        if (!petInFront) {
+        if (in3d) {
+            // the blanket over the sleeping pet, then the furniture in front of it
+            if (f.hasBed && pr.blanket > 0.01f) props.bedFront(c, bedPx, floorAt(d.bedZ), bedS * sizeAt(d.bedZ, 1f), pr.blanket, cozy, t, f.bed, blanketOnly = true)
+            if (!petInFront && f.hasBowl) props.bowlFront(c, L.bowlX * w, backY, propS)
+            val v = home3.view
+            if (v != null) {
+                val petRoomZ = v.toRoom(d.x, d.z).second
+                home3.frontImage(petRoomZ)?.let {
+                    dst.set(0f, 0f, w, h)
+                    c.drawBitmap(it, null, dst, bitmapPaint)
+                }
+            }
+        } else if (!petInFront) {
             props.bowlFront(c, L.bowlX * w, backY, propS)
             props.bedFront(c, L.bedX * w, backY, bedS, pr.blanket, cozy, t, f.bed)
         }
@@ -324,8 +405,12 @@ class SceneRenderer {
         pr.pill?.let { props.floatingItem(c, pr.pillX * w, ground - pr.pillY * petSize, petSize * 0.2f, it, t) }
         for (i in 0 until m.poops.coerceAtMost(3)) props.stink(c, poopX(i) * w, poopBottom, poopR, t, i)
 
-        room.drawLighting(c, L, m.room, m.hour, t, m.lightsOff, m.darkUi, f)
-        if (m.editMode) room.houseArt.editFrames(c, L, f, m.editActive, t)
+        if (in3d) {
+            room.drawLighting(c, L, m.room, m.hour, t, m.lightsOff, m.darkUi, f, window3 = home3.windowRect, lamp3 = home3.lampPoint, noLamp = home3.lampPoint == null)
+        } else {
+            room.drawLighting(c, L, m.room, m.hour, t, m.lightsOff, m.darkUi, f)
+            if (m.editMode) room.houseArt.editFrames(c, L, f, m.editActive, t)
+        }
         ps?.draw(c, w, h)
         d.companion?.let { props.flyer(c, it, d.companionX * w, d.companionY * h, L.petSize * 0.17f, t) }
 

@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -77,7 +79,7 @@ private fun roomColor(k: RoomKind): Color = when (k) {
  * there through the doors; tap a free spot to build a new room.
  */
 @Composable
-fun HouseScreen(state: GameState, onBack: () -> Unit, onEnter: () -> Unit) {
+fun HouseScreen(state: GameState, onBack: () -> Unit, onEnter: () -> Unit, onFurnish: (RoomKind?) -> Unit = {}) {
     val p = LocalPalette.current
     val scope = rememberCoroutineScope()
     val walk = remember { Animatable(0f) }
@@ -91,6 +93,8 @@ fun HouseScreen(state: GameState, onBack: () -> Unit, onEnter: () -> Unit) {
     val unlocked = House.unlocked(state)
     val pet = state.pet
     val petLook = remember(state.pet, state.equipped) { PetLook.of(state)?.copy(sleeping = false) }
+    val in3d = house3dOn(state)
+    var chosen by remember { mutableStateOf<RoomKind?>(null) }
 
     fun go(target: RoomKind) {
         if (route.isNotEmpty()) return
@@ -132,6 +136,14 @@ fun HouseScreen(state: GameState, onBack: () -> Unit, onEnter: () -> Unit) {
                 if (state.settings.houseMode) 0 else 1,
                 { GameRepository.perform(Action.UpdateSettings(GameRepository.current.settings.copy(houseMode = it == 0))) },
             )
+            SegmentedControl(
+                listOf("🧊 3D", "✏️ Gezeichnet"),
+                if (state.settings.house3d) 0 else 1,
+                { GameRepository.perform(Action.UpdateSettings(GameRepository.current.settings.copy(house3d = it == 0))) },
+            )
+            if (state.settings.house3d && !de.knuffi.app.render.house3d.Room3d.available) {
+                Text("3D klappt auf diesem Gerät leider nicht, deshalb siehst du die gezeichneten Zimmer.", style = MaterialTheme.typography.bodySmall, color = p.textMuted)
+            }
             if (!houseOn) {
                 SurfaceCard(Modifier.fillMaxWidth()) {
                     Text(
@@ -139,15 +151,55 @@ fun HouseScreen(state: GameState, onBack: () -> Unit, onEnter: () -> Unit) {
                         style = MaterialTheme.typography.bodyMedium,
                         color = p.textMuted,
                     )
+                    if (in3d) {
+                        Spacer(Modifier.height(10.dp))
+                        ClayTextButton("Zimmer einrichten", { onFurnish(null) }, Modifier.fillMaxWidth(), emoji = "🛋️", small = true, color = p.violet, deep = p.violetDeep)
+                    }
                 }
                 return@Column
             }
             Text(
-                "Tippe auf ein Zimmer, dann läuft ${pet?.name ?: "dein Haustier"} durch die Türen dorthin. Graue Felder kannst du ausbauen.",
+                if (in3d) {
+                    "Dreh das Haus mit dem Finger, zoome mit zwei Fingern und tippe auf ein Zimmer. Graue Felder kannst du ausbauen."
+                } else {
+                    "Tippe auf ein Zimmer, dann läuft ${pet?.name ?: "dein Haustier"} durch die Türen dorthin. Graue Felder kannst du ausbauen."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = p.textMuted,
             )
-            Canvas(
+            if (in3d) {
+                House3dOverview(
+                    state,
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(0.92f)
+                        .staggered(0)
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp)),
+                    selected = chosen,
+                    walkFrom = route,
+                    walk = walk.value,
+                    onSelect = { chosen = it },
+                    onPlot = { askBuild = it },
+                )
+                val sel = chosen
+                if (sel != null && sel in unlocked) {
+                    SurfaceCard(Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            EmojiTile(sel.emoji, size = 46.dp, color = p.mint)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(sel.title, style = MaterialTheme.typography.titleSmall, color = p.text)
+                                Text(sel.description, style = MaterialTheme.typography.bodySmall, color = p.textMuted)
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ClayTextButton(if (state.house.current == sel) "Ansehen" else "Hingehen", { go(sel) }, Modifier.weight(1f), emoji = "🚶", small = true, color = p.pink, deep = p.pinkDeep)
+                            if (!sel.outdoor) ClayTextButton("Einrichten", { onFurnish(sel) }, Modifier.weight(1f), emoji = "🛋️", small = true, color = p.violet, deep = p.violetDeep)
+                        }
+                    }
+                }
+            } else Canvas(
                 Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
@@ -258,6 +310,7 @@ fun HouseScreen(state: GameState, onBack: () -> Unit, onEnter: () -> Unit) {
                     }
                 }
             }
+            Residents(state)
             SectionHeader("Zimmer", "🚪")
             for ((i, k) in RoomKind.entries.withIndex()) {
                 val built = k in unlocked
@@ -299,5 +352,51 @@ fun HouseScreen(state: GameState, onBack: () -> Unit, onEnter: () -> Unit) {
             },
             onDismiss = { askBuild = null },
         )
+    }
+}
+
+/** Who of the Kuschelhaus lives in the house (the others stay in the Kuschelhaus). */
+@Composable
+private fun Residents(state: GameState) {
+    val p = LocalPalette.current
+    val pets = state.resting.filter { it.alive && !it.isEgg }
+    SectionHeader("Wer wohnt im Haus?", "🏡")
+    SurfaceCard(Modifier.fillMaxWidth()) {
+        if (pets.isEmpty()) {
+            Text(
+                "Im Kuschelhaus wohnt noch niemand. Wenn du mehr Haustiere hast, kannst du hier auswählen, wer mit ins Haus zieht.",
+                style = MaterialTheme.typography.bodySmall,
+                color = p.textMuted,
+            )
+            return@SurfaceCard
+        }
+        Text(
+            "Wähle aus, wer bei ${state.pet?.name ?: "deinem Haustier"} im Haus wohnt. Die anderen bleiben im Kuschelhaus.",
+            style = MaterialTheme.typography.bodySmall,
+            color = p.textMuted,
+        )
+        for (pet in pets) {
+            val lives = pet.id in state.house.home
+            val look = remember(pet, state.equipped) { PetLook.of(pet, state).copy(sleeping = false, hat = null, face = null, neck = null, back = null) }
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                PetPortrait(look, Modifier.size(46.dp), animated = false)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(pet.name, style = MaterialTheme.typography.titleSmall, color = p.text)
+                    val room = state.house.residents[pet.id]
+                    Text(
+                        when {
+                            !lives -> "im Kuschelhaus"
+                            state.onTrip(pet.id) != null -> "gerade auf Reisen"
+                            room != null -> "wohnt im Haus · ${room.emoji} ${room.title}"
+                            else -> "wohnt im Haus"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (lives) p.mintDeep else p.textMuted,
+                    )
+                }
+                KSwitch(lives) { GameRepository.perform(Action.SetResident(pet.id, it)) }
+            }
+        }
     }
 }
