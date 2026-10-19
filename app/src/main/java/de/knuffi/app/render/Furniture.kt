@@ -26,16 +26,62 @@ data class Furnishing(
     /** Number of trophies on the shelf (festival prizes, stories, collections). */
     val trophies: Int = 0,
     val deco: String? = null,
+    /** The room of the house (null: the single classic room). */
+    val house: de.knuffi.core.RoomKind? = null,
+    val doors: List<de.knuffi.core.Door> = emptyList(),
+    /** How far furniture was moved, in screen widths. */
+    val offsets: Map<Slot, Float> = emptyMap(),
+    /** Plants in the garden beds: "" or "emoji|growth|ready". */
+    val plants: List<String> = emptyList(),
 ) {
-    val key: String get() = "$wall|$rug|$bed|$plant|$lamp|$picture|${event?.name}|$toy|$trophies|$deco"
+    val key: String
+        get() = "$wall|$rug|$bed|$plant|$lamp|$picture|${event?.name}|$toy|$trophies|$deco|${house?.name}|" +
+            doors.joinToString(",") { "${it.to.name}${it.side.name}" } + "|" + offsets.entries.joinToString(",") { "${it.key.name}${(it.value * 1000).toInt()}" }
+
+    /** The bed stands in the bedroom (or in the classic room). */
+    val hasBed: Boolean get() = house == null || house == de.knuffi.core.RoomKind.BEDROOM
+
+    /** The food bowl stands in the kitchen (or in the classic room). */
+    val hasBowl: Boolean get() = house == null || house == de.knuffi.core.RoomKind.KITCHEN
+
+    fun offset(slot: Slot): Float = offsets[slot] ?: 0f
 
     companion object {
         fun of(state: GameState, event: SeasonEvent?): Furnishing {
             val d = Catalog.defaultEquipped(state.settings.look)
             fun get(slot: Slot) = state.equipped[slot] ?: d.getValue(slot)
             val trophies = (state.counters.prizes + state.story.finished.size + state.findSetsDone.size + state.cups.size).coerceAtMost(8)
-            return Furnishing(get(Slot.WALL), get(Slot.RUG), get(Slot.BED), get(Slot.PLANT), get(Slot.LAMP), get(Slot.PICTURE), event, state.equipped[Slot.TOY], trophies, state.equipped[Slot.DECO])
+            val house = if (de.knuffi.core.House.enabled(state)) state.house.current else null
+            val doors = if (house != null) de.knuffi.core.House.doors(house, de.knuffi.core.House.unlocked(state)) else emptyList()
+            val now = System.currentTimeMillis()
+            val plants = if (house == de.knuffi.core.RoomKind.GARDEN) {
+                state.garden.plots.map { p ->
+                    val seed = p.seed?.let { Catalog[it] }
+                    if (seed == null) {
+                        ""
+                    } else {
+                        val crop = seed.yieldId?.let { Catalog[it]?.emoji } ?: seed.emoji
+                        "$crop|${(p.progress(now) * 4).toInt() / 4f}|${if (p.ready(now)) 1 else 0}"
+                    }
+                }
+            } else {
+                emptyList()
+            }
+            return Furnishing(
+                get(Slot.WALL), get(Slot.RUG), get(Slot.BED), get(Slot.PLANT), get(Slot.LAMP), get(Slot.PICTURE), event,
+                state.equipped[Slot.TOY], trophies, state.equipped[Slot.DECO],
+                house = house,
+                doors = doors,
+                offsets = state.furnitureOffsets,
+                plants = plants,
+            )
         }
+
+        /** Room style to draw: the garden is outside, everything else uses the chosen room. */
+        fun roomId(state: GameState): String =
+            if (de.knuffi.core.House.enabled(state) && state.house.current == de.knuffi.core.RoomKind.GARDEN) GARDEN else state.room
+
+        const val GARDEN = "room_garden"
     }
 }
 

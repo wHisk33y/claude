@@ -75,6 +75,7 @@ fun KuschelhausScreen(state: GameState, onBack: () -> Unit, onTrips: () -> Unit)
     val p = LocalPalette.current
     val now = rememberNow(10_000L)
     var hatchLine by remember { mutableStateOf<EggLine?>(null) }
+    var hatchFamily by remember { mutableStateOf<de.knuffi.core.FamilyEgg?>(null) }
     var release by remember { mutableStateOf<Pet?>(null) }
     // "Aufräumen": pick several pets and say goodbye to all of them at once.
     var tidying by remember { mutableStateOf(false) }
@@ -141,6 +142,16 @@ fun KuschelhausScreen(state: GameState, onBack: () -> Unit, onTrips: () -> Unit)
                 }
             }
 
+            if (state.familyEggs.isNotEmpty()) {
+                item { SectionHeader("Nachwuchs", "💕") }
+                item {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(state.familyEggs, key = { it.id }) { egg ->
+                            FamilyEggCard(egg, full) { hatchFamily = egg }
+                        }
+                    }
+                }
+            }
             if (state.totalEggs > 0) {
                 item { SectionHeader("Deine Eier", "🥚") }
                 item {
@@ -274,6 +285,23 @@ fun KuschelhausScreen(state: GameState, onBack: () -> Unit, onTrips: () -> Unit)
             onDismiss = { hatchLine = null },
         )
     }
+    hatchFamily?.let { egg ->
+        NameDialog(
+            title = "💕 ${egg.title}",
+            text = if (active != null && active.alive) {
+                "${active.name} kuschelt sich solange ins Kuschelhaus. Wie soll das Kleine heißen?"
+            } else {
+                "Wie soll das Kleine heißen?"
+            },
+            confirm = if (egg.line.real) "Abholen" else "Ausbrüten",
+            onConfirm = {
+                GameRepository.perform(Action.HatchFamilyEgg(egg.id, it))
+                hatchFamily = null
+                onBack()
+            },
+            onDismiss = { hatchFamily = null },
+        )
+    }
     release?.let { pet ->
         ConfirmDialog(
             title = "${pet.name} verabschieden?",
@@ -401,6 +429,30 @@ private fun BoxScope.PickOverlay(picked: Boolean, enabled: Boolean, label: Strin
                 textColor = if (picked) Color.White else p.text,
             )
         }
+    }
+}
+
+@Composable
+private fun FamilyEggCard(egg: de.knuffi.core.FamilyEgg, full: Boolean, onHatch: () -> Unit) {
+    val p = LocalPalette.current
+    val look = remember(egg.id) { eggPreview(egg.line).let { it.copy(blend = egg.blend, fur = egg.fur ?: it.fur) } }
+    SurfaceCard(Modifier.width(170.dp), contentPadding = PaddingValues(12.dp), color = if (p.dark) p.surfaceAlt else Color(0xFFFFEEF6)) {
+        Box {
+            PetPortrait(look, Modifier.fillMaxWidth().height(96.dp), sizeFactor = 0.8f)
+            Pill("💕", Modifier.align(Alignment.TopEnd), color = p.pink.copy(alpha = 0.3f))
+        }
+        Text(egg.line.title, style = MaterialTheme.typography.titleSmall, color = p.text, maxLines = 1)
+        Text("Von ${egg.parentNames.joinToString(" und ")}. Es hat etwas von beiden!", style = MaterialTheme.typography.bodySmall, color = p.textMuted, maxLines = 2, minLines = 2)
+        Spacer(Modifier.height(8.dp))
+        ClayTextButton(
+            if (full) "Kein Platz" else if (egg.line.real) "Abholen" else "Ausbrüten",
+            onHatch,
+            small = true,
+            enabled = !full,
+            modifier = Modifier.fillMaxWidth(),
+            color = p.pink,
+            deep = p.pinkDeep,
+        )
     }
 }
 

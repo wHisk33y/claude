@@ -92,6 +92,7 @@ private sealed interface OverlayItem {
     data class EggFound(val line: EggLine, val reason: String) : OverlayItem
     data class Birthday(val name: String, val months: Int, val coins: Int) : OverlayItem
     data class TripBack(val name: String, val loot: TripLoot) : OverlayItem
+    data class CardsOpened(val forms: List<Form>) : OverlayItem
 }
 
 private data class ToastItem(val id: Long, val emoji: String, val title: String?, val text: String)
@@ -144,6 +145,8 @@ fun BoxScope.OverlayHost(state: GameState, debugScene: String?) {
                 is GameEvent.GoalDone -> toast(e.goal.emoji, "Sammelziel geschafft!", e.goal.rewardLabel)
                 is GameEvent.Message -> toast("💬", null, e.text)
                 is GameEvent.EggFound -> overlays.add(OverlayItem.EggFound(e.line, e.reason))
+                is GameEvent.CardsOpened -> overlays.add(OverlayItem.CardsOpened(e.forms))
+                is GameEvent.RoomBuilt -> toast(e.room.emoji, "${e.room.title} gebaut!", "Tippe auf die Tür, um hineinzugehen. 🚪")
                 is GameEvent.NewForm -> toast(if (e.shiny) "✨" else "📖", if (e.shiny) "Schillernd! Neu im Album" else "Neu im Album!", e.form.title)
                 is GameEvent.StickersGot -> toast("🎴", "Neue Sticker!", e.ids.mapNotNull { Stickers[it]?.emoji }.joinToString(" "))
                 is GameEvent.Harvested -> Catalog[e.itemId]?.let { toast(it.emoji, "Geerntet!", "${e.count}× ${it.name}") }
@@ -189,6 +192,7 @@ fun BoxScope.OverlayHost(state: GameState, debugScene: String?) {
         is OverlayItem.EggFound -> EggFoundOverlay(o.line, o.reason) { overlays.removeAt(0) }
         is OverlayItem.Birthday -> BirthdayOverlay(state, o.name, o.months, o.coins) { overlays.removeAt(0) }
         is OverlayItem.TripBack -> TripBackOverlay(o.name, o.loot) { overlays.removeAt(0) }
+        is OverlayItem.CardsOpened -> CardsOpenedOverlay(o.forms) { overlays.removeAt(0) }
     }
     if (overlays.isEmpty()) BatteryHint(state)
 }

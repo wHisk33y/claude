@@ -222,6 +222,45 @@ fun WorldScreen(state: GameState, onOpen: (Route) -> Unit) {
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                val rooms = de.knuffi.core.House.unlocked(state).size
+                WorldTile(
+                    "🏠", "Dein Haus",
+                    if (de.knuffi.core.House.enabled(state)) "$rooms / ${de.knuffi.core.RoomKind.entries.size} Zimmer" else "Ein Zimmer (klassisch)",
+                    Color(0xFFFFB38A), Color(0xFFFF7EB6),
+                    progress = if (de.knuffi.core.House.enabled(state)) rooms / de.knuffi.core.RoomKind.entries.size.toFloat() else null,
+                    modifier = Modifier.weight(1f).staggered(13),
+                ) { onOpen(Route.House) }
+                val cards = de.knuffi.core.Cards.owned(state).size
+                WorldTile(
+                    "🎴", "Sammelkarten",
+                    "$cards / ${de.knuffi.core.Cards.all.size} Karten",
+                    Color(0xFFB99AFF), Color(0xFF7FB8FF),
+                    progress = cards / de.knuffi.core.Cards.all.size.toFloat(),
+                    badge = state.count(de.knuffi.core.Cards.PACK).takeIf { it > 0 }?.let { "🃏 $it" },
+                    modifier = Modifier.weight(1f).staggered(14),
+                ) { onOpen(Route.Cards) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                WorldTile(
+                    "🎹", "Musik",
+                    "${state.songs.size} ${if (state.songs.size == 1) "Lied" else "Lieder"} gespeichert",
+                    Color(0xFF9AA8FF), Color(0xFFFF9EC4),
+                    modifier = Modifier.weight(1f).staggered(15),
+                ) { onOpen(Route.Music) }
+                val family = state.familyEggs.size
+                WorldTile(
+                    "💕", "Nachwuchs",
+                    if (family > 0) "$family ${if (family == 1) "Ei wartet" else "Eier warten"}!" else "Beste Freunde bekommen manchmal ein Ei",
+                    Color(0xFFFF9EC4), Color(0xFFFFD08A),
+                    badge = if (family > 0) "🥚 $family" else null,
+                    modifier = Modifier.weight(1f).staggered(16),
+                ) { onOpen(Route.Kuschelhaus) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 val adv = state.adventure
                 val cost = de.knuffi.core.Adventure.cost(adv.station, adv.map)
                 WorldTile(

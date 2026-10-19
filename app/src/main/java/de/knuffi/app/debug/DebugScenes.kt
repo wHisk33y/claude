@@ -141,7 +141,41 @@ object DebugScenes {
                 friendship = if (scene == "visit") mapOf(de.knuffi.core.Friends.key(pet.id, state.resting.first().id) to 90) else emptyMap(),
             )
         }
+        state = withHouse(state, scene)
         return Launch(scene, state, hour)
+    }
+
+    private val roomScenes = mapOf(
+        "kitchenroom" to de.knuffi.core.RoomKind.KITCHEN,
+        "bathroom" to de.knuffi.core.RoomKind.BATH,
+        "bedroom" to de.knuffi.core.RoomKind.BEDROOM,
+        "playroom" to de.knuffi.core.RoomKind.PLAYROOM,
+        "musicroom" to de.knuffi.core.RoomKind.MUSIC,
+        "gardenroom" to de.knuffi.core.RoomKind.GARDEN,
+        "craftroom" to de.knuffi.core.RoomKind.CRAFT,
+    )
+
+    /** The house (rooms, residents), cards, songs and a family egg for the screenshots. */
+    private fun withHouse(base: GameState, scene: String): GameState {
+        val now = System.currentTimeMillis()
+        var s = base.copy(
+            settings = base.settings.copy(houseMode = scene != "classic"),
+            cards = base.album.filter { de.knuffi.core.Cards.isCard(it) }.associateWith { if (it.length % 3 == 0) 2 else 1 },
+            cardDust = 120,
+            inventory = base.inventory + (de.knuffi.core.Cards.PACK to 2),
+            songs = listOf(de.knuffi.core.Song("Mochis Lied", List(12) { de.knuffi.core.SongNote(de.knuffi.core.Instrument.PIANO, it % 8, it * 350) }, now)),
+        )
+        if (scene == "kuschelhaus") {
+            val a = s.resting.first()
+            s = s.copy(familyEggs = listOf(de.knuffi.core.FamilyEgg(now, a.line, listOf(a.id, s.pet?.id ?: 0L), listOf(a.name, s.pet?.name ?: "Mochi"), s.pet?.form?.name, null, now)))
+        }
+        s = de.knuffi.core.House.normalize(s, now)
+        if (scene == "house" || scene in roomScenes) {
+            for (k in de.knuffi.core.RoomKind.entries) s = de.knuffi.core.House.build(s, k)
+            s = de.knuffi.core.House.normalize(s, now + 1)
+        }
+        roomScenes[scene]?.let { s = de.knuffi.core.House.goTo(s, it) }
+        return s
     }
 
     fun initialRoute(scene: String?): Route = when (scene) {
@@ -167,6 +201,9 @@ object DebugScenes {
         "jumper" -> Route.Game(MiniGame.JUMPER)
         "race" -> Route.Game(MiniGame.RACE)
         "tricks" -> Route.Tricks
+        "house" -> Route.House
+        "music" -> Route.Music
+        "cards" -> Route.Cards
         "adventuremap" -> Route.Adventure
         "tournament" -> Route.Tournament
         "settings" -> Route.Settings

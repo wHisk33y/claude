@@ -1,6 +1,7 @@
 package de.knuffi.app.render
 
 import de.knuffi.core.Catalog
+import de.knuffi.core.Door
 import de.knuffi.core.Emotion
 import de.knuffi.core.FriendMoment
 import de.knuffi.core.GameEvent
@@ -89,7 +90,7 @@ class PetDirector(seed: Int = 7) {
     val canDuo: Boolean
         get() = !act.care && act !is Act.Sleeping && act !is Act.GoSleep && act !is Act.Ladder && act !is Act.Duo &&
             act !is Act.PlanePlay && act !is Act.Paint && act !is Act.Wake && act !is Act.Perform && !inRoomGame &&
-            act !is Act.Carried && act !is Act.Fall
+            act !is Act.Carried && act !is Act.Fall && act !is Act.Door
 
     /** Hanging from the player's finger. */
     var carried = false
@@ -122,6 +123,14 @@ class PetDirector(seed: Int = 7) {
     var hasBed = true
     var hasTub = true
     var hasBall = true
+
+    /** 1 = fully visible; lower while walking through a door. */
+    var fade = 1f
+        private set
+    private var onThroughDoor: (() -> Unit)? = null
+
+    /** True while the pet walks through a door. */
+    val inDoor: Boolean get() = act is Act.Door
 
     // Position & motion
     var x = 0.46f
@@ -247,6 +256,11 @@ class PetDirector(seed: Int = 7) {
         class Flip : Act(1.3f)
         class Butterfly : Act(5.5f)
         class Daydream : Act(3.6f)
+
+        // The house: out of one room through a door, into the next one
+        class Door(val door: de.knuffi.core.Door, val exit: Boolean) : Act(if (exit) 10f else 6f) {
+            var done = false
+        }
     }
 
     /** Something small flying around the pet (a butterfly), in scene coordinates 0..1. */
@@ -271,6 +285,39 @@ class PetDirector(seed: Int = 7) {
         if (act is Act.Sleeping || act.care) return
         start(Act.Spin())
         say(line("Mir ist ganz schwindelig! 😵‍💫", "Miau … alles dreht sich!"), 2f)
+    }
+
+    // ------------------------------------------------------------------ house
+
+    /**
+     * Walks to [door] and through it; [onThrough] is called once the pet is gone.
+     * Returns false if the pet cannot go right now (asleep, carried, in a game).
+     */
+    fun exitThrough(door: Door, onThrough: () -> Unit): Boolean {
+        if (act is Act.Sleeping || act is Act.GoSleep || act is Act.Wake || carried || inRoomGame || act.care) return false
+        hidden = false
+        onThroughDoor = onThrough
+        start(Act.Door(door, true))
+        return true
+    }
+
+    /** Comes into the room through [door] (the door of this room leading back where it came from). */
+    fun enterFrom(door: Door) {
+        onThroughDoor = null
+        act = Act.Idle(0.1f)
+        x = DoorGeo.outX(door)
+        z = DoorGeo.outZ(door)
+        targetX = x
+        targetZ = z
+        fade = 0f
+        facing = if (DoorGeo.inX(door) >= x) 1f else -1f
+        start(Act.Door(door, false))
+    }
+
+    /** Puts the pet somewhere in the room without walking (e.g. after the room changed by itself). */
+    fun appear(nx: Float) {
+        place(nx)
+        fade = 1f
     }
 
     /** Starts a moment together with a friend (see [FriendPlay]). */
@@ -625,6 +672,9 @@ class PetDirector(seed: Int = 7) {
     private fun start(a: Act) {
         // While held in the air the pet only reacts with its face, it keeps hanging on.
         if (carried && a !is Act.Carried && a !is Act.Fall) return
+        // Walking through a door is not interrupted.
+        val cur = act
+        if (cur is Act.Door && !cur.done && a !is Act.Door) return
         queue.clear()
         if (a !is Act.Ladder) dropToys()
         companion = null
@@ -732,6 +782,16 @@ class PetDirector(seed: Int = 7) {
                 say(line("Oh, ein Schmetterling!", "Miau?! Ein Schmetterling!"), 1.6f)
             }
             is Act.Daydream -> Unit
+            is Act.Door -> {
+                if (a.exit) {
+                    targetX = DoorGeo.outX(a.door)
+                    targetZ = DoorGeo.outZ(a.door)
+                } else {
+                    targetX = DoorGeo.inX(a.door)
+                    targetZ = DoorGeo.inZ(a.door)
+                }
+                speed = 0.3f
+            }
             is Act.FootHop -> jump(0.28f, 0.36f)
             is Act.Fall -> if (fallV > 1f) say(line("Huiiii!", "Miauuu!"), 1f)
             else -> Unit
@@ -926,6 +986,7 @@ class PetDirector(seed: Int = 7) {
         val finished = when (a) {
             is Act.Walk -> abs(targetX - x) < 0.006f && abs(targetZ - z) < 0.02f
             is Act.Fall -> (carryH <= 0f && fallV == 0f && elapsed > 0.35f) || elapsed >= a.dur
+            is Act.Door -> a.done || elapsed >= a.dur
             else -> elapsed >= a.dur
         }
         if (finished) {
@@ -945,6 +1006,7 @@ class PetDirector(seed: Int = 7) {
 
         walking = false
         runAct(act, t - actStart, dt, look, ps, headX, headY)
+        if (act !is Act.Door && fade < 1f) fade = min(1f, fade + dt * 3f)
 
         // Movement (x and depth)
         if (walking) {
@@ -1346,6 +1408,7 @@ class PetDirector(seed: Int = 7) {
                 }
             }
             is Act.Duo -> runDuo(a, el, dt, ps, headX, headY)
+            is Act.Door -> runDoor(a, dt)
             is Act.PlanePlay -> runPlane(el, dt, ps)
             is Act.Fetch -> {
                 val p = toys.plane
@@ -1949,6 +2012,28 @@ class PetDirector(seed: Int = 7) {
             }
         }
         if (el >= a.dur - dt) toys.ladderExtend = 0f
+    }
+
+    private fun runDoor(a: Act.Door, dt: Float) {
+        walking = abs(targetX - x) > 0.006f || abs(targetZ - z) > 0.02f
+        val d = a.door
+        if (a.exit) {
+            // fade out on the last steps to the door
+            val dist = abs(DoorGeo.outX(d) - x) + abs(DoorGeo.outZ(d) - z) * 0.4f
+            if (dist < 0.14f) fade = min(fade, dist / 0.14f)
+            if (!walking) fade = max(0f, fade - dt * 4f)
+            if (fade <= 0.02f && !a.done) {
+                fade = 0f
+                a.done = true
+                val cb = onThroughDoor
+                onThroughDoor = null
+                cb?.invoke()
+            }
+        } else {
+            fade = min(1f, fade + dt * 2.5f)
+            if (!walking && fade >= 1f) a.done = true
+        }
+        pose.eyes = EyeShape.HAPPY
     }
 
     private fun runPlane(el: Float, dt: Float, ps: ParticleSystem) {

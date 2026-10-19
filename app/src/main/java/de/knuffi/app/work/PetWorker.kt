@@ -27,6 +27,10 @@ class PetWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
         }
         runCatching { de.knuffi.app.data.WeatherFetcher.refreshIfNeeded(ctx) }
         GameRepository.tick(userPresent = false, sync = true)
+        val now = System.currentTimeMillis()
+        if (de.knuffi.app.data.Backup.autoDue(GameRepository.current, now) && de.knuffi.app.data.Backup.saveToDownloads(ctx, GameRepository.current, now)) {
+            GameRepository.perform(Action.BackupMade(now), userPresent = false)
+        }
         runCatching { Notifier.checkAndNotify(ctx) }
         runCatching { WidgetUpdater.updateAll(ctx) }
         return Result.success()

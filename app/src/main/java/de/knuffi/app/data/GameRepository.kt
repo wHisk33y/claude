@@ -82,6 +82,15 @@ object GameRepository {
         mutate(updateWidget = true, sync = true) { Outcome(GameState()) }
     }
 
+    /** Replaces the whole game with a backup (see [Backup]). */
+    fun restore(state: GameState) {
+        if (previewMode) return
+        // The pet continues right where the backup stopped, without the time in between.
+        mutate(updateWidget = true, sync = true) { Outcome(state.copy(lastSimulated = System.currentTimeMillis())) }
+        tick(userPresent = true, sync = true, updateWidget = true)
+        message("Spielstand wiederhergestellt! Willkommen zurück, ${state.pet?.name ?: "Knuffi"}. 💾")
+    }
+
     /** Shows a fake state without ever saving it (used for screenshots in debug builds). */
     fun enterPreview(state: GameState) {
         previewMode = true

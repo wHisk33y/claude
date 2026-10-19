@@ -96,11 +96,17 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
     val pet = state.pet ?: return
     var sheet by remember { mutableStateOf<Sheet?>(null) }
     var moodSheet by remember { mutableStateOf(false) }
-    val act: (Action) -> Unit = { GameRepository.perform(it) }
+    val scene = remember { SceneHandle() }
+    var editMode by remember { mutableStateOf(false) }
+    val voice = rememberTrickVoice()
+    // In the house the pet first walks through the doors: eating in the kitchen, sleeping in the bedroom …
+    val act: (Action) -> Unit = { a ->
+        val room = de.knuffi.core.House.roomFor(a, GameRepository.current)
+        if (room != null) scene.travel(room) { GameRepository.perform(a) } else GameRepository.perform(a)
+    }
     val navSpace = bottomBarSpace()
     var hudPx by remember { mutableStateOf(0) }
     val dockHeight = if (pet.isEgg) (if (state.count(Catalog.GLITTER) > 0 || pet.shiny) 160.dp else 112.dp) else 124.dp
-    val scene = remember { SceneHandle() }
     var roomGame by remember { mutableStateOf<RoomGameSession?>(null) }
     val running = roomGame
     LaunchedEffect(running?.finished) {
@@ -156,11 +162,28 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
                 onTouch = { zone -> act(Action.Touch(zone)) },
                 roomGame = roomGame,
                 handle = scene,
+                editMode = editMode,
+                onFixture = { name ->
+                    when (name) {
+                        "piano" -> onOpen(Route.Music)
+                        "cards" -> onOpen(Route.Cards)
+                        "kitchen" -> onOpen(Route.Kitchen)
+                        "beds" -> onOpen(Route.Garden)
+                        "tub" -> act(Action.Clean)
+                        "pool" -> act(Action.Play)
+                    }
+                },
             )
             Spacer(Modifier.height(navSpace + dockHeight - 34.dp))
         }
 
-        Hud(state, pet, onOpenSettings, Modifier.align(Alignment.TopCenter).onSizeChanged { hudPx = it.height }, onMood = { moodSheet = true }, onOpen = onOpen, onWish = { fulfil(it) })
+        Hud(
+            state, pet, onOpenSettings, Modifier.align(Alignment.TopCenter).onSizeChanged { hudPx = it.height },
+            onMood = { moodSheet = true }, onOpen = onOpen, onWish = { fulfil(it) },
+            roomBar = {
+                RoomBar(state, pet, voice, editMode, onHouse = { onOpen(Route.House) }, onEdit = { editMode = !editMode })
+            },
+        )
 
         Column(
             Modifier
@@ -190,7 +213,9 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
                     textColor = Color.White,
                 )
             }
-            if (pet.isEgg) {
+            if (editMode) {
+                EditDock(state, Modifier.height(dockHeight), onReset = { GameRepository.perform(Action.ResetFurniture) }, onDone = { editMode = false })
+            } else if (pet.isEgg) {
                 EggDock(pet, Modifier.height(dockHeight), glitter = state.count(Catalog.GLITTER)) { act(Action.UseItem(Catalog.GLITTER)) }
             } else if (running != null && !running.finished) {
                 RoomGameDock(running, Modifier.height(dockHeight)) { running.stop(scene.director) }
@@ -328,8 +353,70 @@ private fun RoomGameDock(game: RoomGameSession, modifier: Modifier = Modifier, o
     }
 }
 
+/** Which room the pet is in (opens the house), moving furniture and spoken trick commands. */
 @Composable
-private fun Hud(state: GameState, pet: Pet, onOpenSettings: () -> Unit, modifier: Modifier = Modifier, onMood: () -> Unit = {}, onOpen: (Route) -> Unit = {}, onWish: (Wish) -> Unit = {}) {
+private fun RoomBar(state: GameState, pet: Pet, voice: de.knuffi.app.sound.TrickVoice, editMode: Boolean, onHouse: () -> Unit, onEdit: () -> Unit) {
+    val p = LocalPalette.current
+    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        val house = de.knuffi.core.House.enabled(state)
+        val room = state.house.current
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(p.glass)
+                .border(1.dp, p.glassBorder, RoundedCornerShape(50))
+                .clickable { onHouse() }
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(if (house) room.emoji else "🏠", fontSize = 18.sp)
+            Spacer(Modifier.width(6.dp))
+            Text(if (house) room.title else "Kinderzimmer", style = MaterialTheme.typography.labelLarge, color = p.text)
+            Spacer(Modifier.width(4.dp))
+            Text("🗺️", fontSize = 14.sp)
+        }
+        Spacer(Modifier.weight(1f))
+        if (!pet.isEgg && pet.alive && de.knuffi.core.Tricks.learnedCount(pet) > 0) {
+            VoiceButton(voice)
+            Spacer(Modifier.width(6.dp))
+        }
+        GlassIconButton(if (editMode) "✅" else "✏️", onEdit, size = 42.dp)
+    }
+}
+
+/** Shown instead of the care buttons while furniture is being moved. */
+@Composable
+private fun EditDock(state: GameState, modifier: Modifier = Modifier, onReset: () -> Unit, onDone: () -> Unit) {
+    val p = LocalPalette.current
+    GlassPanel(modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)) {
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
+            Text("✏️ Möbel verschieben", style = MaterialTheme.typography.titleMedium, color = p.text)
+            Text(
+                "Zieh ein Möbelstück mit dem Finger zur Seite. ${if (de.knuffi.core.House.enabled(state)) "Jedes Zimmer merkt sich seine Einrichtung." else ""}",
+                style = MaterialTheme.typography.bodySmall,
+                color = p.textMuted,
+                maxLines = 2,
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ClayTextButton("Zurücksetzen", onReset, Modifier.weight(1f), emoji = "↩️", small = true, color = Color(0xFF9A8FB0), deep = Color(0xFF6E6484))
+                ClayTextButton("Fertig", onDone, Modifier.weight(1f), emoji = "✅", small = true, color = p.mint, deep = p.mintDeep)
+            }
+        }
+    }
+}
+
+@Composable
+private fun Hud(
+    state: GameState,
+    pet: Pet,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+    onMood: () -> Unit = {},
+    onOpen: (Route) -> Unit = {},
+    onWish: (Wish) -> Unit = {},
+    roomBar: @Composable () -> Unit = {},
+) {
     val p = LocalPalette.current
     Column(
         modifier
@@ -402,6 +489,7 @@ private fun Hud(state: GameState, pet: Pet, onOpenSettings: () -> Unit, modifier
                 HudButton("💬", if (pet.level < de.knuffi.core.Chat.UNLOCK_LEVEL) "${de.knuffi.core.Chat.UNLOCK_LEVEL}" else null) { onOpen(Route.Chat) }
             }
         }
+        roomBar()
         val wish = state.wish
         if (wish != null && pet.alive && !pet.isEgg) {
             val left = ((wish.until - System.currentTimeMillis()) / 60_000L).coerceAtLeast(0)

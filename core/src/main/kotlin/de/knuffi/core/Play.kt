@@ -45,6 +45,27 @@ object Tricks {
     /** Coins for learning a trick. */
     fun learnCoins(t: Trick): Int = 10 + t.practice * 3
 
+    /** Words that call a trick, checked in this order (the longer tricks first). */
+    private val words: List<Pair<Trick, List<String>>> = listOf(
+        Trick.SALTO to listOf("salto", "überschlag", "ueberschlag"),
+        Trick.ROLLE to listOf("rolle", "roll dich", "rollen", "kuller"),
+        Trick.VERBEUGUNG to listOf("verbeug", "verneig", "diener", "bück dich"),
+        Trick.TANZ to listOf("tanz"),
+        Trick.MAENNCHEN to listOf("männchen", "maennchen", "mach dich groß", "steh auf"),
+        Trick.PFOTE to listOf("pfote", "pfötchen", "pfoetchen", "gib fünf", "high five"),
+        Trick.WINKEN to listOf("wink", "tschüss", "tschüs", "hallo"),
+        Trick.SPRUNG to listOf("hopp", "spring", "sprung", "hüpf"),
+        Trick.DREHEN to listOf("dreh", "pirouette", "im kreis"),
+        Trick.SITZ to listOf("sitz", "setz dich", "hinsetzen", "platz"),
+    )
+
+    /** The trick a spoken sentence asks for ("Sitz!", "Gib Pfötchen!" …), or null. */
+    fun match(text: String): Trick? {
+        val t = text.lowercase().trim()
+        if (t.isEmpty()) return null
+        return words.firstOrNull { (_, ws) -> ws.any { it in t } }?.first
+    }
+
     /** Reason why the pet cannot practise right now, or null. */
     fun blocker(s: GameState, t: Trick? = null): String? {
         val p = s.pet ?: return "Du hast noch kein Haustier."

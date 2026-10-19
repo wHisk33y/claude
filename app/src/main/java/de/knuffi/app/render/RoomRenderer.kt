@@ -80,13 +80,29 @@ class RoomRenderer : Painter() {
     private val clear = Paint(Paint.ANTI_ALIAS_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR) }
     private val path3 = Path()
     private val furniture = FurnitureRenderer()
+
+    /** Doors, fixtures and the garden of the house. */
+    val houseArt = HouseArt()
     private var vignette: RadialGradient? = null
     private var vignetteKey = 0f
 
     private fun lampX(L: SceneLayout) = L.w * 0.53f
     private fun lampY(L: SceneLayout) = L.window.top + L.window.height() * 0.2f
 
-    fun isCozy(room: String) = room == "room_cozy" || room !in setOf("room_forest", "room_ocean", "room_space", "room_candy", "room_beach", "room_castle")
+    fun isCozy(room: String) = room == "room_cozy" || room !in setOf("room_forest", "room_ocean", "room_space", "room_candy", "room_beach", "room_castle", Furnishing.GARDEN)
+
+    /** Draws [block] moved sideways by the player's offset for [slot]. */
+    private inline fun moved(c: Canvas, L: SceneLayout, f: Furnishing, slot: de.knuffi.core.Slot, block: () -> Unit) {
+        val dx = f.offset(slot) * L.w
+        if (dx == 0f) {
+            block()
+            return
+        }
+        c.save()
+        c.translate(dx, 0f)
+        block()
+        c.restore()
+    }
 
     // ------------------------------------------------------------------ time of day
 
@@ -234,7 +250,7 @@ class RoomRenderer : Painter() {
         val w = L.w
         val h = L.h
         when (room) {
-            "room_forest", "room_candy", "room_beach" -> {
+            "room_forest", "room_candy", "room_beach", Furnishing.GARDEN -> {
                 if (room == "room_candy") {
                     val dark = darkness(hour)
                     vgrad(c, 0f, 0f, w, L.floorY + 2f, Colors.lerp(0xFFFFC2E2.toInt(), 0xFF4A3470.toInt(), dark * 0.8f), Colors.lerp(0xFFFFEFF7.toInt(), 0xFF8C5FA0.toInt(), dark * 0.8f))
@@ -291,6 +307,8 @@ class RoomRenderer : Painter() {
 
     /** Cached static layer (transparent where the sky shows through). */
     fun drawStatic(c: Canvas, L: SceneLayout, room: String, f: Furnishing = Furnishing()) {
+        houseArt.doorRects.clear()
+        houseArt.fixtureRects.clear()
         when (room) {
             "room_forest" -> staticForest(c, L)
             "room_ocean" -> staticOcean(c, L)
@@ -298,13 +316,21 @@ class RoomRenderer : Painter() {
             "room_candy" -> staticCandy(c, L)
             "room_beach" -> staticBeach(c, L)
             "room_castle" -> staticCastle(c, L)
+            Furnishing.GARDEN -> houseArt.gardenStatic(c, L)
             else -> staticCozy(c, L, f)
+        }
+        // The cosy room draws its fixtures and doors itself, behind the furniture.
+        if (!isCozy(room)) {
+            val kind = f.house
+            if (kind != null && room != Furnishing.GARDEN) houseArt.fixtures(c, L, kind)
+            if (L.kind == LayoutKind.HOME && f.doors.isNotEmpty()) houseArt.doors(c, L, f.doors, room == Furnishing.GARDEN)
         }
     }
 
     /** Animated parts that sit in front of the static layer but behind the pet. */
     fun drawAnimated(c: Canvas, L: SceneLayout, room: String, hour: Float, t: Float, f: Furnishing = Furnishing()) {
         if (isCozy(room)) f.event?.let { furniture.garland(c, L, it, t) }
+        if (room == Furnishing.GARDEN) houseArt.gardenAnimated(c, L, t, f.plants)
         val w = L.w
         val h = L.h
         val dark = darkness(hour)
@@ -540,7 +566,7 @@ class RoomRenderer : Painter() {
         }
         if (cozy && !lightsOff && dark > 0.15f) {
             // warm glow from the lamp
-            val lx = lampX(L)
+            val lx = lampX(L) + f.offset(de.knuffi.core.Slot.LAMP) * L.w
             val ly = lampY(L) + if (f.lamp == "lamp_lava") L.h * 0.02f else 0f
             val gr = w * 0.55f
             val glow = furniture.lampGlow(f.lamp)
@@ -617,7 +643,7 @@ class RoomRenderer : Painter() {
         // baseboard
         box(c, 0f, fy - h * 0.018f, w, fy + h * 0.002f, 0f, 0xFFFFFFFF.toInt(), 0xFFEDE3EC.toInt())
 
-        furniture.rug(c, L, f.rug)
+        moved(c, L, f, de.knuffi.core.Slot.RUG) { furniture.rug(c, L, f.rug) }
 
         // window frame with a transparent hole for the sky
         val fw = w * 0.022f
@@ -669,6 +695,8 @@ class RoomRenderer : Painter() {
         }
 
         // picture frame
+        c.save()
+        c.translate(f.offset(de.knuffi.core.Slot.PICTURE) * w, 0f)
         val pl = w * 0.6f
         val pr = w * 0.86f
         val pt = win.top
@@ -682,10 +710,32 @@ class RoomRenderer : Painter() {
         line.color = Colors.alpha(0xFF8A5A10.toInt(), 0.4f)
         line.strokeWidth = w * 0.003f
         c.drawRect(pl + pad, pt + pad, pr - pad, pb - pad, line)
+        c.restore()
 
         // lamp (glow is drawn dynamically)
-        furniture.lamp(c, L, f.lamp, lampX(L), lampY(L))
+        moved(c, L, f, de.knuffi.core.Slot.LAMP) { furniture.lamp(c, L, f.lamp, lampX(L), lampY(L)) }
 
+        // In the house a door to the next room may take the place of the shelf.
+        val northDoor = L.kind == LayoutKind.HOME && f.doors.any { it.side == de.knuffi.core.DoorSide.NORTH }
+        if (!northDoor) shelf(c, L, f, pb, wt)
+
+        // fixtures of the room (kitchen, bath …) and the doors, behind the furniture
+        f.house?.let { houseArt.fixtures(c, L, it) }
+        if (L.kind == LayoutKind.HOME && f.doors.isNotEmpty()) houseArt.doors(c, L, f.doors, false)
+
+        // plant in the corner
+        moved(c, L, f, de.knuffi.core.Slot.PLANT) { furniture.plant(c, L, f.plant) }
+
+        // toy corner
+        moved(c, L, f, de.knuffi.core.Slot.TOY) { furniture.toy(c, L, f.toy, f.trophies) }
+
+        // cosy corner (sofa, piano, ...)
+        moved(c, L, f, de.knuffi.core.Slot.DECO) { furniture.deco(c, L, f.deco) }
+    }
+
+    private fun shelf(c: Canvas, L: SceneLayout, f: Furnishing, pb: Float, wt: Float) {
+        val w = L.w
+        val h = L.h
         // shelf with books
         val sl = w * 0.6f
         val sr = w * 0.9f
@@ -712,15 +762,6 @@ class RoomRenderer : Painter() {
 
         // extra trophies for festival prizes, stories and collections
         for (k in 1 until f.trophies.coerceAtMost(4)) furniture.cup(c, tx - k * w * 0.045f, st, h * 0.03f)
-
-        // plant in the corner
-        furniture.plant(c, L, f.plant)
-
-        // toy corner
-        furniture.toy(c, L, f.toy, f.trophies)
-
-        // cosy corner (sofa, piano, ...)
-        furniture.deco(c, L, f.deco)
     }
 
     private fun curtain(c: Canvas, l: Float, r: Float, t: Float, b: Float, left: Boolean, w: Float, style: WallStyle) {

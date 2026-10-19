@@ -177,7 +177,7 @@ class KnuffiWallpaperService : WallpaperService() {
                 lastState = state
                 model.look = PetLook.of(state)?.takeIf { state.pet?.alive == true }
                 model.needs = state.pet?.needs() ?: emptyList()
-                model.room = state.room
+                model.room = Furnishing.roomId(state)
                 model.furniture = Furnishing.of(state, EventCalendar.active(System.currentTimeMillis(), ZoneId.systemDefault()))
                 model.poops = state.pet?.poops ?: 0
                 model.lightsOff = state.pet?.sleeping == true
@@ -196,6 +196,7 @@ class KnuffiWallpaperService : WallpaperService() {
                     holder.lockCanvas()
                 }
                 if (canvas != null) {
+                    scene.furnishing = model.furniture
                     scene.configure(director, width, height, LayoutKind.WALLPAPER)
                     director.update(t, model.look, model.needs, particles, scene.headNX, scene.headNY)
                     val gl = model.guest

@@ -174,7 +174,14 @@ fun TricksScreen(state: GameState, onBack: () -> Unit) {
         }
     }
     Column(Modifier.fillMaxSize()) {
-        PageHeader("Kunststücke", onBack) { CoinPill(state.coins) }
+        val voice = rememberTrickVoice()
+        PageHeader("Kunststücke", onBack) {
+            if (pet != null && !pet.isEgg) {
+                VoiceButton(voice)
+                Spacer(Modifier.width(8.dp))
+            }
+            CoinPill(state.coins)
+        }
         if (pet == null || pet.isEgg) {
             Text(
                 "Erst wenn dein Haustier geschlüpft ist, kann es Kunststücke lernen.",
@@ -205,7 +212,7 @@ fun TricksScreen(state: GameState, onBack: () -> Unit) {
                             Text("${pet.name} kann $learned von ${Trick.entries.size} Tricks", style = MaterialTheme.typography.titleMedium, color = p.text)
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                blocker ?: "Übe jeden Trick ein paar Mal. Mit guter Laune und viel Energie klappt es öfter! Gelernte Tricks kannst du vorführen.",
+                                blocker ?: "Übe jeden Trick ein paar Mal. Mit guter Laune und viel Energie klappt es öfter! Tippe auf 🎙️ und sag das Kommando (z. B. „Sitz!“), dann macht ${pet.name} den Trick.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (blocker != null) p.red else p.textMuted,
                             )
@@ -241,7 +248,7 @@ private fun TrickCard(state: GameState, t: Trick, blocker: String?) {
                         Pill("✓ kann es", color = p.mint.copy(alpha = 0.3f))
                     }
                 }
-                Text(if (locked) "Ab Level ${t.minLevel}" else t.description, style = MaterialTheme.typography.bodySmall, color = p.textMuted)
+                Text(if (locked) "Ab Level ${t.minLevel}" else "${t.description} Sag: „${t.command}“", style = MaterialTheme.typography.bodySmall, color = p.textMuted)
                 if (!locked && !done) {
                     Spacer(Modifier.height(6.dp))
                     GlossyBar(Tricks.progress(pet, t), p.gold, p.goldDeep, Modifier.fillMaxWidth(), height = 8.dp)

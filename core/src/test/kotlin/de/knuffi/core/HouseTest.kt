@@ -278,6 +278,24 @@ class HouseTest {
         assertEquals(2, s.counters.duelWins)
     }
 
+    // ------------------------------------------------------------------ voice commands
+
+    @Test
+    fun spokenCommandsFindTheTrick() {
+        assertEquals(Trick.SITZ, Tricks.match("Sitz!"))
+        assertEquals(Trick.SITZ, Tricks.match("mochi sitz"))
+        assertEquals(Trick.PFOTE, Tricks.match("Gib Pfötchen"))
+        assertEquals(Trick.ROLLE, Tricks.match("Mach eine Rolle"))
+        assertEquals(Trick.SALTO, Tricks.match("Salto rückwärts"))
+        assertEquals(Trick.DREHEN, Tricks.match("dreh dich"))
+        assertEquals(Trick.SPRUNG, Tricks.match("Hopp!"))
+        assertEquals(Trick.MAENNCHEN, Tricks.match("Mach Männchen"))
+        assertEquals(Trick.TANZ, Tricks.match("Tanz für mich"))
+        assertNull(Tricks.match("Guten Morgen"))
+        // every trick can be called with its own command
+        for (t in Trick.entries) assertEquals(t, Tricks.match(t.command))
+    }
+
     // ------------------------------------------------------------------ music
 
     @Test

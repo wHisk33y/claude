@@ -107,6 +107,8 @@ object Sounds {
             is GameEvent.WishMade -> play(Sfx.SPARKLE)
             is GameEvent.WishFulfilled, is GameEvent.TournamentDone, is GameEvent.GoalDone -> play(Sfx.FANFARE)
             is GameEvent.AdventureStep -> play(if (e.mapDone) Sfx.FANFARE else Sfx.SUCCESS)
+            is GameEvent.CardsOpened, is GameEvent.RoomBuilt -> play(Sfx.FANFARE)
+            is GameEvent.RoomEntered -> play(Sfx.POP)
             else -> Unit
         }
     }

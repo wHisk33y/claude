@@ -184,7 +184,7 @@ private fun petPicture(state: GameState, px: Int): ImageBitmap {
     val scene = SceneRenderer()
     val director = PetDirector(3)
     val model = SceneModel().apply {
-        room = state.room
+        room = de.knuffi.app.render.Furnishing.roomId(state)
         look = de.knuffi.app.render.PetLook.of(state)?.copy(mood = de.knuffi.core.Mood.HAPPY, sleeping = false)
         hour = 11f
         showBubble = false

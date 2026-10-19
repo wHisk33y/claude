@@ -114,6 +114,9 @@ sealed interface Route {
 
     /** Not a page of its own: switches to the goals tab. */
     data object Goals : Route
+    data object House : Route
+    data object Music : Route
+    data object Cards : Route
 }
 
 /** Space that scrolling pages keep free at the bottom for the floating navigation bar. */
@@ -272,6 +275,12 @@ private fun MainNavigation(state: GameState, debug: DebugScenes.Launch?) {
             Route.Adventure -> AdventureScreen(state, onBack = { route = Route.Main })
             Route.Tournament -> de.knuffi.app.ui.games.TournamentScreen(state, onExit = { route = Route.Main })
             Route.Goals -> Unit
+            Route.House -> HouseScreen(state, onBack = { route = Route.Main }, onEnter = {
+                tab = Tab.HOME
+                route = Route.Main
+            })
+            Route.Music -> MusicScreen(state, onBack = { route = Route.Main })
+            Route.Cards -> CardsScreen(state, onBack = { route = Route.Main })
         }
     }
 }

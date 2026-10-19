@@ -35,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import de.knuffi.app.BuildConfig
+import de.knuffi.app.data.Backup
 import de.knuffi.app.data.GameRepository
 import de.knuffi.app.notify.Battery
 import de.knuffi.app.notify.Notifier
@@ -71,7 +73,9 @@ import de.knuffi.core.TimeUtil
 import de.knuffi.core.ToyKind
 import de.knuffi.core.ToyTuning
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val themeOrder = listOf(ThemeMode.SYSTEM, ThemeMode.LIGHT, ThemeMode.DARK)
 
@@ -96,6 +100,36 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
     var wallpaperActive by remember { mutableStateOf(ScreenPet.isWallpaperActive(context)) }
     var batteryOk by remember { mutableStateOf(Battery.isIgnoring(context)) }
     var waitingForOverlayPermission by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    var backupBusy by remember { mutableStateOf(false) }
+    var pendingImport by remember { mutableStateOf<Backup.Contents?>(null) }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(Backup.MIME)) { uri ->
+        if (uri != null) {
+            scope.launch {
+                backupBusy = true
+                val ok = withContext(Dispatchers.IO) {
+                    runCatching { context.contentResolver.openOutputStream(uri)?.use { Backup.write(context, GameRepository.current, it) } != null }.getOrDefault(false)
+                }
+                backupBusy = false
+                GameRepository.message(if (ok) "Sicherung gespeichert! 💾" else "Die Sicherung konnte nicht gespeichert werden.")
+            }
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                backupBusy = true
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.openInputStream(uri)?.use { Backup.read(it) } ?: throw IllegalArgumentException("Die Datei konnte nicht geöffnet werden.")
+                    }
+                }
+                backupBusy = false
+                result.onSuccess { pendingImport = it }
+                result.onFailure { GameRepository.message(it.message ?: "Das ist keine Knuffi-Sicherung.") }
+            }
+        }
+    }
     fun update(settings: Settings) {
         GameRepository.perform(Action.UpdateSettings(settings))
     }
@@ -150,6 +184,21 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
                 Spacer(Modifier.height(8.dp))
                 Text(
                     "Zauber: Rosa und Flieder. Abenteuer: Blau und Grün. Alle Haustiere, Kleider und Möbel gibt es in beiden Looks.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = p.textMuted,
+                )
+                Spacer(Modifier.height(16.dp))
+                Text("Zuhause", style = MaterialTheme.typography.titleSmall, color = p.text)
+                Spacer(Modifier.height(10.dp))
+                SegmentedControl(
+                    listOf("🏠 Ganzes Haus", "🛏️ Ein Zimmer"),
+                    if (s.houseMode) 0 else 1,
+                    { update(s.copy(houseMode = it == 0)) },
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    if (s.houseMode) "Mehrere Zimmer mit Türen: Gegessen wird in der Küche, geschlafen im Schlafzimmer. Jedes Zimmer richtest du selbst ein."
+                    else "Das klassische Kinderzimmer, in dem alles passiert. Deine Haus-Zimmer bleiben erhalten.",
                     style = MaterialTheme.typography.bodySmall,
                     color = p.textMuted,
                 )
@@ -432,7 +481,54 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
                 }
             }
 
-            SectionHeader("Daten", "💾")
+            SectionHeader("Sicherung", "💾")
+            SurfaceCard(Modifier.fillMaxWidth()) {
+                Text(
+                    "Speichere deinen Spielstand mit allen Fotos als ZIP-Datei auf deinem Handy, zum Beispiel im Download-Ordner. So kannst du ihn später oder auf einem neuen Handy wiederherstellen. Nichts davon geht ins Internet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = p.textMuted,
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ClayTextButton("Exportieren", { exportLauncher.launch(Backup.fileName()) }, Modifier.weight(1f), emoji = "📤", small = true, enabled = !backupBusy, color = p.mint, deep = p.mintDeep)
+                    ClayTextButton("Importieren", { importLauncher.launch(Backup.OPEN_TYPES) }, Modifier.weight(1f), emoji = "📥", small = true, enabled = !backupBusy, color = p.sky, deep = p.skyDeep)
+                }
+                Spacer(Modifier.height(12.dp))
+                SwitchRow(
+                    "Automatische Sicherung",
+                    "Einmal pro Woche eine Sicherung nach ${Backup.folderText}. Die letzten 3 bleiben, ältere werden gelöscht.",
+                    s.autoBackup,
+                ) { update(s.copy(autoBackup = it)) }
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (state.lastAutoBackup > 0L) "Zuletzt: ${backupDate(state.lastAutoBackup)}" else "Noch keine automatische Sicherung.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = p.textMuted,
+                        modifier = Modifier.weight(1f),
+                    )
+                    ClayTextButton(
+                        "Jetzt sichern",
+                        {
+                            scope.launch {
+                                backupBusy = true
+                                val now = System.currentTimeMillis()
+                                val ok = withContext(Dispatchers.IO) { Backup.saveToDownloads(context, GameRepository.current, now) }
+                                if (ok) GameRepository.perform(Action.BackupMade(now))
+                                backupBusy = false
+                                GameRepository.message(if (ok) "Gesichert in ${Backup.folderText}! 💾" else "Die Sicherung hat nicht geklappt.")
+                            }
+                        },
+                        small = true,
+                        emoji = "💾",
+                        enabled = !backupBusy,
+                        color = p.violet,
+                        deep = p.violetDeep,
+                    )
+                }
+            }
+
+            SectionHeader("Daten", "🗑️")
             SurfaceCard(Modifier.fillMaxWidth()) {
                 Text(
                     "Setzt das komplette Spiel zurück: Haustier, Münzen, Erfolge und Einstellungen.",
@@ -480,6 +576,28 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
             onDismiss = { confirmNewEgg = false },
         )
     }
+    pendingImport?.let { c ->
+        ConfirmDialog(
+            title = "Spielstand laden?",
+            text = "In der Sicherung${if (c.createdAt > 0L) " vom ${backupDate(c.createdAt)}" else ""}: ${c.petName} (Level ${c.petLevel}), " +
+                "${c.pets} ${if (c.pets == 1) "Haustier" else "Haustiere"}, ${c.state.coins} Münzen und ${c.photos.size} Fotos. " +
+                "Dein jetziger Spielstand wird ersetzt. Vorher wird er automatisch in ${Backup.folderText} gesichert.",
+            confirm = "Laden",
+            danger = true,
+            onConfirm = {
+                pendingImport = null
+                scope.launch {
+                    backupBusy = true
+                    withContext(Dispatchers.IO) {
+                        Backup.saveBeforeImport(context, GameRepository.current)
+                        Backup.restore(context, c)
+                    }
+                    backupBusy = false
+                }
+            },
+            onDismiss = { pendingImport = null },
+        )
+    }
     if (confirmReset) {
         ConfirmDialog(
             title = "Wirklich alles löschen?",
@@ -521,6 +639,9 @@ private fun toyDescription(kind: ToyKind, level: Int): String = when {
     kind == ToyKind.FOOTPRINTS -> "Hinterlässt beim Laufen Fußspuren, die nach etwa ${ToyTuning.footprintSeconds(level).toInt().let { if (it >= 60) "${it / 60} Min" else "$it Sek" }} verblassen."
     else -> "Malt Farbkleckse an Wand und Boden (höchstens ${ToyTuning.maxSplashes(level)}). Wisch sie mit dem Finger weg!"
 }
+
+private fun backupDate(at: Long): String =
+    java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm").format(java.time.Instant.ofEpochMilli(at).atZone(java.time.ZoneId.systemDefault()))
 
 private fun hoursText(h: Double): String {
     val half = (h * 2).roundToInt() / 2.0

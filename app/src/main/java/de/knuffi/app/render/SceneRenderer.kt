@@ -38,6 +38,10 @@ class SceneModel {
 
     /** Today's hidden object, if not found yet. */
     var hidden: de.knuffi.core.HiddenItem? = null
+
+    /** Furniture can be moved by finger; [editActive] is the piece being dragged. */
+    var editMode: Boolean = false
+    var editActive: de.knuffi.core.Slot? = null
 }
 
 /**
@@ -63,6 +67,20 @@ class SceneRenderer {
 
     /** True if (x, y) hits today's hidden object. */
     fun hitHidden(x: Float, y: Float): Boolean = !hiddenRect.isEmpty && hiddenRect.contains(x, y)
+
+    /** The furniture of the room (set before [configure], so the pet knows where the bed is). */
+    var furnishing = Furnishing()
+
+    /** The door at (x, y), if any. */
+    fun hitDoor(x: Float, y: Float): de.knuffi.core.Door? =
+        room.houseArt.doorRects.firstOrNull { it.second.contains(x, y) }?.first
+
+    /** A fixture of the room at (x, y): "piano", "cards", "kitchen", "tub", "beds", "pool" or null. */
+    fun hitFixture(x: Float, y: Float): String? =
+        room.houseArt.fixtureRects.firstOrNull { it.second.contains(x, y) }?.first
+
+    /** The movable furniture at (x, y), if any. */
+    fun hitFurniture(x: Float, y: Float): de.knuffi.core.Slot? = room.houseArt.hitFurniture(layout, furnishing, x, y)
 
     /** Things in the cosy room that react to taps: "picture", "window", "lamp" or null. */
     fun hitObject(x: Float, y: Float, room: String): String? {
@@ -94,12 +112,18 @@ class SceneRenderer {
 
     private fun poopX(i: Int) = floatArrayOf(0.1f, 0.9f, 0.3f)[i]
 
+    /** Starts a see-through layer while a pet walks through a door; returns -1 when not needed. */
+    private fun fadeLayer(c: Canvas, fade: Float): Int =
+        if (fade < 0.995f) c.saveLayerAlpha(null, (fade.coerceIn(0f, 1f) * 255).toInt()) else -1
+
     fun configure(d: PetDirector, w: Float, h: Float, kind: LayoutKind) {
         layout.compute(w, h, kind)
         d.minX = layout.minX
         d.maxX = layout.maxX
         d.bowlX = layout.bowlX
-        d.bedX = layout.bedX
+        d.bedX = layout.bedX + furnishing.offset(de.knuffi.core.Slot.BED)
+        d.hasBed = furnishing.hasBed
+        d.hasBowl = furnishing.hasBowl
         // On the home screen the ladder reaches almost up to the clock.
         d.toys.ladderHeight = if (kind == LayoutKind.WALLPAPER) max(1.55f, (layout.groundY - h * 0.2f) / layout.petSize) else 1.55f
     }
@@ -113,14 +137,22 @@ class SceneRenderer {
     private fun ensureCache(w: Float, h: Float, roomId: String, kind: LayoutKind, f: Furnishing) {
         val key = "${w.toInt()}x${h.toInt()}:$roomId:$kind:${f.key}"
         if (key == cacheKey && cache != null) return
-        cache?.recycle()
-        val bmp = Bitmap.createBitmap(max(1, w.toInt()), max(1, h.toInt()), Bitmap.Config.ARGB_8888)
+        val old = cache
+        // Same size: draw again into the same bitmap (cheap while furniture is being dragged).
+        val bmp = if (old != null && !old.isRecycled && old.width == max(1, w.toInt()) && old.height == max(1, h.toInt())) {
+            old.eraseColor(android.graphics.Color.TRANSPARENT)
+            old
+        } else {
+            old?.recycle()
+            Bitmap.createBitmap(max(1, w.toInt()), max(1, h.toInt()), Bitmap.Config.ARGB_8888)
+        }
         room.drawStatic(Canvas(bmp), layout, roomId, f)
         cache = bmp
         cacheKey = key
     }
 
     fun draw(c: Canvas, w: Float, h: Float, kind: LayoutKind, m: SceneModel, d: PetDirector, ps: ParticleSystem?, t: Float, guest: PetDirector? = null, friends: FriendPlay? = null, guest2: PetDirector? = null) {
+        furnishing = m.furniture
         configure(d, w, h, kind)
         val L = layout
         val f = m.furniture
@@ -173,13 +205,14 @@ class SceneRenderer {
         val px = d.x * w
         val petInFront = z < 0.5f
 
-        // Back props
-        props.bedBack(c, L.bedX * w, backY, bedS, cozy, f.bed)
-        props.bowlBack(c, L.bowlX * w, backY, propS)
+        // Back props (in the house: the bed only in the bedroom, the bowl only in the kitchen)
+        val bedPx = d.bedX * w
+        if (f.hasBed) props.bedBack(c, bedPx, backY, bedS, cozy, f.bed)
+        if (f.hasBowl) props.bowlBack(c, L.bowlX * w, backY, propS)
         pr.food?.let { props.food(c, L.bowlX * w, backY, propS, it, pr.bites, pr.foodPop) }
         if (petInFront) {
-            props.bowlFront(c, L.bowlX * w, backY, propS)
-            props.bedFront(c, L.bedX * w, backY, bedS, pr.blanket, cozy, t, f.bed)
+            if (f.hasBowl) props.bowlFront(c, L.bowlX * w, backY, propS)
+            if (f.hasBed) props.bedFront(c, bedPx, backY, bedS, pr.blanket, cozy, t, f.bed)
         }
 
         // Poops on the floor
@@ -216,26 +249,30 @@ class SceneRenderer {
 
         // A second visiting friend
         val gl2 = m.guest2
-        if (gl2 != null && guest2 != null && !guest2.hidden) {
+        if (gl2 != null && guest2 != null && !guest2.hidden && guest2.fade > 0.01f) {
             guest2.minX = L.minX
             guest2.maxX = L.maxX
             val gz = guest2.z
             val gs = L.petSize * 0.8f * (1f - 0.2f * gz)
             val gFloor = L.groundY + (backY - L.groundY) * gz
+            val layer = fadeLayer(c, guest2.fade)
             if (guest2.showsShadow) guestPet2.drawShadow(c, guest2.x * w, gFloor, gs, guest2.pose, gl2)
             guestPet2.draw(c, guest2.x * w, gFloor - guest2.yOffset * gs, gs, gl2, guest2.pose)
+            if (layer >= 0) c.restoreToCount(layer)
         }
 
         // A visiting friend walks around behind the pet
         val gl = m.guest
-        if (gl != null && guest != null && !guest.hidden) {
+        if (gl != null && guest != null && !guest.hidden && guest.fade > 0.01f) {
             guest.minX = L.minX
             guest.maxX = L.maxX
             val gz = guest.z
             val gs = L.petSize * 0.85f * (1f - 0.2f * gz)
             val gFloor = L.groundY + (backY - L.groundY) * gz
+            val layer = fadeLayer(c, guest.fade)
             if (guest.showsShadow) guestPet.drawShadow(c, guest.x * w, gFloor, gs, guest.pose, gl)
             guestPet.draw(c, guest.x * w, gFloor - guest.yOffset * gs, gs, gl, guest.pose)
+            if (layer >= 0) c.restoreToCount(layer)
         }
 
         // Hiding places during hide and seek
@@ -245,8 +282,10 @@ class SceneRenderer {
 
         // The pet (not while it hides)
         if (look != null && !d.hidden) {
+            val layer = fadeLayer(c, d.fade)
             if (d.showsShadow) pet.drawShadow(c, px, floorY, petSize, d.pose, look)
             pet.draw(c, px, ground, petSize, look, d.pose)
+            if (layer >= 0) c.restoreToCount(layer)
             petBounds.set(pet.bounds)
             headNX = pet.head.x / w
             headNY = pet.head.y / h
@@ -286,6 +325,7 @@ class SceneRenderer {
         for (i in 0 until m.poops.coerceAtMost(3)) props.stink(c, poopX(i) * w, poopBottom, poopR, t, i)
 
         room.drawLighting(c, L, m.room, m.hour, t, m.lightsOff, m.darkUi, f)
+        if (m.editMode) room.houseArt.editFrames(c, L, f, m.editActive, t)
         ps?.draw(c, w, h)
         d.companion?.let { props.flyer(c, it, d.companionX * w, d.companionY * h, L.petSize * 0.17f, t) }
 

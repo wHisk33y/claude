@@ -431,17 +431,30 @@ object Looks {
     }
 
     /** The final look of a pet: form, cat fur, festival costume and the shiny variant. */
-    fun compose(form: Form, fur: String?, skin: String?, shiny: Boolean): FormLook {
-        if (fur == null && skin == null) return if (shiny) shiny(form) else of(form)
-        val key = "${form.name}|$fur|$skin|$shiny"
-        return composed.getOrPut(key) {
-            var fl = of(form)
-            Skins[fur]?.let { fl = withSkin(fl, it) }
-            Skins[skin]?.let { fl = withSkin(fl, it) }
-            // Real animals don't change colour when they are rare, they just sparkle.
-            if (shiny) fl = if (form.isReal || skin != null) fl.copy(sparkles = true) else shift(fl)
-            fl
-        }
+    fun compose(form: Form, fur: String?, skin: String?, shiny: Boolean, blend: String? = null): FormLook {
+        if (fur == null && skin == null && blend == null) return if (shiny) shiny(form) else of(form)
+        val key = "${form.name}|$fur|$skin|$shiny|$blend"
+        composed[key]?.let { return it }
+        var fl = of(form)
+        Skins[fur]?.let { fl = withSkin(fl, it) }
+        Skins[skin]?.let { fl = withSkin(fl, it) }
+        // Real animals don't change colour when they are rare, they just sparkle.
+        if (shiny) fl = if (form.isReal || skin != null) fl.copy(sparkles = true) else shift(fl)
+        // A baby from a family egg has a bit of the other parent's colours.
+        val other = blend?.let { b -> Form.entries.firstOrNull { it.name == b } }
+        if (other != null && skin == null && other != Form.EGG) fl = mix(fl, of(other).colors)
+        composed[key] = fl
+        return fl
+    }
+
+    private fun mix(base: FormLook, o: PetColors): FormLook {
+        val k = base.colors
+        fun m(a: Int, b: Int, f: Float) = Colors.lerp(a, b, f)
+        val col = PetColors(
+            m(k.body, o.body, 0.35f), m(k.light, o.light, 0.35f), m(k.shade, o.shade, 0.35f), m(k.belly, o.belly, 0.25f),
+            m(k.accent, o.accent, 0.5f), m(k.accent2, o.accent2, 0.5f), k.cheek, m(k.iris, o.iris, 0.5f), k.eye, m(k.extra, o.extra, 0.4f),
+        )
+        return base.withColors(col, sparkle = base.sparkles)
     }
 
     /** Shiny variant: hue-shifted colours plus sparkles. */
@@ -512,8 +525,10 @@ data class PetLook(
     /** Tool of the current job, shown while working. */
     val tool: String? = null,
     val back: String? = null,
+    /** Form of the other parent (family eggs): its colours shine through a little. */
+    val blend: String? = null,
 ) {
-    val formLook: FormLook get() = Looks.compose(form, fur, skin, shiny)
+    val formLook: FormLook get() = Looks.compose(form, fur, skin, shiny, blend)
     val isEgg: Boolean get() = form == Form.EGG
     val isCat: Boolean get() = form.isCat
 
@@ -543,6 +558,7 @@ data class PetLook(
                 emotion = if (pet.alive && !pet.isEgg) pet.emotion(System.currentTimeMillis()) else null,
                 tool = pet.job?.tool,
                 back = state.equipped[Slot.BACK],
+                blend = pet.blend,
             )
         }
 
@@ -562,6 +578,7 @@ data class PetLook(
             fur = pet.fur,
             skin = pet.skin,
             back = state.equipped[Slot.BACK],
+            blend = pet.blend,
         )
     }
 }

@@ -121,6 +121,85 @@ class SceneHandle {
     val particles = ParticleSystem()
     val renderer = SceneRenderer()
     val model = SceneModel()
+
+    // ------------------------------------------------------------------ the house
+
+    /** Ids of the pets in the two guest places, to notice when someone comes in. */
+    val guestIds = arrayOfNulls<Long>(2)
+    var shownRoom: de.knuffi.core.RoomKind? = null
+
+    /** The door of the new room the pet came in through (visitors follow through it). */
+    var cameIn: de.knuffi.core.Door? = null
+
+    /** A piece of furniture being dragged and its offset, before it is saved. */
+    var editPreview: Pair<de.knuffi.core.Slot, Float>? = null
+    private var pendingHop: (() -> Unit)? = null
+    private var pendingThen: (() -> Unit)? = null
+
+    val travelling: Boolean get() = director.inDoor || pendingHop != null || pendingThen != null
+
+    /**
+     * Takes the pet through the doors into room [target], one room after the other, and runs
+     * [then] when it arrived. Eggs and the classic room switch right away.
+     */
+    fun travel(target: de.knuffi.core.RoomKind, then: (() -> Unit)? = null) {
+        val s = GameRepository.current
+        if (!de.knuffi.core.House.enabled(s) || target == s.house.current) {
+            then?.invoke()
+            return
+        }
+        if (travelling) {
+            then?.invoke()
+            return
+        }
+        val pet = s.pet
+        if (pet != null && pet.alive && pet.sleeping && target != de.knuffi.core.RoomKind.BEDROOM) {
+            GameRepository.message("${pet.name} schläft gerade. Psst! 😴")
+            return
+        }
+        val path = de.knuffi.core.House.path(s.house.current, target, de.knuffi.core.House.unlocked(s))
+        if (path.size < 2 || pet == null || !pet.alive || pet.isEgg) {
+            GameRepository.perform(Action.GoToRoom(target))
+            director.appear(0.5f)
+            then?.invoke()
+            return
+        }
+        hop(path, 0, then)
+    }
+
+    private fun hop(path: List<de.knuffi.core.RoomKind>, i: Int, then: (() -> Unit)?) {
+        val from = path[i]
+        val to = path[i + 1]
+        val door = de.knuffi.core.House.doors(from, de.knuffi.core.House.unlocked(GameRepository.current)).firstOrNull { it.to == to }
+        val ok = door != null && director.exitThrough(door) {
+            GameRepository.perform(Action.GoToRoom(to))
+            val back = de.knuffi.core.House.doors(to, de.knuffi.core.House.unlocked(GameRepository.current)).firstOrNull { it.to == from }
+            cameIn = back
+            if (back != null) director.enterFrom(back) else director.appear(0.5f)
+            if (i + 2 < path.size) pendingHop = { hop(path, i + 1, then) } else pendingThen = then
+        }
+        if (!ok) {
+            GameRepository.perform(Action.GoToRoom(path.last()))
+            director.appear(0.5f)
+            then?.invoke()
+        }
+    }
+
+    /** Called every frame: starts the next door walk or the action waiting for the arrival. */
+    fun pollTravel() {
+        if (director.inDoor) return
+        val hopNext = pendingHop
+        if (hopNext != null) {
+            pendingHop = null
+            hopNext()
+            return
+        }
+        val then = pendingThen
+        if (then != null) {
+            pendingThen = null
+            then()
+        }
+    }
 }
 
 private fun currentHour(): Float {
@@ -150,12 +229,18 @@ fun PetScene(
     onTouch: ((TouchZone) -> Unit)? = null,
     /** A running game in the room, it gets the taps first. */
     roomGame: RoomGameSession? = null,
+    /** Furniture can be moved by finger. */
+    editMode: Boolean = false,
+    /** A tap on something of the room: "piano", "cards", "kitchen", "tub", "beds", "pool". */
+    onFixture: ((String) -> Unit)? = null,
 ) {
     val look = remember(state.pet, state.equipped) { PetLook.of(state) }
     val needs = remember(state.pet) { state.pet?.needs() ?: emptyList() }
-    val furniture = remember(state.equipped, state.settings.look) {
+    val furniture = remember(state.equipped, state.settings.look, state.house, state.furnitureOffsets, state.garden, state.lastSimulated / 120_000L) {
         Furnishing.of(state, DebugScenes.eventOverride ?: Engine.activeEvent(System.currentTimeMillis(), ZoneId.systemDefault()))
     }
+    val editState by rememberUpdatedState(editMode)
+    val fixtureCb by rememberUpdatedState(onFixture)
     val dark = LocalPalette.current.dark
     val typeface = rememberCanvasTypeface()
     val time = rememberFrameTime()
@@ -189,11 +274,18 @@ fun PetScene(
         }
         return false
     }
-    val guestLook = remember(state.visit, state.resting, state.equipped) {
-        state.visit?.let { v -> state.resting.firstOrNull { it.id == v.petId } }?.let { PetLook.of(it, state).copy(hat = null, face = null, neck = null, back = null, sleeping = false, mood = de.knuffi.core.Mood.HAPPY) }
+    // Visitors first, then the pets from the Kuschelhaus who live in this room of the house.
+    val roomGuests = remember(state.visit, state.visit2, state.resting, state.house, state.settings.houseMode) {
+        val visitors = state.visitors
+        val residents = de.knuffi.core.House.residentsIn(state, state.house.current).filter { r -> visitors.none { it.id == r.id } }
+        (visitors + residents).take(2)
     }
-    val guestLook2 = remember(state.visit2, state.resting, state.equipped) {
-        state.visit2?.let { v -> state.resting.firstOrNull { it.id == v.petId } }?.let { PetLook.of(it, state).copy(hat = null, face = null, neck = null, back = null, sleeping = false, mood = de.knuffi.core.Mood.HAPPY) }
+    val visitorIds = remember(state.visit, state.visit2) { listOfNotNull(state.visit?.petId, state.visit2?.petId).toSet() }
+    val guestLook = remember(roomGuests, state.equipped) {
+        roomGuests.getOrNull(0)?.let { PetLook.of(it, state).copy(hat = null, face = null, neck = null, back = null, sleeping = false, mood = de.knuffi.core.Mood.HAPPY) }
+    }
+    val guestLook2 = remember(roomGuests, state.equipped) {
+        roomGuests.getOrNull(1)?.let { PetLook.of(it, state).copy(hat = null, face = null, neck = null, back = null, sleeping = false, mood = de.knuffi.core.Mood.HAPPY) }
     }
     val wishText = remember(state.wish, state.pet?.form) { state.wish?.let { Wishes.text(it, state.pet?.isCat == true) } }
     var lastDropAt by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
@@ -215,13 +307,13 @@ fun PetScene(
         // Only the real, touchable scene hands out rewards for the screen toys.
         d.onToy = if (interactive && !GameRepository.previewMode) { kind -> GameRepository.perform(Action.Toy(kind)) } else null
         d.onSound = if (interactive) { sfx -> de.knuffi.app.sound.Sounds.play(sfx) } else null
-        handle.friends.onMoment = if (interactive && !GameRepository.previewMode) { m -> GameRepository.perform(Action.FriendPlay(m)) } else null
+        handle.friends.onMoment = if (interactive && !GameRepository.previewMode) { m -> GameRepository.perform(Action.FriendPlay(m, handle.guestIds[0] ?: 0L)) } else null
         handle.friends2.onMoment = if (interactive && !GameRepository.previewMode) { m ->
-            GameRepository.current.visit2?.let { GameRepository.perform(Action.FriendPlay(m, it.petId)) }
+            handle.guestIds[1]?.let { GameRepository.perform(Action.FriendPlay(m, it)) }
         } else null
     }
     // The pet hears blowing, clapping and singing while the app is open (if allowed in the settings).
-    val micOn = interactive && state.settings.micReactions && !GameRepository.previewMode
+    val micOn = interactive && state.settings.micReactions && !GameRepository.previewMode && !de.knuffi.app.sound.VoiceState.listening
     LifecycleResumeEffect(micOn) {
         val mic = if (micOn) {
             de.knuffi.app.sound.MicListener { kind ->
@@ -266,12 +358,27 @@ fun PetScene(
                     val game = session
                     if (game != null && !game.finished && game.tap(nx, ny, hitPet(pos.x, pos.y), d, ps, r.headNX, r.headNY)) return@detectTapGestures
                     if (d.tapToys(pos.x, pos.y, ps, size.width.toFloat(), size.height.toFloat())) return@detectTapGestures
+                    if (editState) return@detectTapGestures
                     if (interactive && r.hitHidden(pos.x, pos.y)) {
                         val h = de.knuffi.core.Hidden.today(GameRepository.current.daily.day)
                         ps.burst(de.knuffi.app.render.PKind.SPARKLE, nx, ny, 12, 0.3f, 1f, 0.025f, de.knuffi.app.render.ParticleSystem.SPARKLE_COLORS)
                         d.celebrate("Du hast ${h.name} gefunden! ${h.emoji}")
                         GameRepository.perform(Action.FindHidden)
                         return@detectTapGestures
+                    }
+                    // In the house: doors lead to the next room, some things of the room open a page.
+                    if (de.knuffi.core.House.enabled(GameRepository.current) && !hitPet(pos.x, pos.y)) {
+                        val door = r.hitDoor(pos.x, pos.y)
+                        if (door != null) {
+                            handle.travel(door.to)
+                            return@detectTapGestures
+                        }
+                        val fixture = r.hitFixture(pos.x, pos.y)
+                        val cb = fixtureCb
+                        if (fixture != null && cb != null) {
+                            cb(fixture)
+                            return@detectTapGestures
+                        }
                     }
                     if (interactive && hitPet(pos.x, pos.y) && d.onLadderTop) {
                         d.celebrate("Gib mir fünf! 🙌")
@@ -280,7 +387,7 @@ fun PetScene(
                     if (interactive && !hitPet(pos.x, pos.y)) {
                         val hourNow = hourOverride ?: hour.floatValue
                         val dark = hourNow >= 20f || hourNow < 6f
-                        val obj = r.hitObject(pos.x, pos.y, state.room)
+                        val obj = r.hitObject(pos.x, pos.y, Furnishing.roomId(GameRepository.current))
                         if (obj != null) {
                             // easter egg: window, lamp, picture in a row unlocks kittens
                             val nowMs = System.currentTimeMillis()
@@ -342,7 +449,7 @@ fun PetScene(
                     lastAngle = Float.NaN
                     spin = 0f
                 }) { change, drag ->
-                    if (d.carried) return@detectDragGestures
+                    if (d.carried || editState) return@detectDragGestures
                     // circles around the pet make it dizzy (a secret)
                     val b = r.petBounds
                     if (interactive && !b.isEmpty) {
@@ -383,7 +490,7 @@ fun PetScene(
                     onDragStart = { pos ->
                         carrying = false
                         val game = session
-                        if ((game == null || game.finished) && hitPet(pos.x, pos.y) && lookState?.isEgg != true && d.grab()) {
+                        if (!editState && (game == null || game.finished) && hitPet(pos.x, pos.y) && lookState?.isEgg != true && d.grab()) {
                             carrying = true
                             tracker.resetTracking()
                             GameRepository.perform(Action.Carry)
@@ -412,13 +519,50 @@ fun PetScene(
             }
     } else Modifier
 
-    Canvas(modifier.then(input)) {
+    // Moving furniture: drag a piece sideways, it is saved when you let go.
+    val editInput = if (interactive && editMode) {
+        Modifier.pointerInput(Unit) {
+            var slot: de.knuffi.core.Slot? = null
+            var startOff = 0f
+            var moved = 0f
+            detectDragGestures(
+                onDragStart = { pos ->
+                    slot = r.hitFurniture(pos.x, pos.y)
+                    startOff = slot?.let { GameRepository.current.furnitureOffsets[it] } ?: 0f
+                    moved = 0f
+                    m.editActive = slot
+                },
+                onDragEnd = {
+                    val sl = slot
+                    if (sl != null) GameRepository.perform(Action.MoveFurniture(sl, (startOff + moved).coerceIn(-de.knuffi.core.House.MAX_OFFSET, de.knuffi.core.House.MAX_OFFSET)))
+                    handle.editPreview = null
+                    m.editActive = null
+                    slot = null
+                },
+                onDragCancel = {
+                    handle.editPreview = null
+                    m.editActive = null
+                    slot = null
+                },
+            ) { change, amount ->
+                val sl = slot ?: return@detectDragGestures
+                change.consume()
+                moved += amount.x / size.width
+                handle.editPreview = sl to (startOff + moved).coerceIn(-de.knuffi.core.House.MAX_OFFSET, de.knuffi.core.House.MAX_OFFSET)
+            }
+        }
+    } else Modifier
+
+    Canvas(modifier.then(input).then(editInput)) {
         val t = time.floatValue
         handle.lastT = t
         val w = size.width
         val h = size.height
-        m.room = state.room
-        m.furniture = furniture
+        m.room = Furnishing.roomId(state)
+        val preview = handle.editPreview
+        m.furniture = if (preview != null && editMode) furniture.copy(offsets = furniture.offsets + preview) else furniture
+        m.editMode = editMode
+        if (!editMode) m.editActive = null
         m.hour = hourOverride ?: hour.floatValue
         m.lightsOff = state.pet?.sleeping == true
         m.poops = state.pet?.poops ?: 0
@@ -434,20 +578,49 @@ fun PetScene(
         m.nameTag = if (kind == LayoutKind.WALLPAPER && state.settings.showNameTag) state.pet?.name else null
         d.toyConfig.from(state.settings)
         d.wishText = if (interactive) wishText else null
+        r.furnishing = m.furniture
         r.configure(d, w, h, kind)
         d.update(t, look, needs, ps, r.headNX, r.headNY)
+        if (interactive) handle.pollTravel()
+        // Guests: visitors follow the pet through the door, newcomers walk in through one.
+        if (kind == LayoutKind.HOME && interactive) {
+            val roomNow = if (de.knuffi.core.House.enabled(state)) state.house.current else null
+            val ids = arrayOf(roomGuests.getOrNull(0)?.id, roomGuests.getOrNull(1)?.id)
+            val directors = arrayOf(handle.guest, handle.guest2)
+            if (roomNow != handle.shownRoom) {
+                val first = handle.shownRoom == null
+                handle.shownRoom = roomNow
+                for (i in 0..1) {
+                    val id = ids[i] ?: continue
+                    if (first || roomNow == null) continue
+                    val came = handle.cameIn
+                    if (id in visitorIds && came != null) directors[i].enterFrom(came) else directors[i].appear(0.3f + 0.4f * i)
+                }
+                handle.guestIds[0] = ids[0]
+                handle.guestIds[1] = ids[1]
+            } else {
+                for (i in 0..1) {
+                    val id = ids[i]
+                    if (id != handle.guestIds[i]) {
+                        val door = furniture.doors.randomOrNull()
+                        if (id != null && roomNow != null && door != null) directors[i].enterFrom(door)
+                        handle.guestIds[i] = id
+                    }
+                }
+            }
+        }
         val game = session
         if (game != null) game.update(t, d, ps, r.headNX, r.headNY, m) else m.hideSpots = emptyList()
         if (guestLook != null) {
             handle.guest.update(t + 3.7f, guestLook, emptyList(), ps, r.headNX, r.headNY)
             val pet = state.pet
-            val v = state.visit
-            val level = if (pet != null && v != null) de.knuffi.core.Friends.level(state.friendship[de.knuffi.core.Friends.key(pet.id, v.petId)] ?: 0) else 0
+            val g1 = roomGuests.getOrNull(0)
+            val g2 = roomGuests.getOrNull(1)
+            val level = if (pet != null && g1 != null) de.knuffi.core.Friends.level(state.friendship[de.knuffi.core.Friends.key(pet.id, g1.id)] ?: 0) else 0
             handle.friends.update(t, d, handle.guest, level, ps)
             if (guestLook2 != null) {
                 handle.guest2.update(t + 7.1f, guestLook2, emptyList(), ps, r.headNX, r.headNY)
-                val v2 = state.visit2
-                val level2 = if (v != null && v2 != null) de.knuffi.core.Friends.level(state.friendship[de.knuffi.core.Friends.key(v.petId, v2.petId)] ?: 0) else 0
+                val level2 = if (g1 != null && g2 != null) de.knuffi.core.Friends.level(state.friendship[de.knuffi.core.Friends.key(g1.id, g2.id)] ?: 0) else 0
                 handle.friends2.update(t, handle.guest, handle.guest2, level2, ps)
             } else {
                 handle.friends2.reset()
