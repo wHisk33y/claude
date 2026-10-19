@@ -250,13 +250,15 @@ fun FurnishScreen(state: GameState, room: RoomKind?, onBack: () -> Unit) {
     val spec = remember(state.house, state.equipped, state.garden, room, state.settings.houseMode) { Specs3.room(state, room, event) }
     val preview = remember { mutableStateMapOf<Slot, Spot>() }
     var selected by remember { mutableStateOf<Slot?>(null) }
+    // the piece being dragged stands on something: shown red, snaps back when let go
+    var blocked by remember { mutableStateOf<Slot?>(null) }
     val st = remember { View3State(OrbitView(yaw = 0f, pitch = 0.82f, dist = if (room?.outdoor == true) 9.5f else 6.4f, cy = 0.35f)) }
     val time = rememberFrameTime()
     // the stored spots arrived: the preview is not needed any more
     LaunchedEffect(spec) { preview.clear() }
-    val model: RoomModel = remember(spec, preview.toMap(), selected) {
+    val model: RoomModel = remember(spec, preview.toMap(), selected, blocked) {
         val m = Room3.build(spec.copy(spots = spec.spots + preview), Room3.Mode.HOUSE)
-        selected?.let { s -> m.placed[s]?.item?.tint = 0x38FF6FA8 }
+        selected?.let { s -> m.placed[s]?.item?.tint = if (s == blocked) 0x70FF4A4A else 0x38FF6FA8 }
         st.version++
         m
     }
@@ -359,20 +361,26 @@ fun FurnishScreen(state: GameState, room: RoomKind?, onBack: () -> Unit) {
                                         val t = (-m.d / 2f - o[2]) / (if (abs(d[2]) < 1e-4f) 1e-4f else d[2])
                                         val (x, _) = Room3.clampInside(piece, o[0] + d[0] * t - grabX, 0f, 0f, m.w, m.d)
                                         val y = (o[1] + d[1] * t - grabZ).coerceIn(Room3.PIC_Y0, Room3.PIC_Y1)
+                                        val s = Room3.roomToSpot(x, y, m.w, m.d, piece, 0f)
+                                        preview[hit.slot] = s
                                         if (Room3.fits(m, hit.slot, piece, x, y, 0f)) {
-                                            val s = Room3.roomToSpot(x, y, m.w, m.d, piece, 0f)
-                                            preview[hit.slot] = s
                                             newSpot = s
+                                            blocked = null
+                                        } else {
+                                            blocked = hit.slot
                                         }
                                     } else {
                                         val at = c2.onPlane(pos.x, pos.y, 0f)
                                         if (at != null) {
                                             val turn = preview[hit.slot]?.turn ?: m.placed[hit.slot]?.turn ?: hit.turn
                                             val (x, z) = Room3.clampInside(piece, at[0] - grabX, at[2] - grabZ, turn, m.w, m.d)
+                                            val s = Room3.roomToSpot(x, z, m.w, m.d, piece, turn)
+                                            preview[hit.slot] = s
                                             if (Room3.fits(m, hit.slot, piece, x, z, turn)) {
-                                                val s = Room3.roomToSpot(x, z, m.w, m.d, piece, turn)
-                                                preview[hit.slot] = s
                                                 newSpot = s
+                                                blocked = null
+                                            } else {
+                                                blocked = hit.slot
                                             }
                                         }
                                     }
@@ -384,7 +392,17 @@ fun FurnishScreen(state: GameState, room: RoomKind?, onBack: () -> Unit) {
                                 ch.consume()
                             }
                             val s = newSpot
-                            if (hit != null && moved && s != null) commit(hit.slot, s)
+                            if (hit != null && moved) {
+                                // let go on a free spot: saved; on another piece: back to the last free spot
+                                if (s != null) {
+                                    preview[hit.slot] = s
+                                    commit(hit.slot, s)
+                                } else {
+                                    preview.remove(hit.slot)
+                                }
+                                if (blocked != null && s != null) GameRepository.message("Dort ist schon etwas, es steht jetzt am letzten freien Platz.")
+                            }
+                            blocked = null
                             if (hit == null && !moved) selected = null
                         }
                     },
@@ -403,11 +421,15 @@ fun FurnishScreen(state: GameState, room: RoomKind?, onBack: () -> Unit) {
                     if (id != null) "${Catalog[id]?.emoji ?: ""} ${Catalog[id]?.name ?: ""}" else "🛋️ Möbel verschieben",
                     style = MaterialTheme.typography.titleMedium,
                     color = p.text,
+                    maxLines = 1,
                 )
                 Text(
                     if (sel != null) "Zieh es mit dem Finger an einen freien Platz${if (model.placed[sel]?.piece?.onWall == true) " an der Wand" else ""}." else "Tippe ein Möbelstück an und zieh es herum. Wische daneben, um dich umzusehen, und zoome mit zwei Fingern.",
                     style = MaterialTheme.typography.bodySmall,
                     color = p.textMuted,
+                    // always two lines, so the picture above keeps its size
+                    minLines = 2,
+                    maxLines = 2,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     val canTurn = sel != null && model.placed[sel]?.piece?.onWall == false
