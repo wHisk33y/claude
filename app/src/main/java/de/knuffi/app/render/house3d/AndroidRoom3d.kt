@@ -103,7 +103,7 @@ object Room3d {
 
     private class Job(val scene: Scene3, val cam: Camera3, val opt: RenderOptions, val token: Any?, val prepare: (() -> Unit)?)
 
-    private val thread: HandlerThread by lazy { HandlerThread("knuffi-3d").apply { start() } }
+    private val thread: HandlerThread by lazy { HandlerThread("knuffi-3d", android.os.Process.THREAD_PRIORITY_BACKGROUND).apply { start() } }
     private val handler: Handler by lazy { Handler(thread.looper) }
     private val pending = LinkedHashMap<Layer3, Job>()
 
@@ -118,7 +118,7 @@ object Room3d {
         private set
 
     /** How much smaller than the screen the pictures are made. */
-    val scale: Float get() = if (light) 0.55f else 1f
+    val scale: Float get() = if (light) 0.45f else 1f
 
     /** Paints the textures (wallpaper, rugs …). Set once by the app. */
     @Volatile
@@ -155,11 +155,13 @@ object Room3d {
                 val name = (android.opengl.GLES30.glGetString(android.opengl.GLES30.GL_RENDERER) ?: "").lowercase()
                 light = "swiftshader" in name || "emulator" in name || "llvmpipe" in name || "softpipe" in name
                 Log.i(TAG, "3D renderer: $name${if (light) " (light)" else ""}")
-                Renderer3(AndroidGl(), TextureSource { key -> textures.texture(key) }, maxSamples = if (light) 0 else 4, shadowSize = if (light) 1024 else 2048)
+                Renderer3(AndroidGl(), TextureSource { key -> textures.texture(key) }, maxSamples = if (light) 0 else 4, shadowSize = if (light) 512 else 1536)
             }.also { renderer = it }
             val drops = synchronized(drop) { drop.toList().also { drop.clear() } }
             for (d in drops) r.dropTextures(d)
-            val buf: ByteBuffer = r.render(job.scene, job.cam, job.opt)
+            // software graphics: no shadows, they cost a second picture
+            val opt = if (light && job.opt.shadows) RenderOptions(job.opt.filter, false, job.opt.clear, job.opt.cutaway) else job.opt
+            val buf: ByteBuffer = r.render(job.scene, job.cam, opt)
             val bmp = layer.obtain(job.cam.width, job.cam.height)
             buf.position(0)
             bmp.copyPixelsFromBuffer(buf)

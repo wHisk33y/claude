@@ -32,6 +32,12 @@ object Fixtures3 {
 
     private fun model(build: (ModelBuilder) -> Unit): Model3 = ModelBuilder().also(build).build()
 
+    /** A model made smaller (garden things next to the pet). */
+    private fun small(m: Model3, k: Float): Model3 = ModelBuilder().also { b ->
+        b.scale(k)
+        b.add(m)
+    }.build()
+
     fun of(kind: RoomKind?, w: Float, d: Float, spec: RoomSpec, doors: List<DoorPlace>): List<Fixture> {
         val back = -d / 2f
         val hw = w / 2f
@@ -282,9 +288,9 @@ object Fixtures3 {
         val back = -d / 2f
         val hw = w / 2f
         val out = ArrayList<Fixture>()
-        out += Fixture("tree", tree(spec.season), -hw + 0.5f, back + 0.35f, blocks = Rect2(-hw, back, -hw + 0.9f, back + 0.75f))
-        out += Fixture("swing", swing(), -hw + 1.0f, 0.35f, blocks = Rect2(-hw + 0.5f, 0.05f, -hw + 1.5f, 0.65f))
-        out += Fixture("pool", pool(spec.season), hw - 1.2f, 0.42f, blocks = Rect2(hw - 1.8f, -0.15f, hw - 0.6f, 0.98f))
+        out += Fixture("tree", small(tree(spec.season), 0.85f), -hw + 0.5f, back + 0.35f, blocks = Rect2(-hw, back, -hw + 0.9f, back + 0.75f))
+        out += Fixture("swing", small(swing(), 0.75f), -hw + 1.0f, 0.35f, blocks = Rect2(-hw + 0.6f, 0.1f, -hw + 1.4f, 0.6f))
+        out += Fixture("pool", small(pool(spec.season), 0.8f), hw - 1.2f, 0.42f, blocks = Rect2(hw - 1.7f, -0.05f, hw - 0.7f, 0.88f))
         val beds = listOf(0.2f, 0.77f, 1.34f)
         for ((i, x) in beds.withIndex()) {
             val plants = spec.plants.drop(i * 2).take(2)

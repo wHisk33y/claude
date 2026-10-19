@@ -25,6 +25,9 @@ class HomeRoom3 {
     private var lastSpec: RoomSpec? = null
     private var lastDims = 0L
     private var frontKey: String? = null
+
+    /** What stood in front of the pet last time (it stays in front a little longer, no flicker). */
+    private val wasInFront = HashSet<Item3>()
     private var camera: Camera3? = null
 
     /** Rectangles on the screen for taps (pixels). */
@@ -96,15 +99,18 @@ class HomeRoom3 {
         val m = model ?: return null
         val v = view ?: return null
         val inFront = ArrayList<Item3>()
+        fun limit(it: Item3) = petZ + if (it in wasInFront) 0.04f else 0.12f
         for (p in m.placed.values) {
             if (p.piece.flat || p.piece.onWall) continue
-            if (p.z > petZ + 0.12f) inFront += p.item
+            if (p.z > limit(p.item)) inFront += p.item
         }
         for (f in m.fixtures) {
             val b = f.item.bounds
             if (b.y0 > 0.5f) continue
-            if ((b.z0 + b.z1) / 2f > petZ + 0.12f) inFront += f.item
+            if ((b.z0 + b.z1) / 2f > limit(f.item)) inFront += f.item
         }
+        wasInFront.clear()
+        wasInFront += inFront
         val k = inFront.joinToString(",") { it.tag ?: "" } + "@" + key
         if (inFront.isEmpty()) {
             frontKey = k

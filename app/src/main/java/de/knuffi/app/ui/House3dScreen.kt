@@ -94,13 +94,16 @@ fun rememberHouse3dOn(state: GameState): Boolean {
 private class View3State(val orbit: OrbitView) {
     val layer = Layer3()
     var version = 0
+
+    /** While a finger moves something the picture is made smaller (faster). */
+    var busy = false
 }
 
 /** Draws the newest 3D picture and asks for a new one when the camera or the scene changed. */
 private fun drawScene(c: android.graphics.Canvas, w: Float, h: Float, st: View3State, scene: Scene3, opt: RenderOptions, paint: Paint) {
-    val k = (1100f / max(w, h)).coerceIn(0.4f, 1f) * Room3d.scale
+    val k = (1100f / max(w, h)).coerceIn(0.4f, 1f) * Room3d.scale * (if (st.busy) 0.6f else 1f)
     val o = st.orbit
-    val token = "${st.version}:${o.yaw}:${o.pitch}:${o.dist}:${o.cx}:${o.cz}:${w.toInt()}x${h.toInt()}"
+    val token = "${st.version}:${o.yaw}:${o.pitch}:${o.dist}:${o.cx}:${o.cz}:${w.toInt()}x${h.toInt()}:${st.busy}"
     if (st.layer.requested != token) Room3d.request(st.layer, scene, o.camera((w * k).toInt().coerceAtLeast(1), (h * k).toInt().coerceAtLeast(1)), opt, token)
     st.layer.take()?.let { c.drawBitmap(it, null, RectF(0f, 0f, w, h), paint) }
 }
@@ -334,6 +337,7 @@ fun FurnishScreen(state: GameState, room: RoomKind?, onBack: () -> Unit) {
                             var last = down.position
                             var pinch = 0f
                             var newSpot: Spot? = null
+                            st.busy = true
                             while (true) {
                                 val ev = awaitPointerEvent()
                                 val pressed = ev.changes.filter { it.pressed }
@@ -391,6 +395,7 @@ fun FurnishScreen(state: GameState, room: RoomKind?, onBack: () -> Unit) {
                                 last = pos
                                 ch.consume()
                             }
+                            st.busy = false
                             val s = newSpot
                             if (hit != null && moved) {
                                 // let go on a free spot: saved; on another piece: back to the last free spot

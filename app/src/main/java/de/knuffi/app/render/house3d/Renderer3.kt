@@ -379,11 +379,12 @@ class Renderer3(
 
     private fun evict() {
         if (meshes.size > 400) {
-            val old = meshes.entries.filter { frame - it.value.used > 30 }
-            for (e in old) {
-                gl.deleteBuffer(e.value.vbo)
-                gl.deleteBuffer(e.value.ibo)
-                meshes.remove(e.key)
+            // copy first: entries of an IdentityHashMap change while it is changed
+            val old = meshes.entries.filter { frame - it.value.used > 30 }.map { it.key to it.value }
+            for ((key, g) in old) {
+                gl.deleteBuffer(g.vbo)
+                gl.deleteBuffer(g.ibo)
+                meshes.remove(key)
             }
         }
         if (textures.size > 48) {
