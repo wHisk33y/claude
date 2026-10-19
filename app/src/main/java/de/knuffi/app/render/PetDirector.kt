@@ -623,6 +623,8 @@ class PetDirector(seed: Int = 7) {
     }
 
     private fun start(a: Act) {
+        // While held in the air the pet only reacts with its face, it keeps hanging on.
+        if (carried && a !is Act.Carried && a !is Act.Fall) return
         queue.clear()
         if (a !is Act.Ladder) dropToys()
         companion = null
@@ -633,6 +635,11 @@ class PetDirector(seed: Int = 7) {
 
     private fun startCare(vararg acts: Act) {
         if (act is Act.Sleeping || act is Act.GoSleep) return
+        // care (feeding, bathing …) puts the pet back on the floor
+        if (carried) {
+            carried = false
+            carryH = 0f
+        }
         props.inTub = false
         props.ball = false
         dropToys()
