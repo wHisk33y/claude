@@ -119,6 +119,9 @@ enum class Destination(
     VULKAN("Vulkaninsel", "🌋", 14, 8, EggLine.FEUER, "Heiß, heißer, Vulkan!"),
     WOLKEN("Wolkenschloss", "☁️", 17, 10, EggLine.EINHORN, "Ein Schloss auf Wolken, mit Regenbogenbrücke."),
     MOND("Mondreise", "🌙", 20, 12, EggLine.STERN, "Einmal zum Mond und zurück!"),
+    REGENWALD("Regenwald", "🌴", 9, 5, EggLine.DSCHUNGEL, "Lianen, Papageien und riesige Blätter."),
+    OASE("Wüstenoase", "🏜️", 13, 7, EggLine.WUESTE, "Palmen, Dünen und ein glitzernder See."),
+    MINE("Glitzermine", "💎", 16, 9, EggLine.EDELSTEIN, "Tief im Berg funkeln Edelsteine."),
     ;
 
     val durationMs: Long get() = hours * 3_600_000L

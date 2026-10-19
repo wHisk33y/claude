@@ -89,6 +89,8 @@ data class Pet(
     val lastShift: Long = 0,
     /** Talent points per talent. */
     val talents: Map<Talent, Int> = emptyMap(),
+    /** Practice points per trick (see [Tricks]). */
+    val tricks: Map<Trick, Int> = emptyMap(),
 ) {
     /** Pets are identified by their birth time. */
     val id: Long get() = bornAt
@@ -98,6 +100,12 @@ data class Pet(
     val lowest: Double get() = minOf(satiety, joy, energy, hygiene, health)
     val xpToNext: Int get() = Leveling.xpToNext(level)
     val isCat: Boolean get() = line == EggLine.KATZE
+
+    /** A real animal (cat, rabbit, hamster or guinea pig). */
+    val isReal: Boolean get() = line.real
+
+    /** Rabbit, hamster or guinea pig. */
+    val isSmall: Boolean get() = line.small
     val jobLevel: Int get() = Jobs.level(jobXp)
 
     fun emotion(now: Long): Emotion = Emotions.current(this, now)
@@ -186,6 +194,20 @@ data class Counters(
     val hiddenFound: Int = 0,
     /** Best results of the newer mini games by game name. */
     val bests: Map<String, Int> = emptyMap(),
+    val wishes: Int = 0,
+    val tricksLearned: Int = 0,
+    val trickPractice: Int = 0,
+    val trickShows: Int = 0,
+    val tickles: Int = 0,
+    val touches: Int = 0,
+    val carries: Int = 0,
+    val roomGames: Int = 0,
+    val tournaments: Int = 0,
+    val tournamentWins: Int = 0,
+    val voice: Int = 0,
+    val adventureSteps: Int = 0,
+    val monthlies: Int = 0,
+    val monthGoals: Int = 0,
 )
 
 @Serializable
@@ -267,6 +289,8 @@ data class Settings(
     val overlayPinned: Boolean = false,
     /** Real 3D pets (off = the drawn look, e.g. for older phones). */
     val graphics3d: Boolean = true,
+    /** The pet reacts to blowing, clapping and singing (microphone, nothing is recorded). */
+    val micReactions: Boolean = false,
 )
 
 /** Player-adjustable pace of the needs and of sleep. Level 2 is the original balance. */
@@ -372,6 +396,15 @@ data class GameState(
     val story: StoryState = StoryState(),
     /** A pet from the Kuschelhaus visiting the active pet. */
     val visit: Visit? = null,
+    /** A second visitor (three pets in the room). */
+    val visit2: Visit? = null,
+    /** What the pet wishes for right now. */
+    val wish: Wish? = null,
+    val nextWishAt: Long = 0,
+    val monthly: MonthlyState = MonthlyState(),
+    val adventure: AdventureState = AdventureState(),
+    /** Tournament wins per cup name. */
+    val cups: Map<String, Int> = emptyMap(),
     /** Friendship points between two pets (see [Friends.key]). */
     val friendship: Map<String, Int> = emptyMap(),
     /** Secrets found (see [Secret]). */
@@ -392,10 +425,20 @@ data class GameState(
     val room: String get() = equipped[Slot.ROOM] ?: Catalog.DEFAULT_ROOM
     val totalEggs: Int get() = eggs.values.sum()
     val allPets: List<Pet> get() = listOfNotNull(pet) + resting
+
+    /** Pets from the Kuschelhaus that are visiting right now. */
+    val visitors: List<Pet> get() = listOfNotNull(visit, visit2).mapNotNull { v -> resting.firstOrNull { it.id == v.petId } }
     fun onTrip(petId: Long): Trip? = trips.firstOrNull { it.petId == petId }
     fun discovered(form: Form, shiny: Boolean = false): Boolean = (if (shiny) "${form.name}*" else form.name) in album
     val discoveredCount: Int get() = Form.creatures.count { it.name in album }
     val catMode: Boolean get() = petKind == PetKind.CAT
+}
+
+/** Groups of mini games in the games hall. */
+enum class GameGroup(val title: String, val emoji: String) {
+    ACTION("Action", "⚡"),
+    KNOBELN("Knobeln", "🧠"),
+    RUHIG("Ruhig", "🌿"),
 }
 
 @Serializable
@@ -408,15 +451,17 @@ enum class MiniGame(
     /** For these games a lower result is better (moves). */
     val lowerIsBetter: Boolean = false,
     val unit: String = "Punkte",
+    /** Puzzle and brain games. */
+    val puzzle: Boolean = false,
 ) {
     CATCH("Futterfang", "🧺", "Fange leckeres Essen und weiche den Bomben aus!"),
-    MEMORY("Memory", "🃏", "Finde alle Paare mit möglichst wenigen Zügen.", lowerIsBetter = true, unit = "Züge"),
+    MEMORY("Memory", "🃏", "Finde alle Paare mit möglichst wenigen Zügen.", lowerIsBetter = true, unit = "Züge", puzzle = true),
     WHACK("Blitz-Tap", "⚡", "Tippe schnell auf dein Haustier, wenn es auftaucht. Aber nicht auf die Gewitterwolken!", unit = "Treffer"),
     RUNNER("Hüpf-Lauf", "🏃", "Tippe zum Springen! Weiche Hindernissen aus und sammle Münzen.", unit = "Meter"),
     BUBBLES("Blubberblasen", "🫧", "Lass die Blasen in der richtigen Farbe platzen.", unit = "Blasen"),
-    SIMON("Melodie", "🎵", "Merke dir die Reihenfolge und spiel sie nach.", unit = "Töne"),
+    SIMON("Melodie", "🎵", "Merke dir die Reihenfolge und spiel sie nach.", unit = "Töne", puzzle = true),
     COOK("Kochstudio", "🍳", "Wirf die Zutaten in der richtigen Reihenfolge in den Topf. Fertige Gerichte kommen in deinen Vorrat!", unit = "Gerichte"),
-    MATCH("Leckerli-Reihe", "🍬", "Tausche Leckerlis, bis drei gleiche in einer Reihe liegen.", unit = "Leckerlis"),
+    MATCH("Leckerli-Reihe", "🍬", "Tausche Leckerlis, bis drei gleiche in einer Reihe liegen.", unit = "Leckerlis", puzzle = true),
     FLIGHT("Papierflug", "✈️", "Tippe, um den Papierflieger steigen zu lassen. Flieg durch die Ringe!", unit = "Ringe"),
     STACK("Kissenturm", "🛏️", "Lass die Kissen genau aufeinanderfallen. Wie hoch wird dein Turm?", unit = "Kissen"),
     FISHING("Angeln", "🎣", "Wirf die Angel aus, wenn ein Fisch darunter schwimmt.", unit = "Punkte"),
@@ -424,6 +469,19 @@ enum class MiniGame(
     COLORING("Ausmalbild", "🖍️", "Male ein Mandala in deinen Lieblingsfarben aus. Zum Entspannen.", calm = true, unit = "%"),
     YARN("Wollknäuel", "🧶", "Verschiebe die Knoten, bis sich kein Faden mehr kreuzt. Ganz in Ruhe.", calm = true, lowerIsBetter = true, unit = "Züge"),
     PACMAN("Leckerli-Jagd", "👻", "Wische durchs Labyrinth, futtere alle Leckerlis und weiche den Gespenstern aus. Kekse machen sie harmlos!", unit = "Punkte"),
+    SPOT("Unterschiede finden", "🔎", "Zwei Bilder, fast gleich. Tippe unten auf alles, was anders ist!", unit = "Unterschiede", puzzle = true),
+    WORDS("Wortsuche", "🔤", "Finde die versteckten Wörter im Buchstabengitter. Wische über die Buchstaben!", unit = "Wörter", puzzle = true),
+    SHADOW("Schattenrätsel", "👤", "Wessen Schatten ist das? Wähle das richtige Wesen aus!", unit = "Richtige", puzzle = true),
+    SPACE("Sternenflug", "🚀", "Steuere die Rakete, schieße Meteore ab und besiege das Ufo!", unit = "Punkte"),
+    JUMPER("Wolkenhüpfer", "☁️", "Hüpfe von Wolke zu Wolke immer höher hinaus. Tippe links oder rechts zum Lenken.", unit = "Meter"),
+    RACE("Kartrennen", "🏎️", "Wechsle die Spur, weiche Hindernissen aus und sammle Münzen!", unit = "Meter"),
+    ;
+
+    val group: GameGroup get() = when {
+        calm -> GameGroup.RUHIG
+        puzzle -> GameGroup.KNOBELN
+        else -> GameGroup.ACTION
+    }
 }
 
 enum class ReactionKind { EAT, PLAY, PET, CLEAN, HEAL, SLEEP, WAKE, REFUSE, DRINK, BUY, GAME, WORK, TALK }
@@ -432,7 +490,7 @@ sealed interface GameEvent {
     data class LevelUp(val level: Int, val coins: Int) : GameEvent
     data class Evolved(val from: Form, val to: Form) : GameEvent
     data class AchievementUnlocked(val achievement: Achievement) : GameEvent
-    data class QuestDone(val type: QuestType, val weekly: Boolean = false) : GameEvent
+    data class QuestDone(val type: QuestType, val weekly: Boolean = false, val monthly: Boolean = false) : GameEvent
     data class Message(val text: String) : GameEvent
     data class CoinsGained(val amount: Int) : GameEvent
     data class XpGained(val amount: Int) : GameEvent
@@ -454,6 +512,14 @@ sealed interface GameEvent {
     data class Spun(val result: SpinResult) : GameEvent
     data class SecretFound(val secret: Secret) : GameEvent
     data class HiddenFound(val emoji: String, val name: String) : GameEvent
+    data class TrickPracticed(val trick: Trick, val success: Boolean, val learned: Boolean) : GameEvent
+    data class TrickShown(val trick: Trick) : GameEvent
+    data class Touched(val zone: TouchZone) : GameEvent
+    data class WishMade(val wish: Wish) : GameEvent
+    data class WishFulfilled(val wish: Wish, val coins: Int) : GameEvent
+    data class AdventureStep(val station: Int, val title: String, val reward: String, val emoji: String, val mapDone: Boolean) : GameEvent
+    data class TournamentDone(val cup: Cup, val place: Int, val coins: Int, val firstWin: Boolean) : GameEvent
+    data class GoalDone(val goal: LongGoal) : GameEvent
 }
 
 data class Outcome(val state: GameState, val events: List<GameEvent> = emptyList())

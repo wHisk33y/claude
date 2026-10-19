@@ -14,6 +14,12 @@ object TimeUtil {
 
     fun hour(now: Long, zone: ZoneId): Int = Instant.ofEpochMilli(now).atZone(zone).hour
 
+    /** Month index (year * 12 + month - 1). */
+    fun month(now: Long, zone: ZoneId): Int {
+        val d = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+        return d.year * 12 + d.monthValue - 1
+    }
+
     fun isNight(now: Long, zone: ZoneId): Boolean {
         val h = hour(now, zone)
         return h >= 22 || h < 7
@@ -84,7 +90,7 @@ object Leveling {
 enum class QuestKind { COUNT, MAX }
 
 /** What a quest needs so that it can be rolled. */
-enum class QuestNeed { NONE, STEPS, RESTING, JOB, CHAT }
+enum class QuestNeed { NONE, STEPS, RESTING, JOB, CHAT, TRICK }
 
 @kotlinx.serialization.Serializable
 enum class QuestType(
@@ -97,38 +103,52 @@ enum class QuestType(
     /** Target as weekly challenge (0 = not used weekly). */
     val weekly: Int = 0,
     val need: QuestNeed = QuestNeed.NONE,
+    /** Target as monthly goal (0 = not used monthly). */
+    val monthly: Int = 0,
 ) {
-    FEED("Füttere {n}-mal", "🍙", 3, 15, 15, weekly = 20),
-    PLAY("Spiele {n}-mal mit deinem Haustier", "🎾", 3, 15, 15, weekly = 20),
-    PET("Streichle {n}-mal", "💞", 10, 10, 10, weekly = 60),
+    FEED("Füttere {n}-mal", "🍙", 3, 15, 15, weekly = 20, monthly = 120),
+    PLAY("Spiele {n}-mal mit deinem Haustier", "🎾", 3, 15, 15, weekly = 20, monthly = 90),
+    PET("Streichle {n}-mal", "💞", 10, 10, 10, weekly = 60, monthly = 300),
     CLEAN("Mach {n}-mal sauber", "🫧", 1, 10, 10, weekly = 8),
-    GAMES("Spiele {n} Minispiele", "🎮", 2, 20, 25, weekly = 12),
+    GAMES("Spiele {n} Minispiele", "🎮", 2, 20, 25, weekly = 12, monthly = 50),
     STEPS("Gehe {n} Schritte an einem Tag", "👟", 3000, 25, 30, QuestKind.MAX, weekly = 8000, need = QuestNeed.STEPS),
     CATCH_SCORE("Erreiche {n} Punkte in Futterfang", "🧺", 150, 20, 25, QuestKind.MAX, weekly = 400),
     MEMORY("Löse {n} Memory", "🃏", 1, 20, 20, weekly = 5),
     WHACK_SCORE("Schaffe {n} Treffer bei Blitz-Tap", "⚡", 20, 20, 25, QuestKind.MAX, weekly = 40),
     SHOP("Kaufe {n} Sache im Shop", "🛍️", 1, 10, 10),
-    SLEEP("Bring dein Haustier {n}-mal ins Bett", "🌙", 1, 10, 10, weekly = 5),
+    SLEEP("Bring dein Haustier {n}-mal ins Bett", "🌙", 1, 10, 10, weekly = 5, monthly = 20),
     HEALTHY("Gib {n}-mal gesundes Essen", "🥗", 2, 15, 15, weekly = 12),
     SNACK("Gib {n} Leckerli", "🍬", 2, 10, 10),
     BATH("Nimm {n} Schaumbad", "🛁", 1, 15, 15),
     HAPPY("Mach dein Haustier rundum glücklich", "😊", 1, 20, 20),
-    PLANT("Pflanze {n} Samen", "🌱", 2, 12, 12, weekly = 12),
+    PLANT("Pflanze {n} Samen", "🌱", 2, 12, 12, weekly = 12, monthly = 40),
     WATER("Gieße {n}-mal im Garten", "💧", 3, 10, 10, weekly = 15),
-    HARVEST("Ernte {n}-mal", "🧺", 2, 20, 20, weekly = 10),
-    TRIP("Schicke {n} Haustier auf einen Ausflug", "🎒", 1, 20, 20, weekly = 5, need = QuestNeed.RESTING),
+    HARVEST("Ernte {n}-mal", "🧺", 2, 20, 20, weekly = 10, monthly = 35),
+    TRIP("Schicke {n} Haustier auf einen Ausflug", "🎒", 1, 20, 20, weekly = 5, need = QuestNeed.RESTING, monthly = 15),
     OUTFIT("Zieh deinem Haustier etwas an", "🎀", 1, 10, 10),
-    XP("Sammle {n} Erfahrungspunkte", "✨", 80, 15, 0, weekly = 600),
-    COINS("Verdiene {n} Münzen", "🪙", 80, 0, 20, weekly = 600),
+    XP("Sammle {n} Erfahrungspunkte", "✨", 80, 15, 0, weekly = 600, monthly = 2500),
+    COINS("Verdiene {n} Münzen", "🪙", 80, 0, 20, weekly = 600, monthly = 2500),
     RUNNER_SCORE("Laufe {n} Meter beim Hüpf-Lauf", "🏃", 300, 20, 25, QuestKind.MAX, weekly = 800),
     BUBBLES_SCORE("Lass {n} Blasen platzen", "🫧", 25, 20, 25, QuestKind.MAX, weekly = 50),
     SIMON_LEVEL("Schaffe {n} Töne bei Melodie", "🎵", 6, 20, 25, QuestKind.MAX, weekly = 10),
     STARS3("Hole 3 Sterne in einem Minispiel", "⭐", 1, 25, 25, weekly = 5),
-    STICKER("Sammle {n} Sticker", "🎴", 1, 15, 15, weekly = 8),
-    COOK("Koche {n} Gericht", "🍳", 1, 20, 20, weekly = 6),
-    WORK("Geh {n}-mal arbeiten", "💼", 1, 20, 20, weekly = 6, need = QuestNeed.JOB),
+    STICKER("Sammle {n} Sticker", "🎴", 1, 15, 15, weekly = 8, monthly = 25),
+    COOK("Koche {n} Gericht", "🍳", 1, 20, 20, weekly = 6, monthly = 20),
+    WORK("Geh {n}-mal arbeiten", "💼", 1, 20, 20, weekly = 6, need = QuestNeed.JOB, monthly = 25),
     CHAT("Schreib {n} Nachrichten im Chat", "💬", 5, 15, 15, weekly = 25, need = QuestNeed.CHAT),
-    ROUTINE("Schaff den ganzen Tagesablauf", "🕰️", 1, 30, 30, weekly = 4),
+    ROUTINE("Schaff den ganzen Tagesablauf", "🕰️", 1, 30, 30, weekly = 4, monthly = 12),
+    WISH("Erfülle {n} Wunsch deines Haustiers", "💭", 1, 25, 25, weekly = 5, monthly = 15),
+    TRAIN("Übe {n}-mal Kunststücke", "🎓", 5, 15, 15, weekly = 30, monthly = 80),
+    TRICK_SHOW("Zeig {n} Kunststücke vor", "🌟", 3, 15, 15, weekly = 20, need = QuestNeed.TRICK, monthly = 60),
+    TICKLE("Kitzle dein Haustier {n}-mal am Bauch", "🤭", 5, 10, 10, weekly = 30, monthly = 100),
+    VISIT("Lade {n}-mal Besuch ein", "🏠", 1, 15, 15, weekly = 5, need = QuestNeed.RESTING, monthly = 15),
+    PHOTO("Mach {n} Foto von deinem Haustier", "📸", 1, 10, 10, weekly = 7),
+    ROOM_GAME("Spiele {n}-mal im Zimmer (Verstecken, Fangen, Ball)", "🙈", 2, 15, 15, weekly = 10, monthly = 30),
+    TOURNAMENT("Mach bei {n} Turnier mit", "🏆", 1, 25, 25, weekly = 4, monthly = 10),
+    PUZZLES("Löse {n} Knobelspiele", "🧠", 2, 20, 20, weekly = 10, monthly = 30),
+    ACTION("Spiele {n} Action-Spiele", "🕹️", 2, 20, 20, weekly = 12, monthly = 40),
+    HIDDEN("Finde den versteckten Gegenstand im Zimmer", "🔍", 1, 15, 15, weekly = 4),
+    CARRY("Trag dein Haustier im Zimmer herum", "🤗", 1, 10, 10),
     ;
 
     fun label(target: Int = this.target): String = template.replace("{n}", TimeUtil.formatNumber(target))
@@ -141,28 +161,41 @@ object Quests {
     const val BONUS_XP = 30
     const val WEEKLY_BONUS_COINS = 150
 
-    private fun allowed(t: QuestType, stepsAvailable: Boolean, hasResting: Boolean, hasJob: Boolean, canChat: Boolean) = when (t.need) {
+    const val PER_MONTH = 3
+    const val MONTHLY_BONUS_COINS = 400
+
+    private fun allowed(t: QuestType, stepsAvailable: Boolean, hasResting: Boolean, hasJob: Boolean, canChat: Boolean, hasTrick: Boolean) = when (t.need) {
         QuestNeed.NONE -> true
         QuestNeed.STEPS -> stepsAvailable
         QuestNeed.RESTING -> hasResting
         QuestNeed.JOB -> hasJob
         QuestNeed.CHAT -> canChat
+        QuestNeed.TRICK -> hasTrick
     }
 
-    fun roll(day: Long, stepsAvailable: Boolean, hasResting: Boolean = false, hasJob: Boolean = false, canChat: Boolean = false): List<QuestProgress> {
-        val pool = QuestType.entries.filter { allowed(it, stepsAvailable, hasResting, hasJob, canChat) }
+    fun roll(day: Long, stepsAvailable: Boolean, hasResting: Boolean = false, hasJob: Boolean = false, canChat: Boolean = false, hasTrick: Boolean = false): List<QuestProgress> {
+        val pool = QuestType.entries.filter { allowed(it, stepsAvailable, hasResting, hasJob, canChat, hasTrick) }
         val rnd = Random(day * 7919L + 17L)
         return pool.shuffled(rnd).take(PER_DAY).map { QuestProgress(it, it.target) }
     }
 
-    fun rollWeek(week: Long, stepsAvailable: Boolean, hasResting: Boolean = false, hasJob: Boolean = false, canChat: Boolean = false): List<QuestProgress> {
-        val pool = QuestType.entries.filter { it.weekly > 0 && allowed(it, stepsAvailable, hasResting, hasJob, canChat) }
+    fun rollWeek(week: Long, stepsAvailable: Boolean, hasResting: Boolean = false, hasJob: Boolean = false, canChat: Boolean = false, hasTrick: Boolean = false): List<QuestProgress> {
+        val pool = QuestType.entries.filter { it.weekly > 0 && allowed(it, stepsAvailable, hasResting, hasJob, canChat, hasTrick) }
         val rnd = Random(week * 104729L + 5L)
         return pool.shuffled(rnd).take(PER_WEEK).map { QuestProgress(it, it.weekly) }
     }
 
+    /** Three big goals for a whole month. */
+    fun rollMonth(month: Int, hasResting: Boolean = false, hasJob: Boolean = false, hasTrick: Boolean = false): List<QuestProgress> {
+        val pool = QuestType.entries.filter { it.monthly > 0 && it.kind == QuestKind.COUNT && allowed(it, true, hasResting, hasJob, true, hasTrick) }
+        val rnd = Random(month * 7841L + 3L)
+        return pool.shuffled(rnd).take(PER_MONTH).map { QuestProgress(it, it.monthly) }
+    }
+
     fun weeklyCoins(t: QuestType): Int = maxOf(40, t.coins * 4)
     fun weeklyXp(t: QuestType): Int = maxOf(40, t.xp * 3)
+    fun monthlyCoins(t: QuestType): Int = maxOf(150, t.coins * 10)
+    fun monthlyXp(t: QuestType): Int = maxOf(100, t.xp * 6)
 }
 
 object DailyRewards {
@@ -227,7 +260,7 @@ enum class Achievement(
     ALBUM_10("Sammler", "Entdecke 10 verschiedene Wesen", "📖", 60, 10, { it.discoveredCount.toLong() }),
     ALBUM_25("Forscher", "Entdecke 25 verschiedene Wesen", "🔎", 150, 25, { it.discoveredCount.toLong() }),
     ALBUM_50("Wesen-Experte", "Entdecke 50 verschiedene Wesen", "🧭", 300, 50, { it.discoveredCount.toLong() }),
-    ALBUM_100("Meister aller Wesen", "Entdecke alle 100 Wesen", "👑", 1000, 100, { it.discoveredCount.toLong() }),
+    ALBUM_100("Meister aller Wesen", "Entdecke 100 verschiedene Wesen", "👑", 1000, 100, { it.discoveredCount.toLong() }),
     LINES_6("Weltenbummler", "Entdecke Wesen aus 6 Ei-Sorten", "🗺️", 150, 6, { s ->
         Form.creatures.filter { it.name in s.album }.map { it.line }.distinct().size.toLong()
     }),
@@ -269,7 +302,7 @@ enum class Achievement(
     PERFECT("Rundum glücklich", "Alle Werte gleichzeitig über 90", "🌈", 50, 1, { if (it.counters.perfectCare) 1L else 0L }),
     COOK_1("Hobbykoch", "Koche dein erstes Gericht", "🍳", 30, 1, { it.counters.cooked.toLong() }),
     COOK_25("Sternekoch", "Koche 25 Gerichte", "👨‍🍳", 200, 25, { it.counters.cooked.toLong() }),
-    GAMES_ALL("Allrounder", "Spiele jedes Minispiel mindestens einmal", "🎲", 150, 14, { s -> s.counters.bests.size.toLong() }),
+    GAMES_ALL("Allrounder", "Spiele jedes Minispiel mindestens einmal", "🎲", 150, MiniGame.entries.size, { s -> s.counters.bests.keys.count { k -> MiniGame.entries.any { it.name == k } }.toLong() }),
     FINDS_10("Schatzsucher", "Sammle 10 verschiedene Fundstücke", "🐚", 80, 10, { s -> s.finds.count { it.value > 0 }.toLong() }),
     FINDSET_1("Vitrine voll", "Vervollständige eine Fundstück-Sammlung", "🏺", 120, 1, { it.findSetsDone.size.toLong() }),
     STORY_1("Geschichtenerzähler", "Erlebe eine ganze Geschichte", "📖", 100, 1, { it.story.finished.size.toLong() }),
@@ -289,7 +322,24 @@ enum class Achievement(
     SECRETS_3("Geheimagent", "Entdecke 3 Geheimnisse", "🕵️", 100, 3, { it.secrets.size.toLong() }),
     SECRETS_ALL("Meisterdetektiv", "Entdecke alle Geheimnisse", "🗝️", 500, Secret.entries.size, { it.secrets.size.toLong() }),
     HIDDEN_1("Gefunden!", "Finde einen versteckten Gegenstand", "🔍", 20, 1, { it.counters.hiddenFound.toLong() }),
-    DIARY_7("Tagebuchschreiber", "Sammle 7 Tagebucheinträge", "📔", 80, 7, { it.diary.size.toLong() });
+    DIARY_7("Tagebuchschreiber", "Sammle 7 Tagebucheinträge", "📔", 80, 7, { it.diary.size.toLong() }),
+    TRICK_1("Erster Trick", "Bring deinem Haustier ein Kunststück bei", "🎓", 30, 1, { it.counters.tricksLearned.toLong() }),
+    TRICK_10("Trickkiste", "Lerne insgesamt 10 Kunststücke", "🎩", 150, 10, { it.counters.tricksLearned.toLong() }),
+    SHOWS_50("Showtalent", "Zeig 50 Kunststücke vor", "🌟", 150, 50, { it.counters.trickShows.toLong() }),
+    WISH_1("Wunsch erfüllt", "Erfülle einen Wunsch deines Haustiers", "💭", 30, 1, { it.counters.wishes.toLong() }),
+    WISH_50("Glücksfee", "Erfülle 50 Wünsche", "🧞", 300, 50, { it.counters.wishes.toLong() }),
+    TICKLE_50("Kitzelmonster", "Kitzle dein Haustier 50-mal", "🤭", 60, 50, { it.counters.tickles.toLong() }),
+    CARRY_10("Huckepack", "Trag dein Haustier 10-mal herum", "🤗", 40, 10, { it.counters.carries.toLong() }),
+    ROOM_25("Zimmerspieler", "Spiele 25-mal im Zimmer", "🙈", 100, 25, { it.counters.roomGames.toLong() }),
+    TOURNEY_1("Pokalgewinner", "Gewinne ein Turnier", "🏆", 80, 1, { it.counters.tournamentWins.toLong() }),
+    TOURNEY_DIAMOND("Diamant-Champion", "Gewinne den Diamant-Pokal", "💎", 400, 1, { (it.cups[Cup.DIAMANT.name] ?: 0).toLong() }),
+    ADVENTURE_10("Wanderer", "Geh 10 Schritte auf der Abenteuerkarte", "🗺️", 80, 10, { it.counters.adventureSteps.toLong() }),
+    MONTHLY_1("Monatsziel", "Schaff alle Monatsziele eines Monats", "📅", 150, 1, { it.counters.monthlies.toLong() }),
+    VOICE_1("Hörst du mich?", "Lass dein Haustier auf deine Stimme reagieren", "🎤", 30, 1, { it.counters.voice.toLong() }),
+    SMALL_1("Kleintierliebe", "Hol dir einen Hasen, Hamster oder ein Meerschweinchen", "🐹", 50, 1, { s -> Form.smallAnimals.count { s.discovered(it) }.toLong() }),
+    LINES_12("Weltenwanderer", "Entdecke Wesen aus 12 Ei-Sorten", "🧭", 400, 12, { s ->
+        Form.creatures.filter { it.name in s.album }.map { it.line }.distinct().size.toLong()
+    });
 
     fun progress(state: GameState): Long = metric(state).coerceAtMost(target.toLong())
 

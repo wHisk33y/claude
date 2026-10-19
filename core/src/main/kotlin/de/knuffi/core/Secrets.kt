@@ -25,6 +25,9 @@ enum class Secret(val title: String, val emoji: String, val hint: String, val co
     HIDDEN_7("Spürnase", "🔍", "Finde 7 versteckte Gegenstände im Zimmer.", 80),
     FRIENDS("Seelenverwandte", "💞", "Lass zwei Haustiere beste Freunde werden.", 80),
     CATS("Katzenflüsterer", "🐈", "Schreib im Chat dreimal das Wort, das jede Katze kennt … oder tippe im Zimmer Fenster, Lampe und Bild nacheinander an.", 60),
+    SINGER("Superstar", "🎤", "Sing deinem Haustier etwas vor. Dafür muss in den Einstellungen das Mikrofon an sein.", 40),
+    TICKLE("Kitzelkönig", "🤭", "Kitzle dein Haustier ganz oft hintereinander am Bauch.", 30),
+    JUGGLER("Jongleur", "🎾", "Wirf beim Ballspiel im Zimmer 10 Bälle, ohne dass einer auf den Boden fällt.", 50),
 }
 
 object Secrets {

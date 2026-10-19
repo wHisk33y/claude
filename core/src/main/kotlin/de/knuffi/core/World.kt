@@ -84,6 +84,9 @@ object Finds {
         Destination.VULKAN -> listOf(FindSet.STEINE)
         Destination.WOLKEN -> listOf(FindSet.FEDERN)
         Destination.MOND -> listOf(FindSet.STEINE, FindSet.MUSCHELN)
+        Destination.REGENWALD -> listOf(FindSet.FEDERN, FindSet.BLAETTER)
+        Destination.OASE -> listOf(FindSet.MUSCHELN, FindSet.STEINE)
+        Destination.MINE -> listOf(FindSet.STEINE)
     }
 
     fun roll(sets: List<FindSet>, rnd: Random): Find {

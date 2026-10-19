@@ -78,7 +78,38 @@ object Skins {
         Skin("skin_ginger", "Lebkuchen", "🍪", "Braun gebacken mit Zuckerguss.", 0xFFC0804A, 0xFFFF6A7A, 0xFFFFFFFF, 0xFF4A2410, belly = 0xFFE0A870, pattern = SkinPattern.ICING, event = SeasonEvent.WINTERZAUBER),
     )
 
-    val all: List<Skin> = furs + costumes
+    private const val DARK_EYE = 0xFF2A1F2A
+
+    /** Rabbit coats. */
+    val bunnyFurs: List<Skin> = listOf(
+        Skin("fur_bunny_brown", "Wildbraun", "🤎", "Wie ein Feldhase auf der Wiese.", 0xFFA8805E, PINK_EAR, 0xFF7A5A40, DARK_EYE, belly = 0xFFF2E2CC, fur = true),
+        Skin("fur_bunny_white", "Schneeweiß", "🤍", "Weiß wie frischer Schnee.", 0xFFF8F6F3, PINK_EAR, 0xFFE4E0DA, 0xFF7A3A4A, belly = 0xFFFFFFFF, fur = true),
+        Skin("fur_bunny_grey", "Hellgrau", "🩶", "Samtig grau und superweich.", 0xFFA4A6AE, PINK_EAR, 0xFF7A7C86, DARK_EYE, belly = 0xFFE6E7EC, fur = true),
+        Skin("fur_bunny_black", "Schwarz", "🖤", "Glänzend schwarz mit dunklen Knopfaugen.", 0xFF3E3842, 0xFFE89AAE, 0xFF26222A, 0xFF5A4A3A, belly = 0xFF4E4752, fur = true),
+        Skin("fur_bunny_spotted", "Gescheckt", "🐾", "Weiß mit braunen Flecken.", 0xFFF6F2EC, PINK_EAR, 0xFF9A6A48, DARK_EYE, belly = 0xFFFFFFFF, pattern = SkinPattern.SPOTS, fur = true),
+        Skin("fur_bunny_cream", "Creme", "🍦", "Hell wie Vanillepudding.", 0xFFF0D8B4, PINK_EAR, 0xFFD8B488, DARK_EYE, belly = 0xFFFFF4E4, fur = true),
+    )
+
+    /** Hamster coats. */
+    val hamsterFurs: List<Skin> = listOf(
+        Skin("fur_hamster_gold", "Goldbraun", "🧡", "Das klassische Hamsterfell mit hellem Bauch.", 0xFFDDA266, PINK_EAR, 0xFFB4783E, DARK_EYE, belly = 0xFFFFF4E2, fur = true),
+        Skin("fur_hamster_white", "Weiß", "🤍", "Ein flauschiges weißes Fellknäuel.", 0xFFF8F4EE, PINK_EAR, 0xFFE2DACE, 0xFF8A3A4A, belly = 0xFFFFFFFF, fur = true),
+        Skin("fur_hamster_grey", "Silbergrau", "🩶", "Grau wie ein Zwerghamster.", 0xFFB4B2B8, PINK_EAR, 0xFF6E6C74, DARK_EYE, belly = 0xFFF2F0F4, pattern = SkinPattern.STRIPES, fur = true),
+        Skin("fur_hamster_black", "Schwarz", "🖤", "Ganz schwarz mit weißen Pfötchen.", 0xFF3A363E, 0xFFE89AAE, 0xFF242026, 0xFF5A4A3A, belly = 0xFFE8E4E0, fur = true),
+        Skin("fur_hamster_panda", "Panda", "🐼", "Schwarz-weiß gefleckt wie ein kleiner Panda.", 0xFFF8F6F2, PINK_EAR, 0xFF2E2A30, DARK_EYE, belly = 0xFFFFFFFF, pattern = SkinPattern.TUXEDO, fur = true),
+    )
+
+    /** Guinea pig coats. */
+    val guineaFurs: List<Skin> = listOf(
+        Skin("fur_meeri_tricolor", "Dreifarbig", "🍀", "Weiß mit roten und schwarzen Flecken.", 0xFFFAF6F0, PINK_EAR, 0xFFD88A3A, DARK_EYE, belly = 0xFFFFFFFF, extra = 0xFF3A3436, pattern = SkinPattern.CALICO, fur = true),
+        Skin("fur_meeri_brown", "Schokobraun", "🤎", "Dunkelbraun wie Schokolade.", 0xFF9A6A48, PINK_EAR, 0xFF6E4A30, DARK_EYE, belly = 0xFFE8D2BC, fur = true),
+        Skin("fur_meeri_ginger", "Rotblond", "🧡", "Leuchtend orange wie eine Möhre.", 0xFFE8A458, PINK_EAR, 0xFFC27A34, DARK_EYE, belly = 0xFFFFE8CC, fur = true),
+        Skin("fur_meeri_white", "Weiß", "🤍", "Schneeweiß mit rosa Näschen.", 0xFFF8F6F4, PINK_EAR, 0xFFE4DED8, 0xFF8A3A4A, belly = 0xFFFFFFFF, fur = true),
+        Skin("fur_meeri_tuxedo", "Schwarz-weiß", "🎩", "Mit einem weißen Latz wie ein Frack.", 0xFF35313A, 0xFFE89AAE, 0xFFFFFFFF, 0xFF5A4A3A, belly = 0xFFFFFFFF, pattern = SkinPattern.TUXEDO, fur = true),
+        Skin("fur_meeri_grey", "Silbergrau", "🩶", "Glänzend grau mit weißem Bauch.", 0xFFAEAEB6, PINK_EAR, 0xFF7E7E88, DARK_EYE, belly = 0xFFF0F0F4, fur = true),
+    )
+
+    val all: List<Skin> = furs + bunnyFurs + hamsterFurs + guineaFurs + costumes
     private val byId = all.associateBy { it.id }
 
     operator fun get(id: String?): Skin? = id?.let { byId[it] }
@@ -89,6 +120,20 @@ object Skins {
 
     /** Random coat for an adopted kitten. */
     fun randomFur(rnd: Random): String = furs[rnd.nextInt(furs.size)].id
+
+    /** The coats of a real animal line (empty for fantasy lines). */
+    fun furs(line: EggLine): List<Skin> = when (line) {
+        EggLine.KATZE -> furs
+        EggLine.HASE -> bunnyFurs
+        EggLine.HAMSTER -> hamsterFurs
+        EggLine.MEERI -> guineaFurs
+        else -> emptyList()
+    }
+
+    fun defaultFur(line: EggLine): String? = furs(line).firstOrNull()?.id
+
+    /** Random coat for a real animal of [line]. */
+    fun randomFur(line: EggLine, rnd: Random): String? = furs(line).takeIf { it.isNotEmpty() }?.let { it[rnd.nextInt(it.size)].id }
 }
 
 // ---------------------------------------------------------------------------------- perks
@@ -289,11 +334,11 @@ object Talents {
     fun natural(p: Pet): Talent = Talent.entries[Math.floorMod(p.bornAt / 7L + 3L, Talent.entries.size.toLong()).toInt()]
 
     fun of(game: MiniGame): Talent = when (game) {
-        MiniGame.CATCH, MiniGame.RUNNER, MiniGame.WHACK, MiniGame.FLIGHT, MiniGame.STACK -> Talent.SPORT
-        MiniGame.MEMORY, MiniGame.PUZZLE, MiniGame.COLORING, MiniGame.YARN, MiniGame.MATCH -> Talent.BASTELN
+        MiniGame.CATCH, MiniGame.RUNNER, MiniGame.WHACK, MiniGame.FLIGHT, MiniGame.STACK, MiniGame.JUMPER, MiniGame.RACE -> Talent.SPORT
+        MiniGame.MEMORY, MiniGame.PUZZLE, MiniGame.COLORING, MiniGame.YARN, MiniGame.MATCH, MiniGame.SPOT, MiniGame.WORDS -> Talent.BASTELN
         MiniGame.BUBBLES, MiniGame.SIMON -> Talent.MUSIK
         MiniGame.COOK -> Talent.KOCHEN
-        MiniGame.FISHING, MiniGame.PACMAN -> Talent.ENTDECKEN
+        MiniGame.FISHING, MiniGame.PACMAN, MiniGame.SHADOW, MiniGame.SPACE -> Talent.ENTDECKEN
     }
 
     fun level(p: Pet, t: Talent): Int = level(p.talents[t] ?: 0)

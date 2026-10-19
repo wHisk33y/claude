@@ -26,6 +26,8 @@ enum class EggLine(
     val description: String,
     val look: LookStyle? = null,
     val eventOnly: Boolean = false,
+    /** Real animals (cats and small animals) come in a basket and are born as babies. */
+    val real: Boolean = false,
 ) {
     KNUFFEL("Knuffel-Ei", "🥚", "Das klassische Ei. Was schlüpft, hängt ganz von deiner Pflege ab."),
     WALD("Wald-Ei", "🌿", "Riecht nach Moos und Tannennadeln."),
@@ -37,18 +39,29 @@ enum class EggLine(
     BLUETE("Blüten-Ei", "🌸", "Duftet nach Frühlingsblumen.", LookStyle.ZAUBER),
     STERN("Sternen-Ei", "✨", "Funkelt wie der Nachthimmel."),
     ZUCKER("Zucker-Ei", "🍭", "Riecht nach Zuckerwatte und Karamell."),
+    DSCHUNGEL("Dschungel-Ei", "🌴", "Grün gesprenkelt. Drinnen raschelt und zirpt es."),
+    WUESTE("Wüsten-Ei", "🏜️", "Warm wie Sand in der Sonne. Riecht nach Abenteuer."),
+    EDELSTEIN("Edelstein-Ei", "💎", "Funkelt wie ein frisch geschliffener Kristall."),
     FROST("Frost-Ei", "❄️", "Eiskalt! Gibt es nur zum Winterzauber.", eventOnly = true),
     GRUSEL("Grusel-Ei", "🎃", "Huuuh! Gibt es nur zu Halloween.", eventOnly = true),
 
     /** Real cats for the cat mode. Not an egg but a basket with a kitten in it. */
-    KATZE("Katzenkörbchen", "🧺", "Ein kuscheliges Körbchen. Darin schläft ein kleines Kätzchen."),
+    KATZE("Katzenkörbchen", "🧺", "Ein kuscheliges Körbchen. Darin schläft ein kleines Kätzchen.", real = true),
+
+    /** Small animals, also real and in a basket. */
+    HASE("Hasenkörbchen", "🐰", "Ein Körbchen voller Heu. Darin kuschelt ein kleines Häschen.", real = true),
+    HAMSTER("Hamsterhäuschen", "🐹", "Ein kleines Holzhäuschen. Darin raschelt ein Hamsterbaby.", real = true),
+    MEERI("Meerschweinchen-Häuschen", "🌾", "Ein Häuschen mit frischem Heu. Drinnen quiekt es leise.", real = true),
     ;
 
     /** All creatures (without the egg) that can hatch from this line. */
     val forms: List<Form> get() = Form.entries.filter { it.line == this && it != Form.EGG }
 
-    /** Fantasy egg lines (everything but the real cat). */
-    val fantasy: Boolean get() = this != KATZE
+    /** Fantasy egg lines (everything but the real animals). */
+    val fantasy: Boolean get() = !real
+
+    /** Hase, Hamster and Meerschweinchen. */
+    val small: Boolean get() = this == HASE || this == HAMSTER || this == MEERI
 }
 
 /** The place of a form in its family tree. */
@@ -214,17 +227,86 @@ enum class Form(
     SCHMUSEKATZE(Stage.ADULT, "Schmusekatze", "Schnurrt, sobald man sie nur anschaut.", EggLine.KATZE, Role.ADULT_BALANCED),
     STREUNER(Stage.ADULT, "Streunerkatze", "Etwas zerzaust, aber treu wie Gold.", EggLine.KATZE, Role.SHADOW),
     GLUECKSKATZE(Stage.ADULT, "Glückskatze", "Seidiges Fell und ein Blick voller Weisheit. Legendär!", EggLine.KATZE, Role.LEGEND),
+
+    // Dschungel
+    LIANI(Stage.BABY, "Liani", "Ein kleines Blätterknäuel mit einem Rankenschwänzchen.", EggLine.DSCHUNGEL, Role.BABY),
+    KOKOSI(Stage.CHILD, "Kokosi", "Trägt eine halbe Kokosnuss als Helm.", EggLine.DSCHUNGEL, Role.CHILD),
+    TUKANI(Stage.TEEN, "Tukani", "Ein bunter Tukan mit riesigem Schnabel.", EggLine.DSCHUNGEL, Role.TEEN),
+    SCHLINGI(Stage.TEEN, "Schlingi", "Ein grummeliges Chamäleon, das ständig die Farbe wechselt.", EggLine.DSCHUNGEL, Role.TEEN_B),
+    JAGUARO(Stage.ADULT, "Jaguaro", "Ein flinker Dschungelkater mit Flecken.", EggLine.DSCHUNGEL, Role.ADULT_SPORTY),
+    BANANO(Stage.ADULT, "Banano", "Ein gemütlicher kleiner Gorilla, der Bananen liebt.", EggLine.DSCHUNGEL, Role.ADULT_FOODIE),
+    ORCHIDEA(Stage.ADULT, "Orchidea", "Ein Paradiesvogel mit einer Orchideenblüte.", EggLine.DSCHUNGEL, Role.ADULT_BALANCED),
+    SMARAGDLOEWE(Stage.ADULT, "Smaragdlöwe", "Ein Löwe mit grüner Mähne, König des Dschungels. Legendär!", EggLine.DSCHUNGEL, Role.LEGEND),
+
+    // Wüste
+    SANDI(Stage.BABY, "Sandi", "Ein warmes Sandkörnchen mit großen Augen.", EggLine.WUESTE, Role.BABY),
+    FENNI(Stage.CHILD, "Fenni", "Ein Wüstenfuchs mit riesigen Ohren.", EggLine.WUESTE, Role.CHILD),
+    SKARABI(Stage.TEEN, "Skarabi", "Ein glänzender Käfer mit Panzer.", EggLine.WUESTE, Role.TEEN),
+    KAKTUSI(Stage.TEEN, "Kaktusi", "Stachelig und ein bisschen launisch.", EggLine.WUESTE, Role.TEEN_B),
+    WIRBELI(Stage.ADULT, "Wirbeli", "Ein Sandsturm-Wesen, schneller als der Wind.", EggLine.WUESTE, Role.ADULT_SPORTY),
+    KAMELIO(Stage.ADULT, "Kamelio", "Ein rundes Kamel, das nie Durst hat.", EggLine.WUESTE, Role.ADULT_FOODIE),
+    SPHINXI(Stage.ADULT, "Sphinxi", "Eine weise kleine Sphinx, die Rätsel liebt.", EggLine.WUESTE, Role.ADULT_BALANCED),
+    PHARAONI(Stage.ADULT, "Pharaoni", "Der goldene Herrscher der Dünen. Legendär!", EggLine.WUESTE, Role.LEGEND),
+
+    // Edelstein
+    KRISTALLI(Stage.BABY, "Kristalli", "Ein winziger, funkelnder Kristall.", EggLine.EDELSTEIN, Role.BABY),
+    RUBINI(Stage.CHILD, "Rubini", "Rot wie ein Rubin und warmherzig.", EggLine.EDELSTEIN, Role.CHILD),
+    SAPHIRO(Stage.TEEN, "Saphiro", "Blau und klar wie Bergwasser.", EggLine.EDELSTEIN, Role.TEEN),
+    GEODI(Stage.TEEN, "Geodi", "Außen grau und rau, innen voller Glitzer.", EggLine.EDELSTEIN, Role.TEEN_B),
+    DIAMANTO(Stage.ADULT, "Diamanto", "Ein flinker Drache aus Diamant.", EggLine.EDELSTEIN, Role.ADULT_SPORTY),
+    BERNSTEINI(Stage.ADULT, "Bernsteini", "Ein runder Bär aus warmem Bernstein.", EggLine.EDELSTEIN, Role.ADULT_FOODIE),
+    OPALIA(Stage.ADULT, "Opalia", "Schimmert in allen Farben des Regenbogens.", EggLine.EDELSTEIN, Role.ADULT_BALANCED),
+    PRISMARA(Stage.ADULT, "Prismara", "Ein Einhorn aus Licht, das alle Farben zeigt. Legendär!", EggLine.EDELSTEIN, Role.LEGEND),
+
+    // Echte Hasen
+    HAESCHEN(Stage.BABY, "Häschen", "Winzig, mit weichen Öhrchen und einem Stummelschwänzchen.", EggLine.HASE, Role.BABY),
+    JUNGHASE(Stage.CHILD, "Junghase", "Hoppelt den ganzen Tag herum.", EggLine.HASE, Role.CHILD),
+    HOPPELHASE(Stage.TEEN, "Hoppelhase", "Springt über alles, was im Weg steht.", EggLine.HASE, Role.TEEN),
+    TROTZHASE(Stage.TEEN, "Trotzhase", "Klopft mit dem Fuß, wenn ihm etwas nicht passt.", EggLine.HASE, Role.TEEN_B),
+    SPRINTHASE(Stage.ADULT, "Sprinthase", "Der schnellste Hase weit und breit.", EggLine.HASE, Role.ADULT_SPORTY),
+    PUMMELHASE(Stage.ADULT, "Pummelhase", "Rund und gemütlich, am liebsten mit einer Möhre.", EggLine.HASE, Role.ADULT_FOODIE),
+    KUSCHELHASE(Stage.ADULT, "Kuschelhase", "Lässt sich stundenlang kraulen.", EggLine.HASE, Role.ADULT_BALANCED),
+    ZAUSELHASE(Stage.ADULT, "Zauselhase", "Etwas zerzaust, aber mit großem Herz.", EggLine.HASE, Role.SHADOW),
+    MONDHASE(Stage.ADULT, "Mondhase", "Silbernes Fell, das im Mondlicht glänzt. Legendär!", EggLine.HASE, Role.LEGEND),
+
+    // Echte Hamster
+    HAMSTERBABY(Stage.BABY, "Hamsterbaby", "Klein wie ein Daumen und furchtbar neugierig.", EggLine.HAMSTER, Role.BABY),
+    JUNGHAMSTER(Stage.CHILD, "Junghamster", "Rennt im Laufrad, bis ihm schwindelig wird.", EggLine.HAMSTER, Role.CHILD),
+    FLITZHAMSTER(Stage.TEEN, "Flitzhamster", "Flink wie der Blitz.", EggLine.HAMSTER, Role.TEEN),
+    GRUMMELHAMSTER(Stage.TEEN, "Grummelhamster", "Murmelt vor sich hin, wenn er gestört wird.", EggLine.HAMSTER, Role.TEEN_B),
+    LAUFRADPROFI(Stage.ADULT, "Laufradprofi", "Läuft jede Nacht einen Marathon.", EggLine.HAMSTER, Role.ADULT_SPORTY),
+    BACKENHAMSTER(Stage.ADULT, "Backenhamster", "Stopft sich die Backen bis zum Platzen voll.", EggLine.HAMSTER, Role.ADULT_FOODIE),
+    KUSCHELHAMSTER(Stage.ADULT, "Kuschelhamster", "Schläft am liebsten in deiner Hand.", EggLine.HAMSTER, Role.ADULT_BALANCED),
+    ZAUSELHAMSTER(Stage.ADULT, "Zauselhamster", "Etwas strubbelig, aber treu.", EggLine.HAMSTER, Role.SHADOW),
+    STERNENHAMSTER(Stage.ADULT, "Sternenhamster", "Sein Fell glitzert wie der Nachthimmel. Legendär!", EggLine.HAMSTER, Role.LEGEND),
+
+    // Echte Meerschweinchen
+    QUIEKCHEN(Stage.BABY, "Quiekchen", "Ein winziges Meerschweinchen, das fröhlich quiekt.", EggLine.MEERI, Role.BABY),
+    JUNGSCHWEINCHEN(Stage.CHILD, "Jungschweinchen", "Knabbert an allem, was grün ist.", EggLine.MEERI, Role.CHILD),
+    WIRBELSCHWEINCHEN(Stage.TEEN, "Wirbelschweinchen", "Hat lustige Haarwirbel im Fell.", EggLine.MEERI, Role.TEEN),
+    BRUMMSCHWEINCHEN(Stage.TEEN, "Brummschweinchen", "Brummt, wenn ihm etwas nicht gefällt.", EggLine.MEERI, Role.TEEN_B),
+    POPCORNSCHWEINCHEN(Stage.ADULT, "Popcornschweinchen", "Hüpft vor Freude wie Popcorn in die Luft.", EggLine.MEERI, Role.ADULT_SPORTY),
+    GURKENSCHWEINCHEN(Stage.ADULT, "Gurkenschweinchen", "Für eine Gurke tut es alles.", EggLine.MEERI, Role.ADULT_FOODIE),
+    KUSCHELSCHWEINCHEN(Stage.ADULT, "Kuschelschweinchen", "Gurrt leise, wenn man es streichelt.", EggLine.MEERI, Role.ADULT_BALANCED),
+    STRUPPELSCHWEINCHEN(Stage.ADULT, "Struppelschweinchen", "Etwas struppig, aber unglaublich lieb.", EggLine.MEERI, Role.SHADOW),
+    SEIDENSCHWEINCHEN(Stage.ADULT, "Seidenschweinchen", "Mit langem, seidig glänzendem Fell. Legendär!", EggLine.MEERI, Role.LEGEND),
     ;
 
     val isLegend: Boolean get() = role == Role.LEGEND
     val isCat: Boolean get() = line == EggLine.KATZE
 
+    /** Real animals (cats and small animals). */
+    val isReal: Boolean get() = line.real
+
     companion object {
-        /** All fantasy creatures that can be collected (without the egg and the real cats). */
+        /** All fantasy creatures that can be collected (without the egg and the real animals). */
         val creatures: List<Form> get() = entries.filter { it != EGG && it.line.fantasy }
 
         /** The real cats of the cat mode. */
         val cats: List<Form> get() = entries.filter { it.isCat }
+
+        /** Real small animals: rabbits, hamsters and guinea pigs. */
+        val smallAnimals: List<Form> get() = entries.filter { it.line.small }
 
         fun find(line: EggLine, role: Role): Form? = entries.firstOrNull { it.line == line && it.role == role }
     }

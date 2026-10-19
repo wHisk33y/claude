@@ -82,7 +82,23 @@ sealed interface Action {
     // Secrets, hidden objects, friends
     data class FindSecret(val secret: Secret) : Action
     data object FindHidden : Action
-    data class FriendPlay(val moment: FriendMoment) : Action
+    data class FriendPlay(val moment: FriendMoment, val petId: Long = 0L) : Action
+    data class SendHome(val petId: Long) : Action
+
+    // Tricks, touching, room games and voice
+    data class PracticeTrick(val trick: Trick) : Action
+    data class ShowTrick(val trick: Trick) : Action
+    data class Touch(val zone: TouchZone) : Action
+    data object Carry : Action
+    data class RoomGameFinished(val game: RoomGame, val score: Int) : Action
+    data class Voice(val kind: VoiceKind) : Action
+
+    // Monthly goals, adventure map, long-term goals, tournaments
+    data class ClaimMonthly(val index: Int) : Action
+    data object ClaimMonthlyBonus : Action
+    data object AdventureStep : Action
+    data class ClaimGoal(val goal: LongGoal) : Action
+    data class TournamentFinished(val cup: Cup, val place: Int, val rivals: List<Long> = emptyList()) : Action
 }
 
 data class GameReward(val coins: Int, val xp: Int)
@@ -143,14 +159,21 @@ object Engine {
         MiniGame.COLORING -> GameReward(coins = (score * 30 / 100).coerceIn(5, 30), xp = if (score >= 100) 20 else 8)
         MiniGame.YARN -> GameReward(coins = if (score <= 0) 5 else (55 - score).coerceIn(15, 40), xp = 25)
         MiniGame.PACMAN -> GameReward(coins = (score / 10).coerceIn(2, 60), xp = (5 + score / 15).coerceAtMost(50))
+        MiniGame.SPOT -> GameReward(coins = (score * 4).coerceIn(2, 60), xp = (5 + score * 3).coerceAtMost(50))
+        MiniGame.WORDS -> GameReward(coins = (score * 5).coerceIn(2, 50), xp = (5 + score * 4).coerceAtMost(50))
+        MiniGame.SHADOW -> GameReward(coins = (score * 5).coerceIn(2, 50), xp = (5 + score * 4).coerceAtMost(50))
+        MiniGame.SPACE -> GameReward(coins = (score / 12).coerceIn(2, 60), xp = (5 + score / 15).coerceAtMost(50))
+        MiniGame.JUMPER -> GameReward(coins = (score / 10).coerceIn(2, 60), xp = (5 + score / 12).coerceAtMost(50))
+        MiniGame.RACE -> GameReward(coins = (score / 15).coerceIn(2, 60), xp = (5 + score / 18).coerceAtMost(50))
     }
 
     fun gameMaxCoins(game: MiniGame): Int = when (game) {
-        MiniGame.CATCH, MiniGame.RUNNER, MiniGame.COOK, MiniGame.MATCH, MiniGame.FLIGHT, MiniGame.STACK, MiniGame.FISHING, MiniGame.PACMAN -> 60
+        MiniGame.CATCH, MiniGame.RUNNER, MiniGame.COOK, MiniGame.MATCH, MiniGame.FLIGHT, MiniGame.STACK, MiniGame.FISHING, MiniGame.PACMAN,
+        MiniGame.SPOT, MiniGame.SPACE, MiniGame.JUMPER, MiniGame.RACE -> 60
         MiniGame.MEMORY, MiniGame.YARN -> 40
         MiniGame.PUZZLE -> 45
         MiniGame.COLORING -> 30
-        MiniGame.WHACK, MiniGame.BUBBLES, MiniGame.SIMON -> 50
+        MiniGame.WHACK, MiniGame.BUBBLES, MiniGame.SIMON, MiniGame.WORDS, MiniGame.SHADOW -> 50
     }
 
     /** Best result of a game so far, or null. */
@@ -261,8 +284,8 @@ object Engine {
         }
 
         private fun addEgg(found: EggLine, reason: String) {
-            // In the cat mode every egg becomes a basket with a kitten.
-            val line = if (s.catMode) EggLine.KATZE else found
+            // In the cat mode every fantasy egg becomes a basket with a kitten.
+            val line = if (s.catMode && found.fantasy) EggLine.KATZE else found
             s = s.copy(eggs = s.eggs + (line to s.eggCount(line) + 1))
             counters { it.copy(eggsFound = it.eggsFound + 1) }
             emit(GameEvent.EggFound(line, reason))
@@ -295,11 +318,12 @@ object Engine {
             if (s.equipped.values.any { Catalog[it] == null }) s = s.copy(equipped = s.equipped.filterValues { Catalog[it] != null })
             fun fix(p: Pet): Pet = p.copy(
                 lastCare = if (p.lastCare <= 0L) now else p.lastCare,
-                fur = if (p.isCat && p.fur == null) Skins.DEFAULT_FUR else p.fur,
+                fur = if (p.isReal && p.fur == null) Skins.defaultFur(p.line) else p.fur,
             )
             val pet = s.pet
-            if (pet != null && (pet.lastCare <= 0L || (pet.isCat && pet.fur == null))) s = s.copy(pet = fix(pet))
-            if (s.resting.any { it.isCat && it.fur == null }) s = s.copy(resting = s.resting.map { fix(it) })
+            if (pet != null && (pet.lastCare <= 0L || (pet.isReal && pet.fur == null))) s = s.copy(pet = fix(pet))
+            if (s.resting.any { it.isReal && it.fur == null }) s = s.copy(resting = s.resting.map { fix(it) })
+            if (s.visit2 != null && s.visit == null) s = s.copy(visit = s.visit2, visit2 = null)
         }
 
         // ---------------------------------------------------------------- feelings
@@ -519,6 +543,7 @@ object Engine {
             val hasResting = s.resting.any { !it.isEgg }
             val hasJob = s.pet?.job != null
             val canChat = (s.pet?.level ?: 0) >= Chat.UNLOCK_LEVEL
+            val hasTrick = s.pet?.let { Tricks.learnedCount(it) > 0 } == true
             var daily = s.daily
             if (daily.day != today && daily.day >= 0 && daily.log.isNotEmpty()) writeDiary(daily.day, daily.log)
             if (daily.day != today) {
@@ -526,7 +551,7 @@ object Engine {
                     hiddenFound = false,
                     log = emptyMap(),
                     day = today,
-                    quests = Quests.roll(today, s.settings.stepsAvailable, hasResting, hasJob, canChat),
+                    quests = Quests.roll(today, s.settings.stepsAvailable, hasResting, hasJob, canChat, hasTrick),
                     bonusClaimed = false,
                     routine = emptySet(),
                     routineClaimed = false,
@@ -535,7 +560,12 @@ object Engine {
             val week = TimeUtil.week(now, zone)
             var weekly = s.weekly
             if (weekly.week != week) {
-                weekly = WeeklyState(week = week, quests = Quests.rollWeek(week, s.settings.stepsAvailable, hasResting, hasJob, canChat))
+                weekly = WeeklyState(week = week, quests = Quests.rollWeek(week, s.settings.stepsAvailable, hasResting, hasJob, canChat, hasTrick))
+            }
+            val month = TimeUtil.month(now, zone)
+            var monthly = s.monthly
+            if (monthly.month != month) {
+                monthly = MonthlyState(month = month, goals = Quests.rollMonth(month, hasResting, hasJob, hasTrick))
             }
             val date = EventCalendar.date(now, zone)
             var pass = s.pass
@@ -561,7 +591,7 @@ object Engine {
             if (steps.day != today) {
                 steps = steps.copy(day = today, today = 0, claimedTiers = emptySet())
             }
-            s = s.copy(daily = daily, weekly = weekly, counters = counters, steps = steps, pass = pass, event = event)
+            s = s.copy(daily = daily, weekly = weekly, monthly = monthly, counters = counters, steps = steps, pass = pass, event = event)
             if (newLogin) {
                 addPassXp(10)
                 addTokens(2)
@@ -570,6 +600,7 @@ object Engine {
             if (s.onboarded) {
                 rainWatering(now, today)
                 endVisit(now)
+                wishTick(now, userPresent)
             }
             if (userPresent && s.onboarded && s.pet?.alive == true && s.pet?.isEgg == false) {
                 if (Secrets.midnight(now, zone)) findSecret(Secret.MIDNIGHT, now)
@@ -621,11 +652,12 @@ object Engine {
             dayLog("hidden")
             feel(Emotion.NEUGIERIG, now)
             touch(now)
+            questProgress(QuestType.HIDDEN, 1)
             if (s.counters.hiddenFound >= 7) findSecret(Secret.HIDDEN_7, now)
         }
 
-        private fun friendMoment(m: FriendMoment, now: Long) {
-            val guest = visitor() ?: return
+        private fun friendMoment(m: FriendMoment, petId: Long, now: Long) {
+            val guest = (if (petId != 0L) s.visitors.firstOrNull { it.id == petId } else null) ?: visitor() ?: return
             val host = s.pet ?: return
             if (!cooldownReady("moment", now, 90_000L)) return
             s = s.copy(
@@ -685,6 +717,17 @@ object Engine {
             }
             advance(s.daily.quests, false)?.let { s = s.copy(daily = s.daily.copy(quests = it)) }
             advance(s.weekly.quests, true)?.let { s = s.copy(weekly = s.weekly.copy(quests = it)) }
+            // Monthly goals are counted like the weekly ones but announced separately.
+            var monthChanged = false
+            val month = s.monthly.goals.map { q ->
+                if (q.type != type || q.claimed || q.done) return@map q
+                val value = (if (type.kind == QuestKind.COUNT) q.progress + amount else max(q.progress, amount)).coerceAtMost(q.target)
+                if (value == q.progress) return@map q
+                monthChanged = true
+                if (value >= q.target) emit(GameEvent.QuestDone(type, monthly = true))
+                q.copy(progress = value)
+            }
+            if (monthChanged) s = s.copy(monthly = s.monthly.copy(goals = month))
         }
 
         private fun addPassXp(amount: Int) {
@@ -914,12 +957,26 @@ object Engine {
                 Action.PlayTogether -> playTogether(now)
                 Action.PhotoTaken -> {
                     counters { it.copy(photos = it.photos + 1) }
+                    questProgress(QuestType.PHOTO, 1)
+                    wishProgress(WishKind.PHOTO, now)
                     if (cooldownReady("photo_xp", now, 60_000L)) addXp(3, now)
                 }
                 is Action.SetWeather -> s = s.copy(weather = action.weather)
                 is Action.FindSecret -> findSecret(action.secret, now)
                 Action.FindHidden -> findHidden(now)
-                is Action.FriendPlay -> friendMoment(action.moment, now)
+                is Action.FriendPlay -> friendMoment(action.moment, action.petId, now)
+                is Action.SendHome -> sendHome(action.petId)
+                is Action.PracticeTrick -> practiceTrick(action.trick, now)
+                is Action.ShowTrick -> showTrick(action.trick, now)
+                is Action.Touch -> touchZone(action.zone, now)
+                Action.Carry -> carry(now)
+                is Action.RoomGameFinished -> roomGameFinished(action.game, action.score, now)
+                is Action.Voice -> voice(action.kind, now)
+                is Action.ClaimMonthly -> claimMonthly(action.index, now)
+                Action.ClaimMonthlyBonus -> claimMonthlyBonus(now)
+                Action.AdventureStep -> adventureStep(now)
+                is Action.ClaimGoal -> claimGoal(action.goal)
+                is Action.TournamentFinished -> tournamentFinished(action.cup, action.place, action.rivals, now)
             }
             checkPerfect()
         }
@@ -973,14 +1030,17 @@ object Engine {
         }
 
         /** A real cat starts as a kitten right away, there is no egg. */
-        private fun kitten(name: String, now: Long, fur: String): Pet = Pet(
+        private fun kitten(name: String, now: Long, fur: String): Pet = animalBaby(EggLine.KATZE, name, now, fur)
+
+        /** Real animals (cats and small animals) start as babies right away. */
+        private fun animalBaby(line: EggLine, name: String, now: Long, fur: String?): Pet = Pet(
             name = name,
-            form = Form.KAETZCHEN,
+            form = Form.find(line, Role.BABY) ?: Form.KAETZCHEN,
             bornAt = now,
             hatchedAt = now,
             stageStartedAt = now,
-            line = EggLine.KATZE,
-            fur = fur,
+            line = line,
+            fur = fur ?: Skins.defaultFur(line),
             shiny = Random(now).nextInt(SHINY_ODDS * 2) == 0,
             satiety = 70.0,
             joy = 85.0,
@@ -1056,8 +1116,8 @@ object Engine {
             }
             val left = s.eggCount(line) - 1
             val eggs = if (left <= 0) s.eggs - line else s.eggs + (line to left)
-            val cat = line == EggLine.KATZE
-            val pet = if (cat) kitten(cleanName(name, "Mieze"), now, Skins.randomFur(Random(now xor 77L)))
+            val real = line.real
+            val pet = if (real) animalBaby(line, cleanName(name, babyName(line)), now, Skins.randomFur(line, Random(now xor 77L)))
             else Pet(name = cleanName(name, line.title.substringBefore("-")), bornAt = now, line = line)
             s = s.copy(
                 pet = pet,
@@ -1066,7 +1126,15 @@ object Engine {
                 lastSimulated = now,
             )
             if (keepActive) message("${active!!.name} kuschelt sich ins Kuschelhaus. 🏡")
-            if (cat) welcomeKitten(now)
+            if (real) welcomeKitten(now)
+        }
+
+        private fun babyName(line: EggLine): String = when (line) {
+            EggLine.KATZE -> "Mieze"
+            EggLine.HASE -> "Hoppel"
+            EggLine.HAMSTER -> "Krümel"
+            EggLine.MEERI -> "Quieki"
+            else -> line.title.substringBefore("-")
         }
 
         private fun switchPet(petId: Long, now: Long) {
@@ -1096,6 +1164,7 @@ object Engine {
                 resting = s.resting.filter { it.id !in gone && it.id != successor?.id },
                 memorials = s.memorials + leaving.filter { !it.isEgg }.map { Memorial(it.name, it.form, it.level, it.bornAt, now, it.shiny) },
                 visit = s.visit?.takeIf { successor == null && it.petId !in gone },
+                visit2 = s.visit2?.takeIf { successor == null && it.petId !in gone },
                 friendship = s.friendship.filterKeys { key -> key.split("-").none { id -> id.toLongOrNull()?.let { it in gone } == true } },
                 lastSimulated = if (successor != null) now else s.lastSimulated,
             )
@@ -1193,6 +1262,7 @@ object Engine {
             dayLog("feed")
             addTalent(Talent.KOCHEN, if (item.effect.health > 0 && !item.snack) 4 else 2, now)
             if (wasHungry || item.id == Chat.favoriteFood(pet).id) feel(Emotion.FROEHLICH, now)
+            wishProgress(WishKind.FOOD, now, item.id)
         }
 
         private fun useItem(itemId: String, now: Long) {
@@ -1268,6 +1338,7 @@ object Engine {
                     dayLog("bath")
                     touch(now)
                     addXp(8, now)
+                    wishProgress(WishKind.BATH, now)
                 }
                 else -> {
                     val active = activePet() ?: return
@@ -1312,6 +1383,7 @@ object Engine {
                 feel(Emotion.VERSPIELT, now)
                 befriendVisitor(2, now)
             }
+            wishProgress(WishKind.PLAY, now)
         }
 
         private fun stroke(now: Long) {
@@ -1339,6 +1411,7 @@ object Engine {
             if (s.counters.pets % 6 == 0) feel(Emotion.VERSCHMUST, now)
             befriendVisitor(1, now)
             dayLog("pet")
+            wishProgress(WishKind.CUDDLE, now)
         }
 
         private fun clean(now: Long) {
@@ -1356,6 +1429,7 @@ object Engine {
             questProgress(QuestType.CLEAN, 1)
             if (cooldownReady("xp_clean", now, 60_000L)) addXp(4, now)
             touch(now)
+            wishProgress(WishKind.BATH, now)
         }
 
         private fun toggleSleep() {
@@ -1404,6 +1478,11 @@ object Engine {
             )
             emit(GameEvent.Reaction(ReactionKind.GAME))
             questProgress(QuestType.GAMES, 1)
+            when (game.group) {
+                GameGroup.KNOBELN -> questProgress(QuestType.PUZZLES, 1)
+                GameGroup.ACTION -> questProgress(QuestType.ACTION, 1)
+                GameGroup.RUHIG -> Unit
+            }
             when (game) {
                 MiniGame.CATCH -> questProgress(QuestType.CATCH_SCORE, score)
                 MiniGame.MEMORY -> questProgress(QuestType.MEMORY, 1)
@@ -1431,6 +1510,7 @@ object Engine {
                 else -> max(old, score)
             }
             counters { it.copy(bests = it.bests + (game.name to best)) }
+            wishProgress(WishKind.GAME, now, game.name)
             if (game == MiniGame.COOK) {
                 val dishes = Recipes.gameDishes(score)
                 for (d in dishes) addItem(d)
@@ -1517,6 +1597,7 @@ object Engine {
             if (item.kind.wearable) {
                 counters { it.copy(outfits = it.outfits + 1) }
                 questProgress(QuestType.OUTFIT, 1)
+                wishProgress(WishKind.OUTFIT, s.lastSimulated)
             }
         }
 
@@ -1535,6 +1616,7 @@ object Engine {
             val idx = DailyRewards.dayIndex(s.daily.streak)
             s = s.copy(daily = s.daily.copy(rewardClaimedDay = TimeUtil.epochDay(now, zone)))
             addCoins(DailyRewards.coins[idx])
+            addAdventure(3)
             if (idx == 6) {
                 addItem(DailyRewards.BONUS_ITEM)
                 addItem(Catalog.STICKER_PACK)
@@ -1554,6 +1636,7 @@ object Engine {
             addXp(q.type.xp, now)
             addPassXp(20)
             addTokens(3)
+            addAdventure(4)
         }
 
         private fun claimQuestBonus(now: Long) {
@@ -1563,6 +1646,7 @@ object Engine {
             addCoins(Quests.BONUS_COINS)
             addXp(Quests.BONUS_XP, now)
             addPassXp(40)
+            addAdventure(6)
         }
 
         private fun claimWeekly(index: Int, now: Long) {
@@ -1574,6 +1658,7 @@ object Engine {
             addXp(Quests.weeklyXp(q.type), now)
             addPassXp(60)
             addTokens(5)
+            addAdventure(10)
         }
 
         private fun claimWeeklyBonus(now: Long) {
@@ -1585,6 +1670,7 @@ object Engine {
             addItem(Catalog.SEED_PACK)
             addPassXp(100)
             addXp(50, now)
+            addAdventure(15)
         }
 
         private fun claimStepTier(index: Int) {
@@ -1669,6 +1755,7 @@ object Engine {
             if (skinId != null) {
                 feel(Emotion.NEUGIERIG, now)
                 questProgress(QuestType.OUTFIT, 1)
+                wishProgress(WishKind.OUTFIT, now)
             }
         }
 
@@ -1876,6 +1963,7 @@ object Engine {
             emit(GameEvent.Reaction(ReactionKind.WORK, Job.KOCH.name))
             message("${dish?.emoji ?: "🍲"} ${dish?.name ?: "Gericht"} ist fertig!")
             touch(now)
+            wishProgress(WishKind.COOK, now)
         }
 
         // ---------------------------------------------------------------- finds
@@ -1915,6 +2003,7 @@ object Engine {
                 counters = s.counters.copy(storyChapters = s.counters.storyChapters + 1),
             )
             dayLog("story")
+            addAdventure(3)
             addCoins(c.coins)
             c.item?.let { addItem(it) }
             c.find?.let { addFinds(listOf(it)) }
@@ -1943,36 +2032,67 @@ object Engine {
                 message("${guest.name} ist gerade auf Ausflug.")
                 return
             }
-            if (s.visit != null) {
-                message("Es ist schon jemand zu Besuch.")
+            if (s.visit?.petId == petId || s.visit2?.petId == petId) {
+                message("${guest.name} ist doch schon da!")
                 return
             }
-            val last = s.cooldowns["visit"] ?: 0L
+            // Up to two friends can visit at the same time, each place has its own pause.
+            val second = s.visit != null
+            if (second && s.visit2 != null) {
+                message("Es sind schon zwei Freunde zu Besuch.")
+                return
+            }
+            val key = if (second) "visit2" else "visit"
+            val last = s.cooldowns[key] ?: 0L
             if (now - last < Friends.VISIT_COOLDOWN_MS && now >= last) {
                 message("Nächster Besuch in ${TimeUtil.formatDuration(Friends.VISIT_COOLDOWN_MS - (now - last))}.")
                 return
             }
-            s = s.copy(visit = Visit(petId, now + Friends.VISIT_MS), cooldowns = s.cooldowns + ("visit" to now))
+            val v = Visit(petId, now + Friends.VISIT_MS)
+            s = if (second) s.copy(visit2 = v, cooldowns = s.cooldowns + (key to now)) else s.copy(visit = v, cooldowns = s.cooldowns + (key to now))
             counters { it.copy(visits = it.visits + 1) }
             dayLog("visit")
             addFriendship(host.id, petId, 3)
-            message("${guest.name} kommt ${host.name} besuchen! 🏠")
+            message(if (second) "${guest.name} kommt auch noch dazu! Jetzt seid ihr zu dritt. 🎉" else "${guest.name} kommt ${host.name} besuchen! 🏠")
+            questProgress(QuestType.VISIT, 1)
+            wishProgress(WishKind.VISIT, now)
             feel(Emotion.AUFGEREGT, now)
             touch(now)
         }
 
         fun visitor(): Pet? = s.visit?.let { v -> s.resting.firstOrNull { it.id == v.petId } }
 
+        fun visitor2(): Pet? = s.visit2?.let { v -> s.resting.firstOrNull { it.id == v.petId } }
+
         private fun endVisit(now: Long) {
-            val v = s.visit ?: return
-            if (now < v.until && visitor() != null && s.pet?.alive == true) return
-            val guest = visitor()
-            s = s.copy(visit = null)
             val host = s.pet
-            if (guest != null && host != null) {
-                addFriendship(host.id, guest.id, 5)
-                message("${guest.name} geht zurück ins Kuschelhaus. Es war schön! 👋")
+            fun ends(v: Visit?): Boolean = v != null && (now >= v.until || s.resting.none { it.id == v.petId } || host?.alive != true)
+            fun goodbye(v: Visit) {
+                val g = s.resting.firstOrNull { it.id == v.petId } ?: return
+                if (host == null) return
+                addFriendship(host.id, g.id, 5)
+                message("${g.name} geht zurück ins Kuschelhaus. Es war schön! 👋")
             }
+            val v2 = s.visit2
+            if (v2 != null && ends(v2)) {
+                s = s.copy(visit2 = null)
+                goodbye(v2)
+            }
+            val v1 = s.visit
+            if (v1 != null && ends(v1)) {
+                // The second guest moves up to the first place.
+                s = s.copy(visit = s.visit2, visit2 = null)
+                goodbye(v1)
+            }
+        }
+
+        private fun sendHome(petId: Long) {
+            val v = listOfNotNull(s.visit, s.visit2).firstOrNull { it.petId == petId } ?: return
+            s = if (s.visit?.petId == petId) s.copy(visit = s.visit2, visit2 = null) else s.copy(visit2 = null)
+            val g = s.resting.firstOrNull { it.id == v.petId } ?: return
+            val host = s.pet ?: return
+            addFriendship(host.id, g.id, 3)
+            message("${g.name} winkt und geht zurück ins Kuschelhaus. 👋")
         }
 
         private fun addFriendship(a: Long, b: Long, n: Int) {
@@ -1988,30 +2108,331 @@ object Engine {
         }
 
         private fun befriendVisitor(n: Int, now: Long) {
-            val guest = visitor() ?: return
+            val guests = s.visitors
             val host = s.pet ?: return
-            if (!cooldownReady("befriend", now, 60_000L)) return
-            addFriendship(host.id, guest.id, n)
+            if (guests.isEmpty() || !cooldownReady("befriend", now, 60_000L)) return
+            for (g in guests) addFriendship(host.id, g.id, n)
         }
 
         private fun playTogether(now: Long) {
-            val guest = visitor() ?: return
+            val guests = s.visitors
+            if (guests.isEmpty()) return
             val host = activePet() ?: return
             if (!cooldownReady("together", now, 10 * 60_000L)) {
-                message("Die beiden ruhen sich kurz aus.")
+                message(if (guests.size > 1) "Die drei ruhen sich kurz aus." else "Die beiden ruhen sich kurz aus.")
                 return
             }
+            val ids = guests.map { it.id }.toSet()
             s = s.copy(
                 pet = host.applyEffect(Effect(joy = 15, energy = tiring(-6))),
-                resting = s.resting.map { if (it.id == guest.id) it.applyEffect(Effect(joy = 15)) else it },
+                resting = s.resting.map { if (it.id in ids) it.applyEffect(Effect(joy = 15)) else it },
             )
-            addFriendship(host.id, guest.id, 6)
+            for (g in guests) addFriendship(host.id, g.id, 6)
+            if (guests.size > 1) addFriendship(guests[0].id, guests[1].id, 6)
             emit(GameEvent.Reaction(ReactionKind.PLAY))
             questProgress(QuestType.PLAY, 1)
             routine(Routine.PLAYTIME, now)
             addXp(8, now)
             feel(Emotion.VERSPIELT, now)
             touch(now)
+        }
+
+        // ---------------------------------------------------------------- tricks
+
+        private fun practiceTrick(t: Trick, now: Long) {
+            Tricks.blocker(s, t)?.let {
+                refuse(it)
+                return
+            }
+            val pet = s.pet ?: return
+            if (Tricks.learned(pet, t)) {
+                showTrick(t, now)
+                return
+            }
+            if (!cooldownReady("trick_practice", now, Tricks.PRACTICE_COOLDOWN_MS)) return
+            val success = Random(now xor pet.id xor (t.ordinal * 7919L)).nextFloat() < Tricks.successChance(pet, now)
+            val points = Tricks.points(pet, t) + if (success) 1 else 0
+            val learned = success && points >= t.practice
+            val practised = pet.applyEffect(Effect(energy = tiring(-2), joy = if (success) 3 else 1))
+            s = s.copy(pet = practised.copy(tricks = pet.tricks + (t to points), care = practised.care.copy(activity = practised.care.activity + 1)))
+            counters { it.copy(trickPractice = it.trickPractice + 1) }
+            emit(GameEvent.TrickPracticed(t, success, learned))
+            questProgress(QuestType.TRAIN, 1)
+            touch(now)
+            addTalent(Talent.SPORT, 1, now)
+            if (cooldownReady("xp_trick", now, 20_000L)) addXp(3, now)
+            if (learned) {
+                counters { it.copy(tricksLearned = it.tricksLearned + 1) }
+                message("${pet.name} kann jetzt „${t.title}“! ${t.emoji}")
+                addCoins(Tricks.learnCoins(t))
+                addXp(20, now)
+                addAdventure(5)
+                feel(Emotion.STOLZ, now)
+            }
+        }
+
+        private fun showTrick(t: Trick, now: Long) {
+            val pet = activePet() ?: return
+            if (!Tricks.learned(pet, t)) {
+                message("${pet.name} muss „${t.title}“ erst noch üben.")
+                return
+            }
+            if (pet.sick) {
+                refuse("${pet.name} ist zu krank für Kunststücke.")
+                return
+            }
+            if (!cooldownReady("trick_show", now, 2_500L)) return
+            s = s.copy(pet = pet.applyEffect(Effect(joy = 4, energy = tiring(-1))))
+            counters { it.copy(trickShows = it.trickShows + 1) }
+            emit(GameEvent.TrickShown(t))
+            questProgress(QuestType.TRICK_SHOW, 1)
+            wishProgress(WishKind.TRICK, now)
+            touch(now)
+            if (cooldownReady("trick_reward", now, Tricks.SHOW_REWARD_COOLDOWN_MS)) {
+                addCoins(2 + t.practice / 3)
+                addXp(4, now)
+            }
+            feel(Emotion.STOLZ, now)
+            befriendVisitor(1, now)
+        }
+
+        // ---------------------------------------------------------------- touching
+
+        private fun touchZone(zone: TouchZone, now: Long) {
+            val pet = s.pet ?: return
+            if (!pet.alive || pet.isEgg) return
+            if (!cooldownReady("touch", now, 800L)) return
+            if (pet.sleeping) {
+                s = s.copy(pet = pet.applyEffect(Effect(joy = 1)))
+                return
+            }
+            val cuddly = pet.emotion(now) == Emotion.VERSCHMUST
+            val base = when (zone) {
+                TouchZone.BELLY -> 4
+                TouchZone.HEAD, TouchZone.CHEEKS -> 3
+                else -> 2
+            }
+            s = s.copy(pet = pet.applyEffect(Effect(joy = if (cuddly) base * 2 else base)))
+            counters { it.copy(touches = it.touches + 1, pets = it.pets + 1, tickles = it.tickles + if (zone == TouchZone.BELLY) 1 else 0) }
+            emit(GameEvent.Touched(zone))
+            questProgress(QuestType.PET, 1)
+            if (zone == TouchZone.BELLY) questProgress(QuestType.TICKLE, 1)
+            wishProgress(WishKind.CUDDLE, now)
+            if (cooldownReady("xp_touch", now, 20_000L)) addXp(1, now)
+            touch(now)
+            befriendVisitor(1, now)
+            dayLog("pet")
+            if (s.counters.touches % 8 == 0) feel(if (zone == TouchZone.BELLY) Emotion.VERSPIELT else Emotion.VERSCHMUST, now)
+        }
+
+        private fun carry(now: Long) {
+            val pet = s.pet ?: return
+            if (!pet.alive || pet.isEgg || pet.sleeping) return
+            if (!cooldownReady("carry", now, 8_000L)) return
+            s = s.copy(pet = pet.applyEffect(Effect(joy = 3)))
+            counters { it.copy(carries = it.carries + 1) }
+            questProgress(QuestType.CARRY, 1)
+            touch(now)
+        }
+
+        // ---------------------------------------------------------------- room games
+
+        private fun roomGameFinished(g: RoomGame, score: Int, now: Long) {
+            val pet = s.pet ?: return
+            if (!pet.alive || pet.isEgg) return
+            val sc = score.coerceIn(0, 50)
+            val played = pet.applyEffect(Effect(joy = 16 + sc, energy = tiring(-8), satiety = -4, hygiene = -2))
+            s = s.copy(pet = played.copy(care = played.care.copy(activity = played.care.activity + 2)))
+            counters { it.copy(roomGames = it.roomGames + 1, plays = it.plays + 1) }
+            questProgress(QuestType.PLAY, 1)
+            questProgress(QuestType.ROOM_GAME, 1)
+            addCoins(RoomGames.coins(sc))
+            addXp(RoomGames.xp(sc), now)
+            addPassXp(4)
+            addAdventure(1)
+            touch(now)
+            routine(Routine.PLAYTIME, now)
+            addTalent(Talent.SPORT, 3, now)
+            feel(Emotion.VERSPIELT, now)
+            befriendVisitor(2, now)
+            dayLog("game")
+            wishProgress(WishKind.ROOM_GAME, now, g.name)
+            if (g == RoomGame.FETCH) wishProgress(WishKind.PLAY, now)
+        }
+
+        // ---------------------------------------------------------------- voice
+
+        private fun voice(kind: VoiceKind, now: Long) {
+            val pet = s.pet ?: return
+            if (!pet.alive || pet.isEgg) return
+            if (!cooldownReady("voice", now, 6_000L)) return
+            counters { it.copy(voice = it.voice + 1) }
+            if (pet.sleeping) return
+            s = s.copy(pet = pet.applyEffect(Effect(joy = if (kind == VoiceKind.LOUD) 0 else 2)))
+            touch(now)
+            if (kind == VoiceKind.SING) {
+                feel(Emotion.FROEHLICH, now)
+                addTalent(Talent.MUSIK, 1, now)
+                findSecret(Secret.SINGER, now)
+            }
+        }
+
+        // ---------------------------------------------------------------- wishes
+
+        /** Now and then the pet wishes for something while you are there. Old wishes fade away. */
+        private fun wishTick(now: Long, userPresent: Boolean) {
+            val p = s.pet ?: return
+            val w = s.wish
+            if (w != null) {
+                if (now > w.until || !p.alive || p.isEgg) {
+                    s = s.copy(wish = null, nextWishAt = now + Wishes.GAP_MS)
+                    if (p.alive && !p.isEgg) message("${p.name}s Wunsch ist verflogen. Vielleicht ein andermal! 💭")
+                }
+                return
+            }
+            if (!userPresent || !p.alive || p.isEgg || p.sleeping) return
+            if (s.nextWishAt <= 0L) {
+                s = s.copy(nextWishAt = now + Wishes.FIRST_DELAY_MS)
+                return
+            }
+            if (now < s.nextWishAt) return
+            val wish = Wishes.roll(s, now, Random(now xor p.id))
+            if (wish == null) {
+                s = s.copy(nextWishAt = now + 30 * 60_000L)
+                return
+            }
+            s = s.copy(wish = wish, nextWishAt = now + Wishes.GAP_MS)
+            emit(GameEvent.WishMade(wish))
+        }
+
+        private fun wishProgress(kind: WishKind, now: Long, target: String? = null) {
+            val w = s.wish ?: return
+            if (w.kind != kind) return
+            if (w.target.isNotEmpty() && w.target != target) return
+            val done = w.progress + 1
+            if (done < w.need) {
+                s = s.copy(wish = w.copy(progress = done))
+                return
+            }
+            val pet = s.pet ?: return
+            s = s.copy(wish = null, nextWishAt = now + Wishes.GAP_MS, pet = pet.applyEffect(Effect(joy = 15)))
+            counters { it.copy(wishes = it.wishes + 1) }
+            emit(GameEvent.WishFulfilled(w, Wishes.COINS))
+            addCoins(Wishes.COINS)
+            addXp(Wishes.XP, now)
+            addPassXp(10)
+            addAdventure(6)
+            questProgress(QuestType.WISH, 1)
+            feel(Emotion.AUFGEREGT, now)
+        }
+
+        // ---------------------------------------------------------------- monthly & long-term goals
+
+        private fun claimMonthly(index: Int, now: Long) {
+            val q = s.monthly.goals.getOrNull(index) ?: return
+            if (!q.done || q.claimed) return
+            val goals = s.monthly.goals.toMutableList().also { it[index] = q.copy(claimed = true) }
+            s = s.copy(monthly = s.monthly.copy(goals = goals))
+            counters { it.copy(monthGoals = it.monthGoals + 1) }
+            addCoins(Quests.monthlyCoins(q.type))
+            addXp(Quests.monthlyXp(q.type), now)
+            addPassXp(120)
+            addTokens(8)
+            addAdventure(20)
+        }
+
+        private fun claimMonthlyBonus(now: Long) {
+            val m = s.monthly
+            if (m.bonusClaimed || m.goals.isEmpty() || !m.goals.all { it.claimed }) return
+            s = s.copy(monthly = m.copy(bonusClaimed = true))
+            counters { it.copy(monthlies = it.monthlies + 1) }
+            addCoins(Quests.MONTHLY_BONUS_COINS)
+            addItem(Catalog.GLITTER)
+            addEgg(rareEggLine(Random(now)), "Belohnung für alle Monatsziele")
+            addAdventure(40)
+            addXp(80, now)
+            feel(Emotion.STOLZ, now)
+        }
+
+        /** One of the special egg lines, preferring one that has not been discovered yet. */
+        private fun rareEggLine(rnd: Random): EggLine {
+            val lines = listOf(EggLine.DSCHUNGEL, EggLine.WUESTE, EggLine.EDELSTEIN, EggLine.STERN, EggLine.ZUCKER)
+            val fresh = lines.filter { l -> l.forms.none { it.name in s.album } }
+            val pool = fresh.ifEmpty { lines }
+            return pool[rnd.nextInt(pool.size)]
+        }
+
+        private fun claimGoal(g: LongGoal) {
+            if (g.claimed(s) || !g.done(s)) return
+            s = s.copy(milestones = s.milestones + "goal:${g.name}")
+            addCoins(g.coins)
+            g.egg?.let { addEgg(it, "Belohnung: ${g.title}") }
+            g.itemId?.let { id ->
+                val item = Catalog[id]
+                if (item != null && item.stackable) {
+                    addItem(id, g.itemCount)
+                } else if (item != null && id !in s.owned) {
+                    s = s.copy(owned = s.owned + id)
+                    message("Neu: ${item.name} ${item.emoji}")
+                }
+            }
+            emit(GameEvent.GoalDone(g))
+        }
+
+        // ---------------------------------------------------------------- adventure map
+
+        private fun addAdventure(n: Int) {
+            if (n <= 0 || !s.onboarded) return
+            s = s.copy(adventure = s.adventure.copy(points = (s.adventure.points + n).coerceAtMost(999)))
+        }
+
+        private fun adventureStep(now: Long) {
+            val a = s.adventure
+            val cost = Adventure.cost(a.station, a.map)
+            if (a.points < cost) {
+                message("Dafür brauchst du noch ${cost - a.points} Abenteuerpunkte. 🧭")
+                return
+            }
+            val st = Adventure.station(a.map, a.station)
+            val reached = a.station + 1
+            val done = reached >= Adventure.STATIONS
+            s = s.copy(adventure = AdventureState(points = a.points - cost, station = if (done) 0 else reached, map = if (done) a.map + 1 else a.map))
+            counters { it.copy(adventureSteps = it.adventureSteps + 1) }
+            val r = st.reward
+            addCoins(r.coins)
+            r.itemId?.let { addItem(it, r.count) }
+            r.egg?.let { addEgg(it, "Gefunden auf der Abenteuerkarte") }
+            emit(GameEvent.AdventureStep(st.index, st.title, r.label, r.emoji, done))
+            if (done) message("Du hast die ganze Abenteuerkarte geschafft! Eine neue Karte wartet schon. 🗺️")
+            feel(Emotion.AUFGEREGT, now)
+        }
+
+        // ---------------------------------------------------------------- tournaments
+
+        private fun tournamentFinished(cup: Cup, place: Int, rivals: List<Long>, now: Long) {
+            val pet = s.pet ?: return
+            if (!pet.alive || pet.isEgg || !Tournament.unlocked(s, cup)) return
+            val pl = place.coerceIn(1, Tournament.RIVALS + 1)
+            val coins = Tournament.coins(cup, pl)
+            val firstWin = pl == 1 && Tournament.wins(s, cup) == 0
+            val played = pet.applyEffect(Effect(joy = if (pl == 1) 20 else 12, energy = tiring(-12), satiety = -6, hygiene = -3))
+            s = s.copy(pet = played.copy(care = played.care.copy(activity = played.care.activity + 3)))
+            counters { it.copy(tournaments = it.tournaments + 1, tournamentWins = it.tournamentWins + if (pl == 1) 1 else 0) }
+            if (pl == 1) s = s.copy(cups = s.cups + (cup.name to Tournament.wins(s, cup) + 1))
+            emit(GameEvent.TournamentDone(cup, pl, coins, firstWin))
+            questProgress(QuestType.TOURNAMENT, 1)
+            addCoins(coins)
+            addXp(15 + (5 - pl) * 8, now)
+            addPassXp(10)
+            addTokens(2)
+            addAdventure(if (pl == 1) 6 else 3)
+            addTalent(Talent.SPORT, 6 + (4 - pl) * 2, now)
+            for (id in rivals.distinct()) if (s.resting.any { it.id == id }) addFriendship(pet.id, id, 2)
+            touch(now)
+            routine(Routine.PLAYTIME, now)
+            dayLog("game")
+            feel(if (pl == 1) Emotion.STOLZ else Emotion.VERSPIELT, now)
+            if (firstWin) message("${cup.emoji} ${cup.title} gewonnen! Er steht jetzt in deiner Vitrine.")
         }
 
         // ---------------------------------------------------------------- garden
@@ -2067,6 +2488,7 @@ object Engine {
             addTokens(1)
             addXp(5, now)
             addTalent(Talent.GAERTNERN, 5, now)
+            wishProgress(WishKind.HARVEST, now)
         }
 
         private fun buyPlot() {

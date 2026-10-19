@@ -255,7 +255,7 @@ class EngineTest {
 
     @Test
     fun linesHaveCompleteFamilyTrees() {
-        assertEquals(100, Form.creatures.size)
+        assertEquals(124, Form.creatures.size)
         for (line in EggLine.entries) {
             assertNotNull("$line baby", Form.find(line, Role.BABY))
             assertNotNull("$line legend", Form.find(line, Role.LEGEND))
@@ -264,6 +264,8 @@ class EngineTest {
                     assertNotNull("$line $r", Form.find(line, r))
                 }
             }
+            // Real animals never turn into a ghost.
+            if (line.real) assertNotNull("$line shadow", Form.find(line, Role.SHADOW))
         }
     }
 

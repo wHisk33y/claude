@@ -117,6 +117,9 @@ object Catalog {
         food("chicken", "Hähnchen", "🍗", 16, "Zart und saftig. Katzen lieben es!", Effect(satiety = 34, joy = 8, health = 2), minLevel = 4),
         food("taco", "Taco", "🌮", 15, "Knusprig gefüllt mit allem Guten.", Effect(satiety = 30, joy = 10), minLevel = 4),
         food("bento", "Bento-Box", "🍱", 24, "Ein ganzes Menü in einer Box.", Effect(satiety = 42, joy = 10, health = 8), minLevel = 6),
+        food("hay", "Heu", "🌾", 3, "Frisches Wiesenheu. Hasen, Hamster und Meerschweinchen lieben es!", Effect(satiety = 16, health = 5)),
+        food("cucumber", "Gurke", "🥒", 5, "Knackig und saftig. Die Leibspeise aller Meerschweinchen.", Effect(satiety = 10, joy = 8, health = 4)),
+        food("dandelion", "Löwenzahn", "🌼", 4, "Frisch von der Wiese gepflückt.", Effect(satiety = 8, joy = 10, health = 3), snack = true),
         // Gekochte Gerichte (Küche und Kochstudio)
         food("dish_soup", "Karotten-Kürbis-Suppe", "🥣", 0, "Selbst gekocht! Wärmt von innen.", Effect(satiety = 45, health = 12, joy = 6), sold = false),
         food("dish_fruitsalad", "Obstsalat", "🍇", 0, "Bunt und gesund.", Effect(satiety = 30, health = 15, joy = 12), sold = false),
@@ -178,7 +181,13 @@ object Catalog {
         egg(EggLine.BLUETE, 600, 6),
         egg(EggLine.STERN, 700, 8),
         egg(EggLine.ZUCKER, 700, 8),
+        egg(EggLine.DSCHUNGEL, 750, 9),
+        egg(EggLine.WUESTE, 750, 9),
+        egg(EggLine.EDELSTEIN, 900, 12),
         egg(EggLine.KATZE, 400, 3),
+        egg(EggLine.HASE, 350, 2),
+        egg(EggLine.HAMSTER, 300, 2),
+        egg(EggLine.MEERI, 350, 2),
         egg(EggLine.FROST, 0, 1, sold = false),
         egg(EggLine.GRUSEL, 0, 1, sold = false),
         // Kopf
@@ -306,6 +315,7 @@ object Catalog {
         wear("toy_horse", "Schaukelpferd", "🐴", ItemKind.TOY, 120, "Hüh, hott!", 4),
         wear("toy_aquarium", "Aquarium", "🐠", ItemKind.TOY, 160, "Mit bunten Fischen. Katzen schauen stundenlang zu!", 6),
         wear("toy_cave", "Kuschelhöhle", "🛖", ItemKind.TOY, 90, "Eine weiche Höhle zum Verstecken.", 3),
+        wear("toy_wheel", "Laufrad", "🎡", ItemKind.TOY, 100, "Ein großes Laufrad. Hamster rennen darin um die Wette!", 2),
         // Sitzecke
         wear("deco_beanbag", "Sitzsack", "🫘", ItemKind.DECO, 80, "Weich und gemütlich. Plumps!", 1),
         wear("deco_sofa", "Kuschelsofa", "🛋️", ItemKind.DECO, 140, "Mit dicken Kissen zum Faulenzen.", 3),
@@ -314,6 +324,7 @@ object Catalog {
         wear("deco_piano", "Klavier", "🎹", ItemKind.DECO, 220, "Plim plim plim! Für kleine Musiker.", 7),
         wear("deco_fireplace", "Kamin", "🔥", ItemKind.DECO, 260, "Knistert so schön an kalten Tagen.", 9),
         wear("deco_tent", "Spielzelt", "⛺", ItemKind.DECO, 150, "Ein Zelt mit Wimpeln für Abenteuer drinnen.", 5),
+        wear("deco_stage", "Zirkusbühne", "🎪", ItemKind.DECO, 0, "Eine kleine Bühne für Kunststücke. Belohnung für das Sammelziel „Zirkusstar“.", sold = false),
         wear("toy_trophy", "Pokalvitrine", "🏆", ItemKind.TOY, 0, "Belohnung für Level 40. Zeigt deine Pokale.", sold = false),
     )
 

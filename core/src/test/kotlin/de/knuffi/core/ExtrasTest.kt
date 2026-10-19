@@ -57,9 +57,11 @@ class ExtrasTest {
     }
 
     @Test
-    fun fantasyCountStaysAtHundred() {
-        assertEquals(100, Form.creatures.size)
+    fun creatureCounts() {
+        assertEquals(124, Form.creatures.size)
         assertEquals(10, Form.cats.size)
+        assertEquals(27, Form.smallAnimals.size)
+        for (line in EggLine.entries.filter { it.real }) assertTrue("$line furs", Skins.furs(line).isNotEmpty())
     }
 
     @Test
