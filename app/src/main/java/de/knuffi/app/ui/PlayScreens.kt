@@ -344,9 +344,11 @@ fun AdventureScreen(state: GameState, onBack: () -> Unit) {
                         pose.armR = 0.6f + 0.3f * sin(t * 5f)
                         val ph = t % 1.4f
                         if (ph < 0.4f) pose.lift = sin(ph / 0.4f * PI.toFloat()) * 0.2f
+                        // next to the station, on the side towards the middle of the screen
+                        val px = if (home.x < w / 2f) home.x + 56.dp.toPx() else home.x - 56.dp.toPx()
                         drawIntoCanvas {
-                            renderer.drawShadow(it.nativeCanvas, home.x - 56.dp.toPx(), home.y + 8.dp.toPx(), 60.dp.toPx(), pose, l)
-                            renderer.draw(it.nativeCanvas, home.x - 56.dp.toPx(), home.y + 8.dp.toPx(), 60.dp.toPx(), l, pose)
+                            renderer.drawShadow(it.nativeCanvas, px, home.y + 8.dp.toPx(), 60.dp.toPx(), pose, l)
+                            renderer.draw(it.nativeCanvas, px, home.y + 8.dp.toPx(), 60.dp.toPx(), l, pose)
                         }
                     }
                 }
