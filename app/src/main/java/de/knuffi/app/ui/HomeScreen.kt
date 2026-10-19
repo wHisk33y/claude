@@ -107,8 +107,12 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
         val g = running ?: return@LaunchedEffect
         if (!g.finished) return@LaunchedEffect
         if (g.juggled) GameRepository.perform(Action.FindSecret(de.knuffi.core.Secret.JUGGLER))
-        GameRepository.perform(Action.RoomGameFinished(g.game, g.score))
-        GameRepository.message("${g.game.emoji} ${g.game.title}: ${g.score} ${if (g.score == 1) "Punkt" else "Punkte"}! +${RoomGames.coins(g.score)} 🪙")
+        if (g.score > 0) {
+            GameRepository.perform(Action.RoomGameFinished(g.game, g.score))
+            GameRepository.message("${g.game.emoji} ${g.game.title}: ${g.score} ${if (g.score == 1) "Punkt" else "Punkte"}! +${RoomGames.coins(g.score)} 🪙")
+        } else {
+            GameRepository.message("${g.game.emoji} ${g.game.title} beendet. Nächstes Mal klappt's bestimmt!")
+        }
         roomGame = null
     }
     fun startRoomGame(game: RoomGame) {

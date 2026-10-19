@@ -135,7 +135,10 @@ fun BoxScope.OverlayHost(state: GameState, debugScene: String?) {
                 is GameEvent.QuestDone -> toast(e.type.emoji, if (e.monthly) "Monatsziel geschafft!" else if (e.weekly) "Wochenaufgabe geschafft!" else "Tagesaufgabe geschafft!", "Hol dir deine Belohnung unter 🏆 Ziele.")
                 is GameEvent.TrickPracticed -> if (e.learned) toast(e.trick.emoji, "Neues Kunststück!", "„${e.trick.title}“ klappt jetzt. Zeig es unter 🎓!")
                 is GameEvent.WishFulfilled -> toast("💖", "Wunsch erfüllt!", "${de.knuffi.core.Wishes.label(e.wish)} · +${e.coins} 🪙")
-                is GameEvent.WishMade -> toast("💭", "${state.pet?.name ?: "Dein Haustier"} wünscht sich etwas!", de.knuffi.core.Wishes.label(e.wish, state.pet?.isCat == true))
+                is GameEvent.WishMade -> {
+                    val pet = GameRepository.current.pet
+                    toast("💭", "${pet?.name ?: "Dein Haustier"} wünscht sich etwas!", de.knuffi.core.Wishes.label(e.wish, pet?.isCat == true))
+                }
                 is GameEvent.AdventureStep -> toast(e.emoji, if (e.mapDone) "Abenteuerkarte geschafft!" else "Station erreicht: ${e.title}", e.reward)
                 is GameEvent.TournamentDone -> toast(e.cup.emoji, if (e.place == 1) "Gewonnen: ${e.cup.title}!" else "Platz ${e.place} beim ${e.cup.title}", "+${e.coins} 🪙")
                 is GameEvent.GoalDone -> toast(e.goal.emoji, "Sammelziel geschafft!", e.goal.rewardLabel)

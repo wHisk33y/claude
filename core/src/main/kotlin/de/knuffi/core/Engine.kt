@@ -2240,7 +2240,8 @@ object Engine {
 
         private fun roomGameFinished(g: RoomGame, score: Int, now: Long) {
             val pet = s.pet ?: return
-            if (!pet.alive || pet.isEgg) return
+            // a game stopped right away (nothing found, caught or fetched) brings nothing
+            if (!pet.alive || pet.isEgg || score <= 0) return
             val sc = score.coerceIn(0, 50)
             val played = pet.applyEffect(Effect(joy = 16 + sc, energy = tiring(-8), satiety = -4, hygiene = -2))
             s = s.copy(pet = played.copy(care = played.care.copy(activity = played.care.activity + 2)))

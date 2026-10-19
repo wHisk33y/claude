@@ -80,7 +80,9 @@ class MicListener(private val onVoice: (VoiceKind) -> Unit) {
             rec.startRecording()
             while (running) {
                 val n = rec.read(frame, 0, frame.size)
-                if (n <= 0) continue
+                // an error code means the microphone is gone: stop instead of spinning
+                if (n < 0) break
+                if (n == 0) continue
                 var sum = 0.0
                 var crossings = 0
                 var prev = 0
