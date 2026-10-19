@@ -112,6 +112,14 @@ object Room3d {
     private var surface: EGLSurface = EGL14.EGL_NO_SURFACE
     private var renderer: Renderer3? = null
 
+    /** True on software graphics: pictures are made smaller (see [scale]). */
+    @Volatile
+    var light = false
+        private set
+
+    /** How much smaller than the screen the pictures are made. */
+    val scale: Float get() = if (light) 0.55f else 1f
+
     /** Paints the textures (wallpaper, rugs …). Set once by the app. */
     @Volatile
     var textures: TextureSource = TextureSource { null }
@@ -142,7 +150,13 @@ object Room3d {
             job.prepare?.invoke()
             if (!ensure()) return
             if (!EGL14.eglMakeCurrent(display, surface, surface, context)) throw IllegalStateException("makeCurrent ${EGL14.eglGetError()}")
-            val r = renderer ?: Renderer3(AndroidGl(), TextureSource { key -> textures.texture(key) }).also { renderer = it }
+            val r = renderer ?: run {
+                // software graphics (emulator) and weak phones get a lighter picture
+                val name = (android.opengl.GLES30.glGetString(android.opengl.GLES30.GL_RENDERER) ?: "").lowercase()
+                light = "swiftshader" in name || "emulator" in name || "llvmpipe" in name || "softpipe" in name
+                Log.i(TAG, "3D renderer: $name${if (light) " (light)" else ""}")
+                Renderer3(AndroidGl(), TextureSource { key -> textures.texture(key) }, maxSamples = if (light) 0 else 4, shadowSize = if (light) 1024 else 2048)
+            }.also { renderer = it }
             val drops = synchronized(drop) { drop.toList().also { drop.clear() } }
             for (d in drops) r.dropTextures(d)
             val buf: ByteBuffer = r.render(job.scene, job.cam, job.opt)

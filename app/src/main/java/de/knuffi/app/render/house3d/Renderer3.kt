@@ -29,7 +29,13 @@ class RenderOptions(
  * Draws a [Scene3] with soft light and shadows into an offscreen image and reads it back.
  * Must be used on the thread that owns the GL context.
  */
-class Renderer3(private val gl: Gl, private val source: TextureSource) {
+class Renderer3(
+    private val gl: Gl,
+    private val source: TextureSource,
+    /** Most anti-aliasing samples to use (0: none, for slow graphics). */
+    private val maxSamples: Int = 4,
+    private val shadowSize: Int = 2048,
+) {
     private var ready = false
     private var program = 0
     private var shadowProgram = 0
@@ -56,7 +62,6 @@ class Renderer3(private val gl: Gl, private val source: TextureSource) {
     private var samples = 0
     private var shadowFbo = 0
     private var shadowTex = 0
-    private val shadowSize = 2048
     private var readBuf: ByteBuffer? = null
 
     private val lightVP = FloatArray(16)
@@ -80,7 +85,7 @@ class Renderer3(private val gl: Gl, private val source: TextureSource) {
         gl.texImageRgba(1, 1, px)
         gl.texParameter(Gl.TEXTURE_MIN_FILTER, Gl.NEAREST)
         gl.texParameter(Gl.TEXTURE_MAG_FILTER, Gl.NEAREST)
-        samples = gl.maxSamples().coerceIn(0, 4)
+        samples = gl.maxSamples().coerceIn(0, maxSamples)
         shadowFbo = gl.genFramebuffer()
         shadowTex = gl.genTexture()
         gl.bindTexture(shadowTex)

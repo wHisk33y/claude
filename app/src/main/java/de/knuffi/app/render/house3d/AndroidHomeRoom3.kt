@@ -153,6 +153,6 @@ class HomeRoom3 {
         val TAPPABLE = setOf("kitchen", "tub", "piano", "cards", "beds", "pool")
 
         /** The 3D pictures are made a bit smaller than the screen and stretched (much faster). */
-        fun renderScale(h: Float): Float = (1500f / h).coerceIn(0.4f, 1f)
+        fun renderScale(h: Float): Float = (1500f / h).coerceIn(0.4f, 1f) * Room3d.scale
     }
 }

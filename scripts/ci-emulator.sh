@@ -19,6 +19,10 @@ adb shell settings put global animator_duration_scale 1
 
 adb install -r -g dist/Knuffi-debug.apk
 adb logcat -c
+# Problems of the 3D house and crashes go straight into the job log (it survives a dying runner).
+adb logcat -v brief Room3d:V AndroidRuntime:E Pet3D:W '*:S' &
+LOGCAT_PID=$!
+trap 'kill $LOGCAT_PID 2>/dev/null || true' EXIT
 
 # Every adb call has a time limit: a stuck emulator must not block the job until it times out.
 # After BUDGET seconds everything else is skipped, so the job ends in time and uploads the screenshots.
@@ -36,6 +40,7 @@ run_scene() {
     echo "::warning::time budget used up, skipping $scene"
     return 0
   fi
+  echo "== $SECONDS s: $theme $scene $*"
   timeout 30 adb shell am force-stop $DEBUG_PKG || true
   if ! timeout 60 adb shell am start -W -n "$DEBUG_PKG/$ACT" --es debug_scene "$scene" --es debug_theme "$theme" "$@" > /dev/null; then
     echo "::warning::scene $scene did not start in time"
@@ -56,6 +61,7 @@ shot dark_house 12
 run_scene light furnish
 sleep 12
 for sw in "540 1150 330 1000" "760 1350 520 1250" "380 900 640 1080" "540 1300 700 1150"; do
+  echo "== swipe $sw"
   timeout 20 adb shell input swipe $sw 700 || true
   sleep 3
 done

@@ -98,7 +98,7 @@ private class View3State(val orbit: OrbitView) {
 
 /** Draws the newest 3D picture and asks for a new one when the camera or the scene changed. */
 private fun drawScene(c: android.graphics.Canvas, w: Float, h: Float, st: View3State, scene: Scene3, opt: RenderOptions, paint: Paint) {
-    val k = (1100f / max(w, h)).coerceIn(0.4f, 1f)
+    val k = (1100f / max(w, h)).coerceIn(0.4f, 1f) * Room3d.scale
     val o = st.orbit
     val token = "${st.version}:${o.yaw}:${o.pitch}:${o.dist}:${o.cx}:${o.cz}:${w.toInt()}x${h.toInt()}"
     if (st.layer.requested != token) Room3d.request(st.layer, scene, o.camera((w * k).toInt().coerceAtLeast(1), (h * k).toInt().coerceAtLeast(1)), opt, token)
