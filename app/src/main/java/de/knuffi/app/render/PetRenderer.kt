@@ -42,10 +42,19 @@ class PetRenderer {
     internal val path3 = Path()
     internal val tmp = Path()
     internal val rect = RectF()
-    private val layerPaint = Paint()
+    internal val layerPaint = Paint()
     private val tint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val srcAtop = PorterDuffXfermode(PorterDuff.Mode.SRC_ATOP)
     internal var u = 1f
+
+    // 3D: the last rendered image and a pose copy without turning (the 3D model turns for real)
+    internal var out3d: android.graphics.Bitmap? = null
+    internal var last3dAt = 0L
+    internal var last3dLook: PetLook? = null
+    internal var last3dSilhouette: Int? = null
+    internal val flat = PetPose()
+    internal val bmpPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+    internal val dst = RectF()
 
     /** Bounds of the most recently drawn pet in canvas coordinates. */
     val bounds = RectF()
@@ -109,7 +118,7 @@ class PetRenderer {
         return p
     }
 
-    private fun buildBody(p: Path, bw: Float, bh: Float, bottom: Float, ghost: Boolean, t: Float) {
+    internal fun buildBody(p: Path, bw: Float, bh: Float, bottom: Float, ghost: Boolean, t: Float) {
         p.reset()
         val top = bottom - 2f * bh
         val cy = bottom - bh
@@ -162,6 +171,7 @@ class PetRenderer {
             drawEgg(c, cx, groundY, look, pose, silhouette)
             return
         }
+        if (de.knuffi.app.render.gl.Pet3D.available && draw3D(c, cx, groundY, size, look, pose, silhouette)) return
         val fl = look.formLook
         val col = fl.colors
         val lying = pose.lying.coerceIn(0f, 1f)
@@ -197,14 +207,14 @@ class PetRenderer {
         if (fl.aura != Aura.NONE && silhouette == null) drawAuraFx(c, fl, bw, bh, cy, pose.t)
         if (fl.ring) drawRing(c, fl, bw, bh, cy, front = false)
         drawBack(c, fl, look, pose, bw, bh, top, cy, fx)
-        if (fl.feet && lying < 0.6f) drawFeet(c, col, pose, bw, footH)
+        if (fl.feet && lying < 0.6f) drawFeet(c, fl, pose, bw, footH)
         drawBody(c, fl, look, pose, bw, bh, bottom, top, cy, fx)
         drawFace(c, fl, pose, bw, bh, cy, fx)
         if (fl.ring) drawRing(c, fl, bw, bh, cy, front = true)
         drawFront(c, fl, look, pose, bw, bh, top, cy, fx)
         drawAccessories(c, look, pose, bw, bh, top, cy, fx)
         if (lying < 0.5f) {
-            if (fl.claws) drawClaws(c, fl, pose, bw, bh, cy, fx) else drawArms(c, col, pose, bw, bh, cy, fx)
+            if (fl.claws) drawClaws(c, fl, pose, bw, bh, cy, fx) else drawArms(c, fl, pose, bw, bh, cy, fx)
         }
         if (pose.foam > 0.01f) drawFoam(c, pose, bw, top, fx)
         if (fl.sparkles && silhouette == null) drawSparkles(c, bw, bh, cy, pose.t)
@@ -234,7 +244,7 @@ class PetRenderer {
         c.restoreToCount(save)
     }
 
-    private fun earHeight(fl: FormLook): Float = when {
+    internal fun earHeight(fl: FormLook): Float = when {
         fl.ears == Ears.BUNNY -> u * 0.6f
         fl.antenna == Antenna.WITCH -> u * 0.8f
         fl.antlers -> u * 0.6f
@@ -259,26 +269,7 @@ class PetRenderer {
 
         c.save()
         c.clipPath(body)
-        // Soft belly patch
-        val bellyW = bw * if (fl.bigBelly) 0.72f else 0.58f
-        val bellyH = bh * if (fl.bigBelly) 0.68f else 0.52f
-        val bx = fx * 0.55f
-        val by = bottom - bellyH * 0.8f
-        c.save()
-        c.scale(1f, bellyH / bellyW, bx, by)
-        shaderFill(radial(bx, by, bellyW, intArrayOf(col.belly, Colors.alpha(col.belly, 0.95f), Colors.alpha(col.belly, 0f)), floatArrayOf(0f, 0.72f, 1f)))
-        c.drawCircle(bx, by, bellyW, fill)
-        fill.shader = null
-        c.restore()
-        drawPatternPart(c, fl, pose, bw, bh, top, bottom, cy, fx)
-        if (fl.jelly) drawJelly(c, fl, bw, bh, top, cy, pose.t)
-        // Dirt smudges
-        if (look.dirty) {
-            fill.color = Colors.alpha(0xFF8D6A4A.toInt(), 0.22f)
-            c.drawOval(-bw * 0.7f, cy + bh * 0.25f, -bw * 0.38f, cy + bh * 0.48f, fill)
-            c.drawOval(bw * 0.35f, cy - bh * 0.35f, bw * 0.6f, cy - bh * 0.18f, fill)
-            c.drawOval(bw * 0.1f, cy + bh * 0.55f, bw * 0.34f, cy + bh * 0.72f, fill)
-        }
+        drawSkin(c, fl, look, pose, bw, bh, bottom, top, cy, fx)
         // Ambient occlusion towards the floor
         shaderFill(
             LinearGradient(
@@ -311,14 +302,50 @@ class PetRenderer {
         outline(c, body, col.shade)
     }
 
-    private fun drawAura(c: Canvas, bw: Float, bh: Float, cy: Float, t: Float, color: Int) {
+    /** Belly, pattern, paint and dirt on the body (call with the body clipped). */
+    internal fun drawSkin(c: Canvas, fl: FormLook, look: PetLook, pose: PetPose, bw: Float, bh: Float, bottom: Float, top: Float, cy: Float, fx: Float) {
+        val col = fl.colors
+        // Soft belly patch
+        val bellyW = bw * if (fl.bigBelly) 0.72f else 0.58f
+        val bellyH = bh * if (fl.bigBelly) 0.68f else 0.52f
+        val bx = fx * 0.55f
+        val by = bottom - bellyH * 0.8f
+        c.save()
+        c.scale(1f, bellyH / bellyW, bx, by)
+        shaderFill(radial(bx, by, bellyW, intArrayOf(col.belly, Colors.alpha(col.belly, 0.95f), Colors.alpha(col.belly, 0f)), floatArrayOf(0f, 0.72f, 1f)))
+        c.drawCircle(bx, by, bellyW, fill)
+        fill.shader = null
+        c.restore()
+        drawPatternPart(c, fl, pose, bw, bh, top, bottom, cy, fx)
+        if (fl.jelly) drawJelly(c, fl, bw, bh, top, cy, pose.t)
+        if (pose.paint > 0.01f) {
+            // colourful splotches from a friend's brush
+            val cols = Toys.SPLASH_COLORS
+            val pts = floatArrayOf(-0.6f, -0.3f, 0.55f, 0.25f, -0.2f, 0.6f, 0.7f, -0.55f, -0.75f, 0.45f)
+            for (i in 0 until 5) {
+                fill.shader = null
+                fill.color = Colors.alpha(cols[i % cols.size], 0.85f * pose.paint.coerceAtMost(1f))
+                c.drawCircle(pts[i * 2] * bw, cy + pts[i * 2 + 1] * bh, u * (0.08f + 0.025f * (i % 3)), fill)
+                c.drawCircle(pts[i * 2] * bw + u * 0.09f, cy + pts[i * 2 + 1] * bh + u * 0.05f, u * 0.025f, fill)
+            }
+        }
+        // Dirt smudges
+        if (look.dirty) {
+            fill.color = Colors.alpha(0xFF8D6A4A.toInt(), 0.22f)
+            c.drawOval(-bw * 0.7f, cy + bh * 0.25f, -bw * 0.38f, cy + bh * 0.48f, fill)
+            c.drawOval(bw * 0.35f, cy - bh * 0.35f, bw * 0.6f, cy - bh * 0.18f, fill)
+            c.drawOval(bw * 0.1f, cy + bh * 0.55f, bw * 0.34f, cy + bh * 0.72f, fill)
+        }
+    }
+
+    internal fun drawAura(c: Canvas, bw: Float, bh: Float, cy: Float, t: Float, color: Int) {
         val r = bw * 2.2f * (1f + 0.05f * sin(t * 2f))
         shaderFill(radial(0f, cy, r, intArrayOf(Colors.alpha(color, 0.45f), Colors.alpha(color, 0.12f), Colors.alpha(color, 0f)), floatArrayOf(0f, 0.6f, 1f)))
         c.drawCircle(0f, cy, r, fill)
         fill.shader = null
     }
 
-    private fun drawSparkles(c: Canvas, bw: Float, bh: Float, cy: Float, t: Float) {
+    internal fun drawSparkles(c: Canvas, bw: Float, bh: Float, cy: Float, t: Float) {
         val pts = floatArrayOf(-1.35f, -0.9f, 1.3f, -0.6f, -1.15f, 0.5f, 1.4f, 0.35f)
         for (i in 0 until 4) {
             val a = (sin(t * 2.2f + i * 1.7f) + 1f) / 2f
@@ -336,9 +363,17 @@ class PetRenderer {
 
     // ------------------------------------------------------------------ limbs
 
-    private fun drawFeet(c: Canvas, col: PetColors, pose: PetPose, bw: Float, footH: Float) {
+    /** Colour of paws and feet: dark for Siamese points, white for a tuxedo cat. */
+    internal fun pawColor(fl: FormLook): Int? = when (fl.pattern) {
+        Pattern.POINTS -> fl.colors.accent2
+        Pattern.TUXEDO -> fl.colors.belly
+        else -> null
+    }
+
+    private fun drawFeet(c: Canvas, fl: FormLook, pose: PetPose, bw: Float, footH: Float) {
+        val col = fl.colors
         val fw = u * 0.2f
-        val base = Colors.lerp(col.body, col.shade, 0.3f)
+        val base = pawColor(fl) ?: Colors.lerp(col.body, col.shade, 0.3f)
         for (s in intArrayOf(-1, 1)) {
             val lift = if (s < 0) pose.footL else pose.footR
             val stride = if (s < 0) pose.strideL else pose.strideR
@@ -349,7 +384,9 @@ class PetRenderer {
         }
     }
 
-    private fun drawArms(c: Canvas, col: PetColors, pose: PetPose, bw: Float, bh: Float, cy: Float, fx: Float) {
+    private fun drawArms(c: Canvas, fl: FormLook, pose: PetPose, bw: Float, bh: Float, cy: Float, fx: Float) {
+        val col = fl.colors
+        val paw = pawColor(fl)
         val len = u * 0.26f
         val th = u * 0.13f
         for (s in intArrayOf(-1, 1)) {
@@ -365,17 +402,22 @@ class PetRenderer {
             c.rotate(-s * angle)
             ovalPath(path, -th * 0.5f, -th * 0.35f, th * 0.5f, len)
             shaded(c, path, col.light, col.body, col.shade)
+            if (paw != null) {
+                ovalPath(path2, -th * 0.5f, len * 0.55f, th * 0.5f, len)
+                shaded(c, path2, Colors.lighten(paw, 0.3f), paw, Colors.darken(paw, 0.25f), outline = false)
+            }
             c.restore()
         }
     }
 
     // ------------------------------------------------------------------ back parts
 
-    private fun drawBack(c: Canvas, fl: FormLook, look: PetLook, pose: PetPose, bw: Float, bh: Float, top: Float, cy: Float, fx: Float) {
+    internal fun drawBack(c: Canvas, fl: FormLook, look: PetLook, pose: PetPose, bw: Float, bh: Float, top: Float, cy: Float, fx: Float) {
         val col = fl.colors
         val t = pose.t
         val lag = pose.earLag
 
+        look.back?.let { drawBackItem(c, it, pose, bw, bh, top, cy) }
         if (look.neck == "neck_cape") drawCapeBehind(c, pose, bw, bh, cy)
         drawBackPart(c, fl, pose, bw, bh, top, cy, fx)
         if (fl.tail != Tail.NONE && fl.tail != Tail.DRAGON) drawTailPart(c, fl, pose, bw, bh, cy)
@@ -475,6 +517,7 @@ class PetRenderer {
             }
             Ears.CAT -> for (s in intArrayOf(-1, 1)) {
                 val sf = s.toFloat()
+                val earBody = if (fl.pattern == Pattern.POINTS) col.accent2 else if (fl.pattern == Pattern.CALICO && s < 0) col.extra else col.body
                 c.save()
                 c.rotate(lag * 0.5f, sf * bw * 0.55f + fx * 0.4f, top + bh * 0.3f)
                 path.reset()
@@ -482,7 +525,7 @@ class PetRenderer {
                 path.quadTo(sf * bw * 0.46f + fx * 0.4f, top - bh * 0.62f, sf * bw * 0.7f + fx * 0.4f, top - bh * 0.36f)
                 path.quadTo(sf * bw * 0.86f + fx * 0.4f, top - bh * 0.12f, sf * bw * 0.9f + fx * 0.4f, top + bh * 0.45f)
                 path.close()
-                shaded(c, path, col.light, col.body, col.shade)
+                shaded(c, path, Colors.lighten(earBody, 0.55f), earBody, Colors.darken(earBody, 0.3f))
                 path.reset()
                 path.moveTo(sf * bw * 0.34f + fx * 0.4f, top + bh * 0.05f)
                 path.quadTo(sf * bw * 0.52f + fx * 0.4f, top - bh * 0.35f, sf * bw * 0.66f + fx * 0.4f, top - bh * 0.2f)
@@ -575,7 +618,7 @@ class PetRenderer {
 
     // ------------------------------------------------------------------ front parts
 
-    private fun drawFront(c: Canvas, fl: FormLook, look: PetLook, pose: PetPose, bw: Float, bh: Float, top: Float, cy: Float, fx: Float) {
+    internal fun drawFront(c: Canvas, fl: FormLook, look: PetLook, pose: PetPose, bw: Float, bh: Float, top: Float, cy: Float, fx: Float) {
         val col = fl.colors
         if (fl.headband) {
             c.save()
@@ -644,7 +687,7 @@ class PetRenderer {
         c.restore()
     }
 
-    private fun drawFoam(c: Canvas, pose: PetPose, bw: Float, top: Float, fx: Float) {
+    internal fun drawFoam(c: Canvas, pose: PetPose, bw: Float, top: Float, fx: Float) {
         val n = (pose.foam * 9).toInt().coerceIn(1, 9)
         val offs = floatArrayOf(0f, -0.4f, 0.4f, -0.2f, 0.25f, -0.62f, 0.6f, 0f, -0.1f)
         val ups = floatArrayOf(0.02f, 0.1f, 0.1f, 0.2f, 0.22f, 0.18f, 0.2f, 0.32f, 0.12f)
@@ -662,7 +705,7 @@ class PetRenderer {
 
     // ------------------------------------------------------------------ face
 
-    private fun drawFace(c: Canvas, fl: FormLook, pose: PetPose, bw: Float, bh: Float, cy: Float, fx: Float) {
+    internal fun drawFace(c: Canvas, fl: FormLook, pose: PetPose, bw: Float, bh: Float, cy: Float, fx: Float) {
         val col = fl.colors
         val turn = pose.turn
         val re = u * 0.135f * (0.92f + 0.08f * fl.width)
@@ -746,6 +789,10 @@ class PetRenderer {
         }
         if ((shape == EyeShape.OPEN || shape == EyeShape.SQUINT || shape == EyeShape.SLEEPY || shape == EyeShape.WIDE) && open < 0.18f) {
             shape = EyeShape.CLOSED
+        }
+        if (fl.eyes == EyeStyle.CAT && (shape == EyeShape.OPEN || shape == EyeShape.SQUINT || shape == EyeShape.SLEEPY)) {
+            drawCatEye(c, col, x, y, re, open, lx, ly, shape != EyeShape.OPEN)
+            return
         }
         when (shape) {
             EyeShape.OPEN, EyeShape.SQUINT, EyeShape.SLEEPY -> {
@@ -832,6 +879,36 @@ class PetRenderer {
                 Shapes.spiral(path, x, y, re * 0.8f, 2.2f, pose.t * 8f * side)
                 stroke(c, path, col.eye, re * 0.16f)
             }
+        }
+    }
+
+    /** Cat eye: big coloured iris with a slit pupil. */
+    private fun drawCatEye(c: Canvas, col: PetColors, x: Float, y: Float, re: Float, open: Float, lx: Float, ly: Float, lid: Boolean) {
+        val w = re * 0.86f
+        val h = re * 0.98f * open
+        ovalPath(path, x - w, y - h, x + w, y + h)
+        shaderFill(radial(x + lx * 0.5f, y + h * 0.35f + ly * 0.5f, w * 1.3f, intArrayOf(Colors.lighten(col.iris, 0.45f), col.iris, Colors.darken(col.iris, 0.35f)), floatArrayOf(0f, 0.55f, 1f)))
+        c.drawPath(path, fill)
+        fill.shader = null
+        c.save()
+        c.clipPath(path)
+        val pw = w * 0.26f
+        ovalPath(path2, x + lx - pw, y - h * 0.92f + ly, x + lx + pw, y + h * 0.92f + ly)
+        fill.color = col.eye
+        c.drawPath(path2, fill)
+        c.restore()
+        stroke(c, path, Colors.alpha(Colors.darken(col.eye, 0.2f), 0.85f), re * 0.12f)
+        fill.color = Color.WHITE
+        val hx = x + w * 0.32f + lx * 0.6f
+        val hy = y - h * 0.42f + ly * 0.5f
+        c.drawOval(hx - w * 0.28f, hy - w * 0.24f * max(open, 0.5f), hx + w * 0.28f, hy + w * 0.24f * max(open, 0.5f), fill)
+        fill.color = Colors.alpha(Color.WHITE, 0.85f)
+        c.drawCircle(x - w * 0.34f + lx * 0.3f, y + h * 0.45f, w * 0.12f, fill)
+        if (lid) {
+            path2.reset()
+            path2.moveTo(x - w * 1.05f, y - h * 0.95f)
+            path2.quadTo(x, y - h * 1.25f, x + w * 1.05f, y - h * 0.95f)
+            stroke(c, path2, col.eye, re * 0.2f)
         }
     }
 
@@ -932,13 +1009,14 @@ class PetRenderer {
 
     // ------------------------------------------------------------------ accessories
 
-    private fun drawAccessories(c: Canvas, look: PetLook, pose: PetPose, bw: Float, bh: Float, top: Float, cy: Float, fx: Float) {
+    internal fun drawAccessories(c: Canvas, look: PetLook, pose: PetPose, bw: Float, bh: Float, top: Float, cy: Float, fx: Float) {
         val re = u * 0.135f
         val ex = bw * 0.36f * (1f - 0.1f * abs(pose.turn))
         val ey = cy - bh * 0.1f
         val t = pose.t
         val neckY = cy + bh * 0.55f
 
+        look.back?.let { drawBackFront(c, it, bw, bh, cy, fx) }
         when (look.neck) {
             "neck_bowtie" -> {
                 val x = fx * 0.6f
@@ -1163,6 +1241,7 @@ class PetRenderer {
     // ------------------------------------------------------------------ egg
 
     private fun drawEgg(c: Canvas, cx: Float, groundY: Float, look: PetLook, pose: PetPose, silhouette: Int?) {
+        if (de.knuffi.app.render.gl.Pet3D.available && draw3DEgg(c, cx, groundY, look, pose, silhouette)) return
         val col = Looks.egg(look.line)
         val ew = u * 0.6f * (1f - 0.02f * pose.breath)
         val eh = u * 0.78f * (1f + 0.02f * pose.breath)
@@ -1175,13 +1254,7 @@ class PetRenderer {
         c.translate(cx, groundY)
         c.rotate(pose.eggWobble)
 
-        path.reset()
-        path.moveTo(0f, -2f * eh)
-        path.cubicTo(ew * 0.75f, -2f * eh, ew, -eh * 1.1f, ew, -eh * 0.7f)
-        path.cubicTo(ew, -eh * 0.25f, ew * 0.6f, 0f, 0f, 0f)
-        path.cubicTo(-ew * 0.6f, 0f, -ew, -eh * 0.25f, -ew, -eh * 0.7f)
-        path.cubicTo(-ew, -eh * 1.1f, -ew * 0.75f, -2f * eh, 0f, -2f * eh)
-        path.close()
+        eggPath(path, ew, eh)
 
         val taps = look.hatchTaps
         if (taps >= 3 && silhouette == null) {
@@ -1197,8 +1270,33 @@ class PetRenderer {
         fill.shader = null
         c.save()
         c.clipPath(path)
+        drawEggSkin(c, look, col, ew, eh, pose.t)
+        // ambient occlusion
+        shaderFill(LinearGradient(0f, -eh * 0.6f, 0f, 0f, Colors.alpha(col.shade, 0f), Colors.alpha(Colors.darken(col.shade, 0.2f), 0.5f), Shader.TileMode.CLAMP))
+        c.drawRect(-ew * 1.5f, -eh * 0.6f, ew * 1.5f, eh * 0.1f, fill)
+        fill.shader = null
+        c.restore()
+        gloss(c, -ew * 0.4f, -eh * 1.45f, ew * 0.32f, eh * 0.22f, 0.85f)
+        outline(c, path, col.shade)
+        drawEggCracks(c, look.hatchTaps, ew, eh)
+        if (look.shiny && silhouette == null) drawSparkles(c, ew, eh * 0.7f, -eh, pose.t)
+        c.restoreToCount(save)
+    }
+
+    internal fun eggPath(p: Path, ew: Float, eh: Float) {
+        p.reset()
+        p.moveTo(0f, -2f * eh)
+        p.cubicTo(ew * 0.75f, -2f * eh, ew, -eh * 1.1f, ew, -eh * 0.7f)
+        p.cubicTo(ew, -eh * 0.25f, ew * 0.6f, 0f, 0f, 0f)
+        p.cubicTo(-ew * 0.6f, 0f, -ew, -eh * 0.25f, -ew, -eh * 0.7f)
+        p.cubicTo(-ew, -eh * 1.1f, -ew * 0.75f, -2f * eh, 0f, -2f * eh)
+        p.close()
+    }
+
+    /** Band, spots or family pattern of the egg (call clipped to the egg). */
+    internal fun drawEggSkin(c: Canvas, look: PetLook, col: PetColors, ew: Float, eh: Float, t: Float) {
         if (look.line != EggLine.KNUFFEL) {
-            drawEggDecor(c, look.line, col, ew, eh, pose.t)
+            drawEggDecor(c, look.line, col, ew, eh, t)
         } else {
         path2.reset()
         val bandY = -eh * 0.95f
@@ -1224,14 +1322,10 @@ class PetRenderer {
             shaded(c, path3, Colors.lighten(col.accent, 0.4f), col.accent, Colors.darken(col.accent, 0.2f), outline = false)
         }
         }
-        // ambient occlusion
-        shaderFill(LinearGradient(0f, -eh * 0.6f, 0f, 0f, Colors.alpha(col.shade, 0f), Colors.alpha(Colors.darken(col.shade, 0.2f), 0.5f), Shader.TileMode.CLAMP))
-        c.drawRect(-ew * 1.5f, -eh * 0.6f, ew * 1.5f, eh * 0.1f, fill)
-        fill.shader = null
-        c.restore()
-        gloss(c, -ew * 0.4f, -eh * 1.45f, ew * 0.32f, eh * 0.22f, 0.85f)
-        outline(c, path, col.shade)
+    }
 
+    /** Cracks after tapping the egg. */
+    internal fun drawEggCracks(c: Canvas, taps: Int, ew: Float, eh: Float) {
         if (taps > 0) {
             path2.reset()
             val n = taps.coerceAtMost(4)
@@ -1256,8 +1350,6 @@ class PetRenderer {
             stroke(c, path2, Colors.alpha(Color.WHITE, 0.6f), u * 0.015f)
             c.restore()
         }
-        if (look.shiny && silhouette == null) drawSparkles(c, ew, eh * 0.7f, -eh, pose.t)
-        c.restoreToCount(save)
     }
 
     /** Convenience for static renders. */

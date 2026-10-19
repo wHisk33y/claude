@@ -22,14 +22,19 @@ data class Furnishing(
     val lamp: String = "lamp_floor",
     val picture: String = "pic_landscape",
     val event: SeasonEvent? = null,
+    val toy: String? = null,
+    /** Number of trophies on the shelf (festival prizes, stories, collections). */
+    val trophies: Int = 0,
+    val deco: String? = null,
 ) {
-    val key: String get() = "$wall|$rug|$bed|$plant|$lamp|$picture|${event?.name}"
+    val key: String get() = "$wall|$rug|$bed|$plant|$lamp|$picture|${event?.name}|$toy|$trophies|$deco"
 
     companion object {
         fun of(state: GameState, event: SeasonEvent?): Furnishing {
             val d = Catalog.defaultEquipped(state.settings.look)
             fun get(slot: Slot) = state.equipped[slot] ?: d.getValue(slot)
-            return Furnishing(get(Slot.WALL), get(Slot.RUG), get(Slot.BED), get(Slot.PLANT), get(Slot.LAMP), get(Slot.PICTURE), event)
+            val trophies = (state.counters.prizes + state.story.finished.size + state.findSetsDone.size).coerceAtMost(8)
+            return Furnishing(get(Slot.WALL), get(Slot.RUG), get(Slot.BED), get(Slot.PLANT), get(Slot.LAMP), get(Slot.PICTURE), event, state.equipped[Slot.TOY], trophies, state.equipped[Slot.DECO])
         }
     }
 }
@@ -47,6 +52,14 @@ class WallStyle(
 
 class FurnitureRenderer : Painter() {
     private val p3 = Path()
+    private val more = MoreFurniture()
+    private val decoArt = DecoFurniture()
+
+    fun deco(c: Canvas, L: SceneLayout, id: String?) = decoArt.deco(c, L, id)
+
+    fun toy(c: Canvas, L: SceneLayout, id: String?, trophies: Int) = more.toy(c, L, id, trophies)
+
+    fun cup(c: Canvas, x: Float, base: Float, s: Float) = more.cup(c, x, base, s)
 
     fun wallStyle(id: String): WallStyle = when (id) {
         "wall_sky" -> WallStyle(
@@ -61,9 +74,25 @@ class FurnitureRenderer : Painter() {
             0xFF3C428E.toInt(), 0xFF2B2F6E.toInt(), 0xFF4A509C.toInt(), 0xFF363B80.toInt(), 0xFF1E2250.toInt(), 0xFF454B94.toInt(),
             intArrayOf(0xFFB28CFF.toInt(), 0xFFCDB4FF.toInt(), 0xFF8E66E8.toInt(), 0xFFC4A8FF.toInt(), 0xFF7E58D8.toInt()), 0xFF4A2E9E.toInt(),
         )
+        "wall_paws" -> WallStyle(
+            0xFFFFF6EC.toInt(), 0xFFF6E2CC.toInt(), 0xFFEED6C0.toInt(), 0xFFD8B898.toInt(), 0xFF9A6A4A.toInt(), 0xFFE8CCB0.toInt(),
+            intArrayOf(0xFFE8A878.toInt(), 0xFFF4C8A0.toInt(), 0xFFD08850.toInt(), 0xFFF0B888.toInt(), 0xFFC07840.toInt()), 0xFF8A4A20.toInt(),
+        )
+        "wall_sunset" -> WallStyle(
+            0xFFFFB8C8.toInt(), 0xFFFFD8A8.toInt(), 0xFFFFC8A0.toInt(), 0xFFF0A080.toInt(), 0xFFB05A40.toInt(), 0xFFFFBC98.toInt(),
+            intArrayOf(0xFFB07CFF.toInt(), 0xFFD0A8FF.toInt(), 0xFF8A58E0.toInt(), 0xFFC8A0FF.toInt(), 0xFF7A48D0.toInt()), 0xFF4A2A8A.toInt(),
+        )
         "wall_wood" -> WallStyle(
             0xFFF3CF9E.toInt(), 0xFFE0AE78.toInt(), 0xFFC98E5A.toInt(), 0xFFA96F40.toInt(), 0xFF6A4020.toInt(), 0xFFBE8350.toInt(),
             intArrayOf(0xFFE85A5A.toInt(), 0xFFFF8A80.toInt(), 0xFFC83A3A.toInt(), 0xFFF07A70.toInt(), 0xFFB83030.toInt()), 0xFF7A1E1E.toInt(),
+        )
+        "wall_lemon" -> WallStyle(
+            0xFFFFFBE0.toInt(), 0xFFFFF0B0.toInt(), 0xFFFFEAA8.toInt(), 0xFFF2D27A.toInt(), 0xFFA88A30.toInt(), 0xFFFFE49A.toInt(),
+            intArrayOf(0xFF7ED8A8.toInt(), 0xFFA8EAC6.toInt(), 0xFF52B884.toInt(), 0xFF96E0B8.toInt(), 0xFF46A874.toInt()), 0xFF2A7A50.toInt(),
+        )
+        "wall_lilac" -> WallStyle(
+            0xFFF6EEFF.toInt(), 0xFFE6D6FF.toInt(), 0xFFE2D2FA.toInt(), 0xFFC8B2EE.toInt(), 0xFF7A5AB8.toInt(), 0xFFDCCAF8.toInt(),
+            intArrayOf(0xFFB28CFF.toInt(), 0xFFCDB4FF.toInt(), 0xFF8E66E8.toInt(), 0xFFC4A8FF.toInt(), 0xFF7E58D8.toInt()), 0xFF4A2E9E.toInt(),
         )
         else -> WallStyle(
             0xFFFFF2E8.toInt(), 0xFFFFE0D2.toInt(), 0xFFF9D9E7.toInt(), 0xFFEFC2D6.toInt(), 0xFFB5708F.toInt(), 0xFFF5D0E0.toInt(),
@@ -81,6 +110,7 @@ class FurnitureRenderer : Painter() {
         vgrad(c, 0f, 0f, w, fy, st.top, st.bottom)
         fill.shader = null
         when (id) {
+            "wall_paws", "wall_sunset", "wall_lemon", "wall_lilac" -> more.wallPattern(c, L, id, wt)
             "wall_sky" -> {
                 fill.color = Colors.alpha(Color.WHITE, 0.75f)
                 var row = 0
@@ -227,6 +257,7 @@ class FurnitureRenderer : Painter() {
         val rcy = L.groundY + h * 0.005f
         ellipseShadow(c, rcx, rcy + ry * 0.2f, rx * 1.05f, ry * 1.2f, 0.25f)
         when (id) {
+            "rug_paw", "rug_heart" -> more.rug(c, L, id)
             "rug_rainbow" -> {
                 val colors = intArrayOf(0xFFFF6A7A.toInt(), 0xFFFFA24D.toInt(), 0xFFFFE066.toInt(), 0xFF6ED88A.toInt(), 0xFF5AB8FF.toInt(), 0xFFA88AFF.toInt(), 0xFFFFF6FA.toInt())
                 for ((i, col) in colors.withIndex()) {
@@ -290,6 +321,7 @@ class FurnitureRenderer : Painter() {
         val pw = r - l
         val ph = b - t
         when (id) {
+            "pic_cat", "pic_sunset" -> more.picture(c, id, l, t, r, b)
             "pic_dragon" -> {
                 vgrad(c, l, t, r, b, 0xFFFFD2A8.toInt(), 0xFFFFF0D8.toInt())
                 path.reset()
@@ -462,13 +494,14 @@ class FurnitureRenderer : Painter() {
         "lamp_mushroom" -> 0xFFFF9AD8.toInt()
         "lamp_moon" -> 0xFFD8E4FF.toInt()
         "lamp_lava" -> 0xFFFF8A5A.toInt()
-        else -> 0xFFFFD18A.toInt()
+        else -> more.lampGlow(id) ?: 0xFFFFD18A.toInt()
     }
 
     fun lamp(c: Canvas, L: SceneLayout, id: String, lx: Float, ly: Float) {
         val w = L.w
         val h = L.h
         when (id) {
+            "lamp_star", "lamp_lantern" -> more.lamp(c, L, id, lx, ly)
             "lamp_mushroom" -> {
                 line.shader = null
                 line.color = 0xFF6A5A7A.toInt()
@@ -551,6 +584,7 @@ class FurnitureRenderer : Painter() {
         val px0 = w * 0.06f
         val potTop = fy - h * 0.02f
         when (id) {
+            "plant_catgrass", "plant_tulips" -> more.plant(c, L, id)
             "plant_cactus" -> {
                 val top = potTop - h * 0.2f
                 val cw = w * 0.032f

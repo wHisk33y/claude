@@ -101,6 +101,7 @@ internal fun PetRenderer.drawExtraNeck(c: Canvas, id: String, pose: PetPose, bw:
             shaded(c, path, 0xFFFFB8D6.toInt(), 0xFFFF4F8B.toInt(), 0xFFB81E5A.toInt())
             gloss(c, fx * 0.6f + swing - u * 0.04f, neckY, u * 0.04f, u * 0.025f, 0.9f)
         }
+        else -> drawGearNeck(c, id, pose, bw, bh, cy, fx)
     }
 }
 
@@ -153,6 +154,7 @@ internal fun PetRenderer.drawExtraFace(c: Canvas, id: String, pose: PetPose, bw:
             path.quadTo(fx, ey - re * 0.7f, fx + ex - re * 1.1f, ey - re * 0.3f)
             stroke(c, path, 0xFFE0A000.toInt(), u * 0.035f)
         }
+        else -> drawGearFace(c, id, pose, bw, bh, cy, fx)
     }
 }
 
@@ -379,5 +381,6 @@ internal fun PetRenderer.drawExtraHat(c: Canvas, id: String, pose: PetPose, bw: 
             shaded(c, path, Color.WHITE, 0xFFF4F6FF.toInt(), 0xFFC8CCE0.toInt())
             c.restore()
         }
+        else -> drawGearHat(c, id, pose, bw, bh, top, fx)
     }
 }

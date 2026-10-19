@@ -74,6 +74,8 @@ import de.knuffi.core.Action
 import de.knuffi.core.Difficulty
 import de.knuffi.core.Form
 import de.knuffi.core.Mood
+import de.knuffi.core.PetKind
+import de.knuffi.core.Skins
 import kotlin.math.sin
 
 object OnboardingNames {
@@ -102,12 +104,16 @@ private fun OnboardingContent(look: LookStyle, onLook: (LookStyle) -> Unit) {
     var difficulty by rememberSaveable { mutableStateOf(Difficulty.RELAXED) }
     var line by rememberSaveable { mutableStateOf(EggLine.KNUFFEL) }
     var name by rememberSaveable { mutableStateOf(OnboardingNames.random()) }
+    var kind by rememberSaveable { mutableStateOf(PetKind.FANTASY) }
+    var fur by rememberSaveable { mutableStateOf(Skins.DEFAULT_FUR) }
     val context = LocalContext.current
     val p = LocalPalette.current
-    val chosenEgg = remember(line) { PetLook(Form.EGG, Mood.HAPPY, line = line) }
+    val chosenEgg = remember(line, kind, fur) {
+        if (kind == PetKind.CAT) PetLook(Form.KAETZCHEN, Mood.HAPPY, line = EggLine.KATZE, fur = fur) else PetLook(Form.EGG, Mood.HAPPY, line = line)
+    }
 
     fun start() {
-        GameRepository.perform(Action.Start(difficulty, name.trim().ifBlank { OnboardingNames.random() }, look, line))
+        GameRepository.perform(Action.Start(difficulty, name.trim().ifBlank { OnboardingNames.random() }, look, line, kind, fur))
     }
 
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { start() }
@@ -137,10 +143,15 @@ private fun OnboardingContent(look: LookStyle, onLook: (LookStyle) -> Unit) {
             ) {
                 when (s) {
                     0 -> Welcome { step = 1 }
-                    1 -> LookPick(look, onPick = onLook, onBack = { step = 0 }) { step = 2 }
-                    2 -> EggPick(line, look, onPick = { line = it }, onBack = { step = 1 }) { step = 3 }
-                    3 -> DifficultyPick(difficulty, onPick = { difficulty = it }, onBack = { step = 2 }) { step = 4 }
-                    else -> NamePick(name, chosenEgg, onName = { name = it }, onBack = { step = 3 }) {
+                    1 -> KindPick(kind, onPick = { kind = it }, onBack = { step = 0 }) { step = 2 }
+                    2 -> LookPick(look, onPick = onLook, onBack = { step = 1 }) { step = 3 }
+                    3 -> if (kind == PetKind.CAT) {
+                        FurPick(fur, onPick = { fur = it }, onBack = { step = 2 }) { step = 4 }
+                    } else {
+                        EggPick(line, look, onPick = { line = it }, onBack = { step = 2 }) { step = 4 }
+                    }
+                    4 -> DifficultyPick(difficulty, onPick = { difficulty = it }, onBack = { step = 3 }) { step = 5 }
+                    else -> NamePick(name, chosenEgg, kind == PetKind.CAT, onName = { name = it }, onBack = { step = 4 }) {
                         if (Build.VERSION.SDK_INT >= 33 && !Notifier.hasPermission(context)) {
                             notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         } else {
@@ -158,7 +169,7 @@ private fun OnboardingContent(look: LookStyle, onLook: (LookStyle) -> Unit) {
                 .padding(bottom = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            for (i in 0..4) {
+            for (i in 0..5) {
                 val w by animateDpAsState(if (i == step) 26.dp else 8.dp, spring(dampingRatio = 0.6f), label = "dot")
                 Box(
                     Modifier
@@ -272,6 +283,75 @@ private fun StepHeader(title: String, subtitle: String, onBack: () -> Unit) {
 }
 
 @Composable
+private fun KindPick(selected: PetKind, onPick: (PetKind) -> Unit, onBack: () -> Unit, onNext: () -> Unit) {
+    StepHeader("Was für ein Haustier?", "Fabelwesen schlüpfen aus Eiern und entwickeln sich in über 100 Formen. Eine echte Katze wächst vom Kätzchen zur großen Katze heran.", onBack)
+    val egg = remember { PetLook(Form.EGG, Mood.HAPPY) }
+    val kitten = remember { PetLook(Form.KAETZCHEN, Mood.HAPPY, line = EggLine.KATZE, fur = "fur_tabby_grey") }
+    KindCard("Fabelwesen", "Drachen, Einhörner, Roboter und viele mehr. Was schlüpft, hängt von deiner Pflege ab.", egg, selected == PetKind.FANTASY, listOf(Color(0xFFFF8FC8), Color(0xFFB99AFF))) { onPick(PetKind.FANTASY) }
+    Spacer(Modifier.height(12.dp))
+    KindCard("Echte Katze", "Ein Kätzchen mit echtem Fell zum Aussuchen. Es schnurrt, miaut, putzt sich und jagt Wollknäuel.", kitten, selected == PetKind.CAT, listOf(Color(0xFFF2A65A), Color(0xFFE07A5A))) { onPick(PetKind.CAT) }
+    Spacer(Modifier.height(20.dp))
+    ClayTextButton("Weiter", onNext, emoji = "➡️", modifier = Modifier.fillMaxWidth())
+}
+
+@Composable
+private fun KindCard(title: String, text: String, look: PetLook, selected: Boolean, colors: List<Color>, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(28.dp)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .shadow(if (selected) 14.dp else 4.dp, shape, ambientColor = colors[0], spotColor = colors[0])
+            .clip(shape)
+            .background(Brush.linearGradient(colors))
+            .border(if (selected) 3.dp else 1.dp, Color.White.copy(alpha = if (selected) 0.95f else 0.4f), shape)
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PetPortrait(look, Modifier.size(96.dp), animated = selected, sizeFactor = 0.8f, shadow = false)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.headlineSmall, color = Color.White)
+            Text(text, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.92f))
+        }
+        if (selected) Text("✓", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+    }
+}
+
+@Composable
+private fun FurPick(selected: String, onPick: (String) -> Unit, onBack: () -> Unit, onNext: () -> Unit) {
+    val p = LocalPalette.current
+    StepHeader("Welches Fell hat deine Katze?", "Such dir eine Fellfarbe aus. Bei Festen kannst du später auch lustige Kostüme gewinnen.", onBack)
+    for (row in Skins.furs.chunked(3)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            for (f in row) {
+                val active = f.id == selected
+                val shape = RoundedCornerShape(22.dp)
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .clip(shape)
+                        .background(if (active) p.pink.copy(alpha = 0.22f) else p.glass)
+                        .border(if (active) 2.5.dp else 1.dp, if (active) p.pink else p.glassBorder, shape)
+                        .clickable { onPick(f.id) }
+                        .padding(vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    PetPortrait(remember(f.id) { PetLook(Form.KAETZCHEN, Mood.HAPPY, line = EggLine.KATZE, fur = f.id) }, Modifier.size(78.dp), animated = active, sizeFactor = 0.8f)
+                    Text(f.name, style = MaterialTheme.typography.labelMedium, color = p.text, maxLines = 1)
+                }
+            }
+            repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+        }
+        Spacer(Modifier.height(10.dp))
+    }
+    val f = Skins[selected]
+    Text("${f?.emoji ?: ""} ${f?.description ?: ""}", style = MaterialTheme.typography.bodyMedium, color = p.textMuted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+    Spacer(Modifier.height(18.dp))
+    ClayTextButton("Dieses Fell nehmen", onNext, emoji = "🐾", modifier = Modifier.fillMaxWidth())
+}
+
+@Composable
 private fun DifficultyPick(selected: Difficulty, onPick: (Difficulty) -> Unit, onBack: () -> Unit, onNext: () -> Unit) {
     StepHeader("Wie streng soll es sein?", "Das kannst du später in den Einstellungen ändern.", onBack)
     for (d in Difficulty.entries) {
@@ -341,7 +421,7 @@ private fun EggPick(selected: EggLine, look: LookStyle, onPick: (EggLine) -> Uni
     val p = LocalPalette.current
     StepHeader("Wähle dein erstes Ei", "Jede Ei-Sorte hat eine eigene Familie mit 8 Wesen. Die anderen Eier kannst du später sammeln.", onBack)
     val lines = remember(look) {
-        EggLine.entries.filter { !it.eventOnly }.sortedBy { if (it == EggLine.KNUFFEL) 0 else if (it.look == look) 1 else if (it.look == null) 2 else 3 }
+        EggLine.entries.filter { !it.eventOnly && it.fantasy }.sortedBy { if (it == EggLine.KNUFFEL) 0 else if (it.look == look) 1 else if (it.look == null) 2 else 3 }
     }
     for (row in lines.chunked(3)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
@@ -374,9 +454,9 @@ private fun EggPick(selected: EggLine, look: LookStyle, onPick: (EggLine) -> Uni
 }
 
 @Composable
-private fun NamePick(name: String, egg: PetLook, onName: (String) -> Unit, onBack: () -> Unit, onDone: () -> Unit) {
+private fun NamePick(name: String, egg: PetLook, cat: Boolean, onName: (String) -> Unit, onBack: () -> Unit, onDone: () -> Unit) {
     val p = LocalPalette.current
-    StepHeader("Wie soll es heißen?", "Gib deinem Haustier einen Namen, bevor es schlüpft.", onBack)
+    StepHeader(if (cat) "Wie soll deine Katze heißen?" else "Wie soll es heißen?", if (cat) "Gib deinem Kätzchen einen Namen." else "Gib deinem Haustier einen Namen, bevor es schlüpft.", onBack)
     Box(Modifier.size(200.dp), contentAlignment = Alignment.Center) {
         PetPortrait(egg, Modifier.fillMaxSize(), sizeFactor = 0.6f) { pose, t ->
             pose.eggWobble = sin(t * 3f) * 5f
@@ -410,5 +490,5 @@ private fun NamePick(name: String, egg: PetLook, onName: (String) -> Unit, onBac
     Spacer(Modifier.height(10.dp))
     ClayTextButton("Zufälliger Name", { onName(OnboardingNames.random()) }, emoji = "🎲", small = true, color = p.violet, deep = p.violetDeep)
     Spacer(Modifier.height(22.dp))
-    ClayTextButton("Ei ins Nest legen", onDone, emoji = "🥚", modifier = Modifier.fillMaxWidth(), enabled = name.isNotBlank())
+    ClayTextButton(if (cat) "Kätzchen nach Hause holen" else "Ei ins Nest legen", onDone, emoji = if (cat) "🐱" else "🥚", modifier = Modifier.fillMaxWidth(), enabled = name.isNotBlank())
 }

@@ -254,6 +254,14 @@ data class EventState(
     val key: String = "",
     val tokens: Int = 0,
     val bought: Map<String, Int> = emptyMap(),
+    /** All tokens earned during this festival (spending does not lower it). */
+    val earned: Int = 0,
+    /** Festival prizes already handed out. */
+    val prizes: Set<String> = emptySet(),
+    /** Day of the last turn of the festival wheel. */
+    val spinDay: Long = -1,
+    val spins: Int = 0,
+    val spinWins: Int = 0,
 )
 
 /** What can be bought with event tokens. */

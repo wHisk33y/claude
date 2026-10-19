@@ -72,13 +72,25 @@ fun GameHost(game: MiniGame, state: GameState, onExit: () -> Unit) {
     BackHandler(enabled = result == null) { onExit() }
     Box(Modifier.fillMaxSize()) {
         val finish: (Int) -> Unit = { if (result == null) result = it }
-        when (game) {
-            MiniGame.CATCH -> CatchGame(startState, onFinished = finish, onBack = onExit)
-            MiniGame.MEMORY -> MemoryGame(startState, onFinished = finish, onBack = onExit)
-            MiniGame.WHACK -> WhackGame(startState, onFinished = finish, onBack = onExit)
-            MiniGame.RUNNER -> RunnerGame(startState, onFinished = finish, onBack = onExit)
-            MiniGame.BUBBLES -> BubblesGame(startState, onFinished = finish, onBack = onExit)
-            MiniGame.SIMON -> SimonGame(startState, onFinished = finish, onBack = onExit)
+        val speed = if (game.calm) 1f else floatArrayOf(0.7f, 1f, 1.3f)[startState.settings.gameSpeed.coerceIn(0, 2)]
+        androidx.compose.runtime.CompositionLocalProvider(de.knuffi.app.ui.LocalTimeScale provides speed) {
+            when (game) {
+                MiniGame.CATCH -> CatchGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.MEMORY -> MemoryGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.WHACK -> WhackGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.RUNNER -> RunnerGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.BUBBLES -> BubblesGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.SIMON -> SimonGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.COOK -> CookGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.MATCH -> MatchGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.FLIGHT -> FlightGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.STACK -> StackGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.FISHING -> FishingGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.PUZZLE -> PuzzleGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.COLORING -> ColoringGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.YARN -> YarnGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.PACMAN -> PacmanGame(startState, onFinished = finish, onBack = onExit)
+            }
         }
         result?.let { score ->
             ResultOverlay(game, score, startState) {
@@ -93,23 +105,12 @@ fun GameHost(game: MiniGame, state: GameState, onExit: () -> Unit) {
 private fun ResultOverlay(game: MiniGame, score: Int, state: GameState, onCollect: () -> Unit) {
     val p = LocalPalette.current
     val reward = Engine.gameReward(game, score)
-    val c = state.counters
-    val record = when (game) {
-        MiniGame.CATCH -> score > c.bestCatch
-        MiniGame.MEMORY -> c.bestMemoryMoves == 0 || score < c.bestMemoryMoves
-        MiniGame.WHACK -> score > c.bestWhack
-        MiniGame.RUNNER -> score > c.bestRunner
-        MiniGame.BUBBLES -> score > c.bestBubbles
-        MiniGame.SIMON -> score > c.bestSimon
-    }
+    val record = Engine.isRecord(state, game, score)
     val stars = Engine.stars(game, score)
     val scoreText = when (game) {
-        MiniGame.CATCH -> "$score Punkte"
-        MiniGame.MEMORY -> "$score Züge"
-        MiniGame.WHACK -> "$score Treffer"
-        MiniGame.RUNNER -> "$score Meter"
-        MiniGame.BUBBLES -> "$score Blasen"
         MiniGame.SIMON -> "$score ${if (score == 1) "Ton" else "Töne"}"
+        MiniGame.COLORING -> "$score % ausgemalt"
+        else -> "$score ${game.unit}"
     }
     val appear = remember { Animatable(0.5f) }
     var shownStars by remember { mutableIntStateOf(0) }

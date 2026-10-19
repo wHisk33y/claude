@@ -4,7 +4,7 @@ Knuffi ist ein Tamagotchi für Android im modernen Gewand: Ein kleines Wesen sch
 wächst mit deiner Pflege heran und entwickelt sich je nach Pflege in eine von über 100 Formen.
 Du sammelst Haustiere aus 12 Ei-Sorten, legst einen Garten an, schickst deine Lieblinge auf Ausflüge
 und feierst die Feste des Jahres. Dazu gibt es ein Homescreen-Widget, einen Live-Hintergrund, ein Haustier,
-das über deinen Bildschirm läuft, Benachrichtigungen, sechs Minispiele, einen Shop, Erfolge und einen Schrittzähler.
+das über deinen Bildschirm läuft, Benachrichtigungen, 15 Minispiele, einen Shop, Erfolge und einen Schrittzähler.
 
 ## APK herunterladen
 
@@ -16,7 +16,11 @@ Eine neue Version lässt sich einfach über die alte installieren, dein Spielsta
 
 ## Funktionen
 
-- **Plastischer 3D-Look**: Haustier, Zimmer und Requisiten werden mit Licht, Schatten, Glanzpunkten und
+- **Echtes 3D**: Haustiere und Eier werden mit OpenGL ES 3 als echte 3D-Figuren gerendert (runder Körper,
+  aufgemaltes Gesicht und Muster, Ohren, Flügel, Hüte und Zubehör als weiche 3D-Formen, echtes Licht und Drehen).
+  Das funktioniert in der App, im Live-Hintergrund, beim schwebenden Haustier und im Widget. In den Einstellungen
+  lässt sich auf den gezeichneten Look umschalten; ohne 3D-Unterstützung wird automatisch gezeichnet.
+- **Plastischer Look**: Zimmer und Requisiten werden mit Licht, Schatten, Glanzpunkten und
   weichen Verläufen gezeichnet. Dazu kommen Tag und Nacht, Wetter (Sonne, Wolken, Regen, Schnee) und Raumlicht.
 - **Hell, Dunkel oder System**: in den Einstellungen wählbar. Das Widget folgt der Wahl.
 - **Lebendiges Haustier**: Es läuft im Zimmer herum, schaut sich um, tanzt, winkt, gähnt, niest,
@@ -67,6 +71,50 @@ Eine neue Version lässt sich einfach über die alte installieren, dein Spielsta
     Tippen = streicheln, ziehen = tragen (und werfen!), lange drücken = App öffnen.
     Dafür braucht die App die Berechtigung „Über anderen Apps einblenden“.
 - **Widget**: animiertes Haustier, Werte als Balken und Schnellknöpfe (füttern, spielen, putzen, schlafen).
+- **Echte Katze** (beim Start wählbar statt Fabelwesen): 10 Fellfarben (getigert, schwarz, weiß, dreifarbig, Siam …),
+  wächst vom Kätzchen zur großen Katze, miaut, schnurrt, putzt sich, jagt Wollknäuel und wird gebürstet statt gebadet.
+  Gefundene Eier werden zu Körbchen mit neuen Kätzchen.
+- **Stimmungssystem**: 13 Gefühle (fröhlich, verspielt, verschmust, stolz, neugierig, einsam, grummelig …), die sich
+  aus Werten und Erlebnissen ergeben, Gesicht und Verhalten verändern, kleine Boni geben und im Stimmungs-Tagebuch landen.
+- **Berufe & Talente**: ab Level 5 einen von 6 Berufen wählen, arbeiten gehen, Lohn verdienen und befördert werden.
+  6 Talente (Kochen, Gärtnern, Basteln, Entdecken, Musik, Sport) wachsen durch gemeinsame Aktivitäten und geben Boni.
+  Jedes Haustier hat ein Naturtalent.
+- **Chat ab Level 6**: offline, ohne Internet. Das Haustier versteht einfache Sätze, antwortet passend zu Stimmung,
+  Beruf und Werten, merkt sich deinen Namen und Lieblingsdinge und kann z. B. spielen oder schlafen gehen.
+- **Fest-Gewinne**: Bei jedem Fest gibt es 2 Skins und 2 Teile besondere Ausrüstung mit Bonus (z. B. +15 % Münzen)
+  zu gewinnen, über verdiente Fest-Punkte und ein tägliches Glücksrad. Anziehen in der Garderobe.
+- **Bildschirm-Spielereien** (je ein Regler, auch ganz aus): Leiter aufstellen und hochklettern, Papierflieger falten
+  und werfen (antippen = fangen), Fußspuren, Farbkleckse zum Wegwischen. Im Zimmer, auf dem Live-Hintergrund und
+  beim schwebenden Haustier über anderen Apps.
+- **14 Minispiele**: neu dazu Kochstudio, Leckerli-Reihe (3 gewinnt), Papierflug, Kissenturm und Angeln,
+  dazu drei ruhige Spiele ohne Zeitdruck (Schiebepuzzle mit dem eigenen Haustier, Mandala-Ausmalbild,
+  Wollknäuel entwirren). Das Spieltempo ist einstellbar (langsam, normal, schnell).
+- **Küche**: 10 Rezepte aus Garten-Ernte und Zutaten (Mehl, Käse, Milch, Tomaten …) mit starken Effekten.
+- **Mehr Inhalte**: Strandhaus und Burgzimmer, neue Tapeten, Teppiche, Betten (Katzenkorb, Hängematte),
+  Lampen, Pflanzen und Bilder, eine Spielecke (Kratzbaum, Aquarium, Schaukelpferd …), neuer Rücken-Slot
+  (Rucksack, Flügel, Raketenrucksack) und Belohnungen für hohe Level.
+- **Fundstücke & Pokale**: Muscheln, Steine, Federn und Blätter von Ausflügen; Pokale stehen im Regal.
+- **Freundschaften**: Haustiere aus dem Kuschelhaus kommen zu Besuch, spielen zusammen und werden Freunde.
+- **Wetter & Tagesablauf**: simuliertes oder echtes Wetter (Open-Meteo, optional) mit Auswirkungen auf
+  Laune, Garten und Ausflüge; Tagesablauf aus Frühstück, Spielzeit, Abendessen und Schlafenszeit.
+- **Geschichten**: drei mehrtägige Abenteuer mit Entscheidungen (ein Kapitel pro Tag).
+- **Fotoalbum**: Fotos vom Haustier mit Rahmen, gespeichert in der App.
+- **Ton**: im Code erzeugte Geräusche (Schnurren, Miau, Münzen …) mit Lautstärke-Regler.
+- **Leckerli-Jagd**: ein Pacman-Minispiel mit Wischsteuerung, Geistern und Power-Keksen.
+- **Geheimnisse & Easter Eggs**: 13 versteckte Geheimnisse (Zauberwort im Chat, Disco-Lampe, Sternschnuppe,
+  Geisterstunde, Vollmond …) und jeden Tag ein versteckter Gegenstand im Zimmer.
+- **Katzen für alle**: Wer Fabelwesen spielt, kann per Easter Egg auch Kätzchen freischalten
+  (im Chat dreimal „Miau“ schreiben oder im Zimmer Fenster, Lampe und Bild nacheinander antippen).
+- **Tagebuch**: Jeden Abend schreibt das Haustier auf, was ihr zusammen erlebt habt.
+- **Freunde zu Besuch**: Ball werfen, sich gegenseitig anmalen, quatschen, kuscheln, tanzen und Verstecken spielen.
+- **Größeres Zimmer & Sitzecke**: mehr Platz im Zimmer und ein neuer Möbel-Platz für Sofa, Sitzsack, Klavier,
+  Kamin, Bücherregal, Globus oder Spielzelt.
+- **Erweiterter Shop**: Angebot des Tages (−30 %), Wunderkiste mit einem Überraschungsteil, neue Leckereien,
+  Pflegeartikel, Hüte (Katzenohren, Heiligenschein, Cowboyhut) und Tapeten.
+- **Mehr Leben auf dem Startbildschirm**: Seifenblasen, Musik machen, Lesen, Snacks, Purzelbäume,
+  Schmetterlinge jagen und Tagträumen; die Leiter reicht jetzt über den ganzen Bildschirm.
+- **Schwebendes Haustier**: zeigt seinen Namen und lässt sich per Doppeltipp, Einstellung oder Benachrichtigung
+  oben links anheften, damit es beim Tippen nicht im Weg ist.
 - **Benachrichtigungen**: bei Hunger, Krankheit, Schmutz, Langeweile oder Müdigkeit, mit Direkt-Aktionen
   wie „Füttern“. Außerdem Hinweise auf tägliche Belohnungen, Schrittziele, reife Pflanzen, zurückgekehrte
   Ausflügler, neue Feste und Geburtstage. Es gibt eine Nachtruhe, die Hinweise haben Abklingzeiten, und die App

@@ -24,6 +24,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sign
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
@@ -43,9 +44,38 @@ class OverlayPetView(context: Context, private val host: Host) : View(context) {
         fun onStroke()
         fun onHatchTap()
         fun onOpenApp()
+
+        /** Screen toys: shared state, slider values, splashes and rewards. */
+        fun toys(): OverlayToys
+        fun toyConfig(): de.knuffi.app.render.ToyConfig
+        fun addSplash(x: Float, y: Float): Boolean
+        fun onToy(kind: de.knuffi.core.ToyKind)
+        fun decorChanged(now: Float, visible: Boolean)
+
+        /** Double tap: stick to the top left corner or walk around again. */
+        fun onTogglePin()
     }
 
-    private enum class Mode { IDLE, WALK, WAVE, SIT, SLEEP, DRAG, FALL, LOVE }
+    private enum class Mode { IDLE, WALK, WAVE, SIT, SLEEP, DRAG, FALL, LOVE, LADDER, PLANE, PAINT, PIN, BUBBLES, MUSIC, READ, SNACK, FLIP, KISS }
+
+    /** Name shown above the pet (empty = no tag). */
+    var name: String = ""
+    var showName = true
+
+    /** Sits in the top left corner (set by the player). */
+    var pinned = false
+    private var pinX = 0f
+    private var pinY = 0f
+    private var topY = 0f
+    private var lastTapAt = 0L
+    private var sayText: String? = null
+    private var sayUntil = 0f
+    private val tagPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = android.graphics.Paint.Align.CENTER
+        textSize = 12f * resources.displayMetrics.density
+    }
+    private val tagBg = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    private val tagRect = android.graphics.RectF()
 
     private val density = resources.displayMetrics.density
     val petSize = 76f * density
@@ -80,6 +110,8 @@ class OverlayPetView(context: Context, private val host: Host) : View(context) {
     private var swingV = 0f
     private var nextBlink = 2f
     private var lastZ = 0f
+    private var lastStepSign = 0f
+    private var groundY = 0f
 
     // Touch
     private var downRawX = 0f
@@ -154,8 +186,23 @@ class OverlayPetView(context: Context, private val host: Host) : View(context) {
             setMode(Mode.FALL)
         }
         val l = look
+        groundY = ground
+        pinX = b[0] + petSize * 0.6f
+        pinY = b[3] + petSize * 1.15f
+        topY = b[3]
+        val wantPin = pinned
+        if (wantPin && mode != Mode.PIN && mode != Mode.DRAG) {
+            host.toys().ladderExtend = 0f
+            setMode(Mode.PIN, 1e9f)
+        } else if (!wantPin && mode == Mode.PIN) {
+            vx = 0f
+            vy = 0f
+            setMode(Mode.FALL)
+        }
         update(dt, l, left, right, ground)
         particles.update(now)
+        val busy = host.toys().update(now, dt, density, ground, b[0] + petSize * 0.2f, b[1] - petSize * 0.2f, host.toyConfig())
+        host.decorChanged(now, busy)
         host.moveWindow((x - windowW / 2f).toInt(), (y - footInWindow).toInt())
         invalidate()
     }
@@ -167,6 +214,31 @@ class OverlayPetView(context: Context, private val host: Host) : View(context) {
         }
         if (l != null && l.isEgg) {
             setMode(Mode.IDLE, 3f)
+            return
+        }
+        if (l != null && !l.sick && !l.tired && l.mood != de.knuffi.core.Mood.SAD) {
+            val cfg = host.toyConfig()
+            var t = rnd.nextFloat()
+            val ladder = de.knuffi.core.ToyTuning.chance(cfg.ladder)
+            val plane = de.knuffi.core.ToyTuning.chance(cfg.planes)
+            val paint = de.knuffi.core.ToyTuning.chance(cfg.paint)
+            if (t < ladder) {
+                setMode(Mode.LADDER, 99f)
+                return
+            }
+            t -= ladder
+            if (t < plane && host.toys().flyer == null) {
+                setMode(Mode.PLANE, 3.4f)
+                return
+            }
+            t -= plane
+            if (t < paint) {
+                setMode(Mode.PAINT, 3f)
+                return
+            }
+        }
+        if (l != null && !l.sick && !l.tired && l.mood != de.knuffi.core.Mood.SAD && rnd.nextFloat() < 0.25f) {
+            hobby(l.isCat)
             return
         }
         val r = rnd.nextFloat()
@@ -181,6 +253,48 @@ class OverlayPetView(context: Context, private val host: Host) : View(context) {
             r < 0.8f -> setMode(Mode.SIT, 4f + rnd.nextFloat() * 4f)
             else -> setMode(Mode.IDLE, 2f + rnd.nextFloat() * 3f)
         }
+    }
+
+    private var hobbyItem = ""
+
+    private fun say(text: String, seconds: Float) {
+        sayText = text
+        sayUntil = now + seconds
+    }
+
+    /** Little hobbies so the floating pet does something different every now and then. */
+    private fun hobby(cat: Boolean) {
+        val pick = if (cat) listOf(Mode.BUBBLES, Mode.SNACK, Mode.FLIP, Mode.KISS).random(rnd)
+        else listOf(Mode.BUBBLES, Mode.MUSIC, Mode.READ, Mode.SNACK, Mode.FLIP, Mode.KISS).random(rnd)
+        when (pick) {
+            Mode.BUBBLES -> say(if (cat) "Miau! Blasen!" else "Seifenblasen! 🫧", 1.6f)
+            Mode.MUSIC -> {
+                hobbyItem = listOf("🎸", "🎺", "🥁", "🎻", "🪇").random(rnd)
+                say("Ein Lied für dich! 🎶", 1.6f)
+            }
+            Mode.READ -> say("Ich lese ein bisschen.", 1.6f)
+            Mode.SNACK -> {
+                hobbyItem = if (cat) listOf("🐟", "🍗", "🧀").random(rnd) else listOf("🍪", "🍓", "🥨", "🍩").random(rnd)
+                say(if (cat) "Leckerli! Prrr …" else "Snack-Pause!", 1.4f)
+            }
+            Mode.FLIP -> {
+                vy = -petSize * 4.2f
+                say(if (cat) "Mrrrp-hopp!" else "Purzelbaum!", 1.1f)
+            }
+            Mode.KISS -> say(if (cat) "Prrr … 💕" else "Hab dich lieb! 💕", 1.6f)
+            else -> Unit
+        }
+        setMode(
+            pick,
+            when (pick) {
+                Mode.BUBBLES -> 3.6f
+                Mode.MUSIC -> 4f
+                Mode.READ -> 4.6f
+                Mode.SNACK -> 2.8f
+                Mode.FLIP -> 1.2f
+                else -> 1.8f
+            },
+        )
     }
 
     private fun update(dt: Float, l: PetLook?, left: Float, right: Float, ground: Float) {
@@ -261,6 +375,75 @@ class OverlayPetView(context: Context, private val host: Host) : View(context) {
                 if (el < 0.05f) particles.add(Particle(PKind.EMOJI, 0.7f, 0.18f, 0f, -0.05f, 1.2f, 0.12f, 0, text = "👋"))
                 if (el > modeDur) chooseNext(l, left, right)
             }
+            Mode.BUBBLES -> {
+                y = ground
+                p.holding = "🫧"
+                p.hold = 1f
+                p.mouth = MouthShape.O
+                p.mouthOpen = 0.6f
+                p.lookX = facing * 0.6f
+                p.lookY = -0.5f
+                if ((el % 0.3f) < dt && el < modeDur - 0.5f) {
+                    particles.add(Particle(PKind.BUBBLE, 0.5f + facing * 0.15f, 0.42f, facing * (0.04f + rnd.nextFloat() * 0.05f), -0.06f - rnd.nextFloat() * 0.06f, 2f, 0.04f + rnd.nextFloat() * 0.03f, 0xFFFFFFFF.toInt(), drag = 0.3f))
+                }
+                if (el > modeDur) chooseNext(l, left, right)
+            }
+            Mode.MUSIC -> {
+                y = ground
+                p.holding = hobbyItem
+                p.hold = 1f
+                val k = el * 6f
+                p.tilt += sin(k) * 7f
+                p.eyes = if ((el % 2f) < 1.3f) EyeShape.CLOSED else EyeShape.HAPPY
+                p.mouth = MouthShape.SMILE
+                if ((el % 0.4f) < dt) particles.add(Particle(PKind.NOTE, 0.4f + rnd.nextFloat() * 0.3f, 0.3f, (rnd.nextFloat() - 0.5f) * 0.05f, -0.1f, 1.4f, 0.07f, listOf(0xFF7C6CFF, 0xFFFF6B9A, 0xFF2EC4A0, 0xFFFFB84D).random(rnd).toInt()))
+                if (el > modeDur) chooseNext(l, left, right)
+            }
+            Mode.READ -> {
+                y = ground
+                p.holding = "📖"
+                p.hold = 1f
+                p.lookY = 0.7f
+                p.scaleY *= 0.95f
+                p.scaleX *= 1.03f
+                p.eyes = if ((el % 1.6f) < 0.25f) EyeShape.HAPPY else EyeShape.OPEN
+                if (el > 2.8f && el - dt <= 2.8f) say(listOf("Spannend!", "Und dann …?", "Haha!").random(rnd), 1.4f)
+                if (el > modeDur) chooseNext(l, left, right)
+            }
+            Mode.SNACK -> {
+                y = ground
+                p.holding = hobbyItem
+                p.hold = 1f - el / modeDur * 0.4f
+                p.mouth = if ((el * 8f).toInt() % 2 == 0) MouthShape.CHEW else MouthShape.CAT
+                p.eyes = EyeShape.HAPPY
+                if ((el % 0.5f) < dt) particles.add(Particle(PKind.CRUMB, 0.5f + facing * 0.05f, 0.5f, (rnd.nextFloat() - 0.5f) * 0.08f, 0.02f, 0.8f, 0.025f, 0xFFD8A060.toInt(), rot = rnd.nextFloat() * 90f, gravity = 0.4f))
+                if (el > modeDur) chooseNext(l, left, right)
+            }
+            Mode.FLIP -> {
+                vy += petSize * 9f * dt
+                y = min(ground, y + vy * dt)
+                val k = (el / 0.9f).coerceIn(0f, 1f)
+                p.tilt += facing * 360f * (k * k * (3f - 2f * k))
+                p.eyes = if (k < 1f) EyeShape.CLOSED else EyeShape.STAR
+                p.mouth = MouthShape.OPEN
+                p.armL = 1f
+                p.armR = 1f
+                if (el > modeDur || (el > 0.3f && y >= ground)) {
+                    y = ground
+                    vy = 0f
+                    particles.burst(PKind.STAR, 0.5f, 0.6f, 5, 0.3f, 0.7f, 0.05f, ParticleSystem.STAR_COLORS, upward = true)
+                    chooseNext(l, left, right)
+                }
+            }
+            Mode.KISS -> {
+                y = ground
+                p.armR = 0.9f
+                p.eyes = EyeShape.HAPPY
+                p.mouth = MouthShape.O
+                p.blush = 1f
+                if (el > 0.5f && el - dt <= 0.5f) particles.burst(PKind.HEART, 0.6f, 0.35f, 4, 0.2f, 1.2f, 0.06f, ParticleSystem.HEART_COLORS, upward = true)
+                if (el > modeDur) chooseNext(l, left, right)
+            }
             Mode.SIT -> {
                 y = ground
                 p.scaleY *= 0.92f
@@ -286,6 +469,123 @@ class OverlayPetView(context: Context, private val host: Host) : View(context) {
                 p.tilt = sin(el * 8f) * 6f
                 if (el > modeDur) chooseNext(l, left, right)
             }
+            Mode.PIN -> {
+                // flies to the corner and sits there quietly
+                val k = min(1f, dt * 6f)
+                x += (pinX - x) * k
+                y += (pinY - y) * k
+                p.scaleY *= 0.94f
+                p.scaleX *= 1.04f
+                p.lookX = 0.6f
+                p.lookY = 0.4f
+                if (l?.sleeping == true) {
+                    p.eyes = EyeShape.CLOSED
+                } else if (el % 6f < 0.4f) {
+                    p.eyes = EyeShape.HAPPY
+                }
+            }
+            Mode.LADDER -> {
+                val toys = host.toys()
+                // The ladder reaches up to just below the status bar.
+                val climb = max(petSize * 1.3f, ground - topY - petSize * 1.45f)
+                val up = (2.4f * sqrt(climb / (petSize * 1.3f))).coerceAtMost(7f)
+                val top = 0.8f + up
+                val wave = top + 2.2f
+                val down = wave + up * 0.7f
+                modeDur = down + 0.8f
+                toys.ladderX = x
+                toys.ladderGround = ground
+                toys.ladderHeight = climb + petSize * 0.45f
+                when {
+                    el < 0.8f -> {
+                        y = ground
+                        toys.ladderExtend = el / 0.8f
+                        p.armL = 0.9f
+                        p.armR = 0.9f
+                        p.lookY = -1f
+                    }
+                    el < top -> {
+                        val k = (el - 0.8f) / up
+                        y = ground - climb * k * k * (3f - 2f * k)
+                        toys.ladderExtend = 1f
+                        val w = sin(el * 10f)
+                        p.armL = 0.75f + 0.25f * w
+                        p.armR = 0.75f - 0.25f * w
+                        p.footL = max(0f, w) * 0.8f
+                        p.footR = max(0f, -w) * 0.8f
+                        p.mouth = MouthShape.TONGUE
+                    }
+                    el < wave -> {
+                        y = ground - climb
+                        if (el - dt < top) {
+                            particles.add(Particle(PKind.EMOJI, 0.7f, 0.18f, 0f, -0.05f, 1.2f, 0.12f, 0, text = if (l?.isCat == true) "😺" else "👋"))
+                            host.onToy(de.knuffi.core.ToyKind.LADDER)
+                        }
+                        p.armR = 1f
+                        p.armWaveR = sin(el * 14f) * 25f
+                        p.eyes = EyeShape.HAPPY
+                        p.mouth = MouthShape.OPEN
+                    }
+                    el < down -> {
+                        val k = (el - wave) / (down - wave)
+                        y = ground - climb * (1f - k)
+                        val w = sin(el * 10f)
+                        p.armL = 0.7f + 0.2f * w
+                        p.armR = 0.7f - 0.2f * w
+                    }
+                    else -> {
+                        y = ground
+                        toys.ladderExtend = (1f - (el - down) / 0.8f).coerceIn(0f, 1f)
+                        if (el > modeDur) {
+                            toys.ladderExtend = 0f
+                            chooseNext(l, left, right)
+                        }
+                    }
+                }
+            }
+            Mode.PLANE -> {
+                y = ground
+                when {
+                    el < 1.6f -> {
+                        p.hold = 1f
+                        p.holding = "📄"
+                        p.lookY = 0.8f
+                        p.mouth = MouthShape.TONGUE
+                    }
+                    el < 2f -> {
+                        p.armR = 1f
+                        p.eyes = EyeShape.SQUINT
+                    }
+                    else -> {
+                        if (host.toys().flyer == null && el - dt < 2f) {
+                            host.toys().flyer = OverlayToys.Flyer(x + facing * petSize * 0.3f, y - petSize * 0.6f, facing * 240f * density, -520f * density, now)
+                            sqV += 4f
+                        }
+                        p.eyes = EyeShape.HAPPY
+                        p.mouth = MouthShape.OPEN
+                        host.toys().flyer?.let { f -> p.lookX = ((f.x - x) / petSize).coerceIn(-1f, 1f) }
+                        if (el > modeDur) chooseNext(l, left, right)
+                    }
+                }
+            }
+            Mode.PAINT -> {
+                y = ground
+                p.hold = 1f
+                p.holding = "🖌️"
+                p.mouth = MouthShape.TONGUE
+                for (at in floatArrayOf(0.7f, 1.4f, 2.1f)) {
+                    if (el >= at && el - dt < at) {
+                        val dir = if (rnd.nextBoolean()) 1f else -1f
+                        val sx = x + dir * petSize * (0.7f + rnd.nextFloat() * 1.6f)
+                        val sy = ground - petSize * (0.3f + rnd.nextFloat() * 2.8f)
+                        if (host.addSplash(sx, sy)) {
+                            p.armR = 1f
+                            sqV += 3f
+                        }
+                    }
+                }
+                if (el > modeDur) chooseNext(l, left, right)
+            }
             Mode.IDLE -> {
                 y = ground
                 p.tilt += sin(now * 0.9f) * 2f
@@ -298,6 +598,11 @@ class OverlayPetView(context: Context, private val host: Host) : View(context) {
         if (walking) {
             walkPhase += dt * 9f
             val s = sin(walkPhase)
+            val sg = if (s >= 0f) 1f else -1f
+            if (sg != lastStepSign) {
+                lastStepSign = sg
+                host.toys().addPrint(x + sg * petSize * 0.12f, ground, sg.toInt(), facing, now, l?.isCat == true, host.toyConfig())
+            }
             p.footL = max(0f, s) * 0.9f
             p.footR = max(0f, -s) * 0.9f
             p.strideL = kotlin.math.cos(walkPhase) * 0.8f * facing
@@ -329,6 +634,18 @@ class OverlayPetView(context: Context, private val host: Host) : View(context) {
         if (mode != Mode.DRAG && mode != Mode.FALL) renderer.drawShadow(canvas, cx, footInWindow, petSize, pose, l)
         renderer.draw(canvas, cx, footInWindow, petSize, l, pose)
         particles.draw(canvas, width.toFloat(), height.toFloat())
+        val say = sayText?.takeIf { now < sayUntil }
+        val text = say ?: if (showName && name.isNotEmpty() && !l.isEgg) name else null
+        if (text != null) {
+            tagPaint.textSize = (if (say != null) 13f else 11.5f) * density
+            val tw = tagPaint.measureText(text)
+            val ty = (renderer.head.y - 6f * density).coerceAtLeast(tagPaint.textSize + 4f * density)
+            tagRect.set(cx - tw / 2f - 8f * density, ty - tagPaint.textSize - 3f * density, cx + tw / 2f + 8f * density, ty + 5f * density)
+            tagBg.color = if (say != null) 0xF2FFFFFF.toInt() else 0xCC2A1F4A.toInt()
+            canvas.drawRoundRect(tagRect, 20f * density, 20f * density, tagBg)
+            tagPaint.color = if (say != null) 0xFF2A1F4A.toInt() else 0xFFFFFFFF.toInt()
+            canvas.drawText(text, cx, ty, tagPaint)
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -352,6 +669,7 @@ class OverlayPetView(context: Context, private val host: Host) : View(context) {
                 if (!dragging && hypot(event.rawX - downRawX, event.rawY - downRawY) > touchSlop) {
                     dragging = true
                     removeCallbacks(longPress)
+                    host.toys().ladderExtend = 0f
                     setMode(Mode.DRAG)
                     swing = 0f
                     swingV = 0f
@@ -387,6 +705,17 @@ class OverlayPetView(context: Context, private val host: Host) : View(context) {
     private fun tap() {
         val l = look ?: return
         sqV += 6f
+        val t = android.os.SystemClock.uptimeMillis()
+        if (t - lastTapAt < 380L && !l.isEgg) {
+            lastTapAt = 0L
+            host.onTogglePin()
+            return
+        }
+        lastTapAt = t
+        if (!l.isEgg && name.isNotEmpty()) {
+            sayText = "Ich bin $name!"
+            sayUntil = now + 2f
+        }
         if (l.isEgg) {
             particles.burst(PKind.CRUMB, 0.5f, 0.6f, 6, 0.3f, 0.7f, 0.03f, intArrayOf(0xFFFFF4E0.toInt(), 0xFFF0D2A8.toInt()), gravity = 1f, upward = true)
             host.onHatchTap()

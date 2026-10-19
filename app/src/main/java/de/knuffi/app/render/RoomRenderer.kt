@@ -44,15 +44,16 @@ class SceneLayout {
         this.kind = kind
         when (kind) {
             LayoutKind.HOME -> {
+                // a roomier room: smaller pet, deeper floor
                 floorY = h * 0.595f
-                groundY = h * 0.775f
-                petSize = min(w * 0.52f, h * 0.27f)
+                groundY = h * 0.8f
+                petSize = min(w * 0.43f, h * 0.225f)
                 window.set(w * 0.07f, h * 0.245f, w * 0.43f, h * 0.46f)
             }
             LayoutKind.WALLPAPER -> {
                 floorY = h * 0.6f
-                groundY = h * 0.76f
-                petSize = min(w * 0.4f, h * 0.2f)
+                groundY = h * 0.78f
+                petSize = min(w * 0.36f, h * 0.18f)
                 window.set(w * 0.08f, h * 0.2f, w * 0.44f, h * 0.42f)
             }
             LayoutKind.BOX -> {
@@ -67,8 +68,8 @@ class SceneLayout {
         vpY = floorY - (h - floorY) * 1.4f
         bowlX = if (kind == LayoutKind.BOX) 0.12f else 0.15f
         bedX = if (kind == LayoutKind.BOX) 0.85f else 0.78f
-        minX = if (kind == LayoutKind.BOX) 0.3f else 0.26f
-        maxX = if (kind == LayoutKind.BOX) 0.7f else 0.74f
+        minX = if (kind == LayoutKind.BOX) 0.3f else 0.2f
+        maxX = if (kind == LayoutKind.BOX) 0.7f else 0.8f
     }
 
     val propSize: Float get() = petSize * 0.78f
@@ -85,7 +86,7 @@ class RoomRenderer : Painter() {
     private fun lampX(L: SceneLayout) = L.w * 0.53f
     private fun lampY(L: SceneLayout) = L.window.top + L.window.height() * 0.2f
 
-    fun isCozy(room: String) = room == "room_cozy" || room !in setOf("room_forest", "room_ocean", "room_space", "room_candy")
+    fun isCozy(room: String) = room == "room_cozy" || room !in setOf("room_forest", "room_ocean", "room_space", "room_candy", "room_beach", "room_castle")
 
     // ------------------------------------------------------------------ time of day
 
@@ -233,7 +234,7 @@ class RoomRenderer : Painter() {
         val w = L.w
         val h = L.h
         when (room) {
-            "room_forest", "room_candy" -> {
+            "room_forest", "room_candy", "room_beach" -> {
                 if (room == "room_candy") {
                     val dark = darkness(hour)
                     vgrad(c, 0f, 0f, w, L.floorY + 2f, Colors.lerp(0xFFFFC2E2.toInt(), 0xFF4A3470.toInt(), dark * 0.8f), Colors.lerp(0xFFFFEFF7.toInt(), 0xFF8C5FA0.toInt(), dark * 0.8f))
@@ -295,6 +296,8 @@ class RoomRenderer : Painter() {
             "room_ocean" -> staticOcean(c, L)
             "room_space" -> staticSpace(c, L)
             "room_candy" -> staticCandy(c, L)
+            "room_beach" -> staticBeach(c, L)
+            "room_castle" -> staticCastle(c, L)
             else -> staticCozy(c, L, f)
         }
     }
@@ -402,6 +405,55 @@ class RoomRenderer : Painter() {
                     fill.shader = null
                     fill.color = Colors.alpha(Color.WHITE, 0.8f)
                     c.drawCircle(bx - br * 0.35f, by - br * 0.35f, br * 0.25f, fill)
+                }
+            }
+            "room_beach" -> {
+                // waves and sparkles on the sea
+                val seaTop = L.floorY - h * 0.1f
+                line.shader = null
+                line.color = Colors.alpha(Color.WHITE, 0.5f * (1f - dark * 0.6f))
+                line.strokeWidth = w * 0.004f
+                for (k in 0 until 3) {
+                    path.reset()
+                    val y0 = seaTop + h * 0.025f * (k + 1)
+                    var x = 0f
+                    path.moveTo(0f, y0)
+                    while (x < w) {
+                        x += w / 16f
+                        path.lineTo(x, y0 + sin(x / w * 20f + t * 1.4f + k) * h * 0.004f)
+                    }
+                    c.drawPath(path, line)
+                }
+                // gulls
+                for (k in 0 until 2) {
+                    val gx = ((t * 0.02f * (k + 1) + k * 0.5f) % 1.2f - 0.1f) * w
+                    val gy = h * (0.12f + 0.06f * k) + sin(t * 2f + k) * h * 0.01f
+                    val flap = sin(t * 6f + k) * w * 0.008f
+                    path.reset()
+                    path.moveTo(gx - w * 0.025f, gy - flap)
+                    path.quadTo(gx - w * 0.012f, gy - w * 0.012f, gx, gy)
+                    path.quadTo(gx + w * 0.012f, gy - w * 0.012f, gx + w * 0.025f, gy - flap)
+                    line.color = Colors.alpha(0xFF4A4A5A.toInt(), 0.7f)
+                    c.drawPath(path, line)
+                }
+            }
+            "room_castle" -> {
+                // torches
+                for (tx in floatArrayOf(w * 0.1f, w * 0.9f)) {
+                    val ty = L.window.top + L.window.height() * 0.5f
+                    box(c, tx - w * 0.012f, ty, tx + w * 0.012f, ty + h * 0.05f, w * 0.004f, 0xFF8A6A4A.toInt(), 0xFF4A3A2A.toInt())
+                    val fl = 0.85f + 0.15f * sin(t * 13f + tx)
+                    shader(radial(tx, ty - h * 0.01f, w * 0.12f, intArrayOf(Colors.alpha(0xFFFFB84D.toInt(), 0.35f * fl), Colors.alpha(0xFFFFB84D.toInt(), 0f))))
+                    c.drawCircle(tx, ty - h * 0.01f, w * 0.12f, fill)
+                    fill.shader = null
+                    path.reset()
+                    path.moveTo(tx, ty - h * 0.045f * fl)
+                    path.quadTo(tx + w * 0.02f, ty - h * 0.01f, tx, ty + h * 0.002f)
+                    path.quadTo(tx - w * 0.02f, ty - h * 0.01f, tx, ty - h * 0.045f * fl)
+                    path.close()
+                    shader(LinearGradient(0f, ty - h * 0.045f, 0f, ty, 0xFFFFF0A0.toInt(), 0xFFFF6A2A.toInt(), Shader.TileMode.CLAMP))
+                    c.drawPath(path, fill)
+                    fill.shader = null
                 }
             }
             "room_candy" -> {
@@ -658,8 +710,17 @@ class RoomRenderer : Painter() {
         shaded(c, path, 0xFFFFF4C2.toInt(), 0xFFFFC83D.toInt(), 0xFFC08000.toInt(), outlineW = w * 0.002f)
         box(c, tx - w * 0.012f, st - h * 0.012f, tx + w * 0.012f, st, w * 0.003f, 0xFFFFD86A.toInt(), 0xFFC08000.toInt())
 
+        // extra trophies for festival prizes, stories and collections
+        for (k in 1 until f.trophies.coerceAtMost(4)) furniture.cup(c, tx - k * w * 0.045f, st, h * 0.03f)
+
         // plant in the corner
         furniture.plant(c, L, f.plant)
+
+        // toy corner
+        furniture.toy(c, L, f.toy, f.trophies)
+
+        // cosy corner (sofa, piano, ...)
+        furniture.deco(c, L, f.deco)
     }
 
     private fun curtain(c: Canvas, l: Float, r: Float, t: Float, b: Float, left: Boolean, w: Float, style: WallStyle) {
@@ -690,6 +751,159 @@ class RoomRenderer : Painter() {
         path.reset()
         path.addRoundRect(sx - w * 0.03f, tieY - w * 0.012f, sx + w * 0.03f, tieY + w * 0.012f, w * 0.01f, w * 0.01f, Path.Direction.CW)
         shaded(c, path, 0xFFFFF1B8.toInt(), 0xFFFFC83D.toInt(), 0xFFB57B00.toInt(), outlineW = w * 0.002f)
+    }
+
+    // ------------------------------------------------------------------ beach
+
+    private fun staticBeach(c: Canvas, L: SceneLayout) {
+        val w = L.w
+        val h = L.h
+        val fy = L.floorY
+        val seaTop = fy - h * 0.1f
+        vgrad(c, 0f, seaTop, w, fy + 2f, 0xFF4FC8E8.toInt(), 0xFF1E8AC8.toInt())
+        // island far away
+        path.reset()
+        path.addOval(w * 0.62f, seaTop - h * 0.02f, w * 0.86f, seaTop + h * 0.015f, Path.Direction.CW)
+        shaded(c, path, 0xFF9BE3A8.toInt(), 0xFF4FB36A.toInt(), 0xFF2B7A40.toInt(), outline = false)
+        // sand
+        vgrad(c, 0f, fy, w, h, 0xFFFFE8B0.toInt(), 0xFFE8C080.toInt())
+        fill.shader = null
+        val r = Random(5)
+        for (i in 0 until 40) {
+            fill.color = Colors.alpha(0xFFB8905A.toInt(), 0.3f)
+            c.drawCircle(r.nextFloat() * w, fy + r.nextFloat() * (h - fy), w * 0.003f, fill)
+        }
+        for ((i, e) in listOf(0.15f to 0.93f, 0.85f to 0.9f, 0.62f to 0.97f).withIndex()) {
+            val sx = e.first * w
+            val sy = e.second * h
+            path.reset()
+            path.moveTo(sx - w * 0.02f, sy)
+            path.quadTo(sx, sy - w * 0.035f, sx + w * 0.02f, sy)
+            path.close()
+            shaded(c, path, 0xFFFFF0F4.toInt(), if (i == 1) 0xFFFFB3C6.toInt() else 0xFFFFD8C0.toInt(), 0xFFC89080.toInt(), outlineW = w * 0.002f)
+        }
+        // wooden hut frame
+        for (px in floatArrayOf(w * 0.02f, w * 0.98f)) box(c, px - w * 0.03f, 0f, px + w * 0.03f, fy + h * 0.02f, w * 0.01f, 0xFFD8A060.toInt(), 0xFF8A5A2A.toInt())
+        // thatched roof
+        val roof = h * 0.09f
+        vgrad(c, 0f, 0f, w, roof, 0xFFE8C878.toInt(), 0xFFC89A48.toInt())
+        path.reset()
+        var x = 0f
+        path.moveTo(0f, roof)
+        while (x < w) {
+            path.lineTo(x + w * 0.025f, roof + h * 0.025f)
+            path.lineTo(x + w * 0.05f, roof)
+            x += w * 0.05f
+        }
+        path.lineTo(w, 0f)
+        path.lineTo(0f, 0f)
+        path.close()
+        shader(LinearGradient(0f, 0f, 0f, roof + h * 0.025f, 0xFFE8C878.toInt(), 0xFFB08038.toInt(), Shader.TileMode.CLAMP))
+        c.drawPath(path, fill)
+        fill.shader = null
+        // palm leaves
+        for (s in intArrayOf(-1, 1)) {
+            val ax = if (s < 0) w * 0.04f else w * 0.96f
+            for (k in 0 until 4) {
+                c.save()
+                c.rotate(s * (20f + k * 22f), ax, roof)
+                path.reset()
+                path.moveTo(ax, roof)
+                path.quadTo(ax - s * w * 0.12f, roof + h * 0.02f, ax - s * w * 0.22f, roof + h * 0.07f)
+                path.quadTo(ax - s * w * 0.1f, roof + h * 0.05f, ax, roof)
+                path.close()
+                shaded(c, path, 0xFF9BE3A8.toInt(), 0xFF3FAF5A.toInt(), 0xFF1E7A3A.toInt(), outlineW = w * 0.002f)
+                c.restore()
+            }
+        }
+        // a little surfboard leaning at the wall
+        c.save()
+        c.rotate(-8f, w * 0.9f, fy)
+        path.reset()
+        path.addOval(w * 0.86f, fy - h * 0.2f, w * 0.94f, fy + h * 0.01f, Path.Direction.CW)
+        shaded(c, path, 0xFFFFE0EC.toInt(), 0xFFFF7AB0.toInt(), 0xFFC23A7A.toInt(), outlineW = w * 0.002f)
+        fill.color = Colors.alpha(Color.WHITE, 0.8f)
+        c.drawRect(w * 0.897f, fy - h * 0.2f, w * 0.903f, fy, fill)
+        c.restore()
+    }
+
+    // ------------------------------------------------------------------ castle
+
+    private fun staticCastle(c: Canvas, L: SceneLayout) {
+        val w = L.w
+        val h = L.h
+        val fy = L.floorY
+        val win = L.window
+        vgrad(c, 0f, 0f, w, fy, 0xFFB8B0C8.toInt(), 0xFF8A82A0.toInt())
+        // bricks
+        fill.shader = null
+        val bh = h * 0.035f
+        var row = 0
+        var y = 0f
+        while (y < fy) {
+            val off = if (row % 2 == 0) 0f else w * 0.06f
+            var x = -off
+            while (x < w) {
+                val shade = ((row * 7 + (x / w * 13).toInt()) % 3) * 0.04f
+                fill.color = Colors.alpha(0xFF5A5270.toInt(), 0.12f + shade)
+                c.drawRoundRect(x + w * 0.004f, y + h * 0.003f, x + w * 0.116f, y + bh - h * 0.003f, w * 0.008f, w * 0.008f, fill)
+                x += w * 0.12f
+            }
+            y += bh
+            row++
+        }
+        // arched window with a hole for the sky
+        val fw = w * 0.025f
+        path.reset()
+        path.addRoundRect(win.left - fw, win.top - fw - win.width() * 0.25f, win.right + fw, win.bottom + fw, win.width() * 0.5f, win.width() * 0.5f, Path.Direction.CW)
+        shaded(c, path, 0xFFD8D0E8.toInt(), 0xFFA8A0C0.toInt(), 0xFF6A6288.toInt(), outlineW = w * 0.003f)
+        path.reset()
+        path.addRoundRect(win.left, win.top - win.width() * 0.25f, win.right, win.bottom, win.width() * 0.45f, win.width() * 0.45f, Path.Direction.CW)
+        c.drawPath(path, clear)
+        box(c, (win.left + win.right) / 2f - w * 0.007f, win.top - win.width() * 0.25f, (win.left + win.right) / 2f + w * 0.007f, win.bottom, 0f, 0xFF8A82A0.toInt(), 0xFF5A5270.toInt())
+        // banners
+        for ((i, bx) in floatArrayOf(w * 0.62f, w * 0.84f).withIndex()) {
+            val col = if (i == 0) 0xFFE0405A.toInt() else 0xFF4A6AD6.toInt()
+            box(c, bx - w * 0.07f, h * 0.06f, bx + w * 0.07f, h * 0.075f, w * 0.005f, 0xFFFFD86A.toInt(), 0xFFC08000.toInt())
+            path.reset()
+            path.moveTo(bx - w * 0.06f, h * 0.075f)
+            path.lineTo(bx + w * 0.06f, h * 0.075f)
+            path.lineTo(bx + w * 0.06f, h * 0.3f)
+            path.lineTo(bx, h * 0.26f)
+            path.lineTo(bx - w * 0.06f, h * 0.3f)
+            path.close()
+            shaded(c, path, Colors.lighten(col, 0.3f), col, Colors.darken(col, 0.35f), outlineW = w * 0.002f)
+            Shapes.softStar(path2, bx, h * 0.16f, w * 0.03f, w * 0.014f, 5, 0f)
+            fill.color = 0xFFFFD86A.toInt()
+            c.drawPath(path2, fill)
+        }
+        // stone floor
+        vgrad(c, 0f, fy, w, h, 0xFF9A92B0.toInt(), 0xFF6A6288.toInt())
+        line.shader = null
+        line.color = Colors.alpha(0xFF3A3450.toInt(), 0.3f)
+        line.strokeWidth = maxOf(1f, w * 0.003f)
+        for (i in -10..10) {
+            val bx = L.vpX + i * w * 0.18f
+            c.drawLine(bx, h, L.vpX + (bx - L.vpX) * ((fy - L.vpY) / (h - L.vpY)), fy, line)
+        }
+        for (k in 1..6) {
+            val yy = fy + (h - fy) * (k / 6f).pow(1.6f)
+            c.drawLine(0f, yy, w, yy, line)
+        }
+        // red carpet
+        path.reset()
+        path.moveTo(w * 0.36f, fy)
+        path.lineTo(w * 0.64f, fy)
+        path.lineTo(w * 0.78f, h)
+        path.lineTo(w * 0.22f, h)
+        path.close()
+        shader(LinearGradient(0f, fy, 0f, h, 0xFFE0405A.toInt(), 0xFFA01E36.toInt(), Shader.TileMode.CLAMP))
+        c.drawPath(path, fill)
+        fill.shader = null
+        line.color = 0xFFFFD86A.toInt()
+        line.strokeWidth = w * 0.006f
+        c.drawLine(w * 0.37f, fy, w * 0.24f, h, line)
+        c.drawLine(w * 0.63f, fy, w * 0.76f, h, line)
     }
 
     // ------------------------------------------------------------------ forest
@@ -1094,6 +1308,14 @@ class RoomRenderer : Painter() {
             0xFFFFA07A.toInt(), 0xFFE0708A.toInt(), 0xFF2A2F6B.toInt(), 0xFF2A2F6B.toInt(),
         )
         private val DARK = floatArrayOf(1f, 1f, 0.45f, 0f, 0f, 0.25f, 0.7f, 1f, 1f)
+
+        /** The weather of the game (simulated or real) as a sky to draw. */
+        fun fromCore(k: de.knuffi.core.WeatherKind): Weather = when (k) {
+            de.knuffi.core.WeatherKind.SUN -> Weather.CLEAR
+            de.knuffi.core.WeatherKind.CLOUDY -> Weather.CLOUDY
+            de.knuffi.core.WeatherKind.RAIN, de.knuffi.core.WeatherKind.STORM -> Weather.RAIN
+            de.knuffi.core.WeatherKind.SNOW -> Weather.SNOW
+        }
 
         fun weatherFor(epochDay: Long, month: Int): Weather {
             val v = ((epochDay * 2654435761L) ushr 8) % 100

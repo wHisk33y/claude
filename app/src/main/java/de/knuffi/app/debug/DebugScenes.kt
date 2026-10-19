@@ -104,7 +104,42 @@ object DebugScenes {
             else -> null
         }
         val look = if (intent.getStringExtra("debug_look") == "abenteuer" || scene.startsWith("adventure")) LookStyle.ABENTEUER else LookStyle.ZAUBER
-        return Launch(scene, seed(theme, scene, form, look), hour)
+        de.knuffi.app.render.PetDirector.debugHobby = intent.getStringExtra("debug_hobby")
+        de.knuffi.app.render.PetDirector.debugToy = intent.getStringExtra("debug_toy")?.let { t -> de.knuffi.core.ToyKind.entries.firstOrNull { it.name.equals(t, true) } }
+        var state = seed(theme, scene, form, look)
+        // Extra knobs for checking the new features: fur, skin, equipment, toys.
+        val p = state.pet
+        if (p != null) {
+            var pet: Pet = p
+            intent.getStringExtra("debug_fur")?.let { pet = pet.copy(fur = it) }
+            intent.getStringExtra("debug_skin")?.let { pet = pet.copy(skin = it) }
+            intent.getStringExtra("debug_level")?.toIntOrNull()?.let { pet = pet.copy(level = it) }
+            intent.getStringExtra("debug_job")?.let { j -> pet = pet.copy(job = de.knuffi.core.Job.entries.firstOrNull { it.name.equals(j, true) }, jobXp = 9) }
+            if (pet.isCat && pet.fur == null) pet = pet.copy(fur = de.knuffi.core.Skins.DEFAULT_FUR)
+            var eq = state.equipped
+            intent.getStringExtra("debug_hat")?.let { eq = eq + (Slot.HAT to it) }
+            intent.getStringExtra("debug_face")?.let { eq = eq + (Slot.FACE to it) }
+            intent.getStringExtra("debug_neck")?.let { eq = eq + (Slot.NECK to it) }
+            intent.getStringExtra("debug_back")?.let { eq = eq + (Slot.BACK to it) }
+            intent.getStringExtra("debug_toy_item")?.let { eq = eq + (Slot.TOY to it) }
+            intent.getStringExtra("debug_deco")?.let { eq = eq + (Slot.DECO to it) }
+            intent.getStringExtra("debug_room")?.let { eq = eq + (Slot.ROOM to it) }
+            if (intent.getStringExtra("debug_nohat") != null) eq = eq - Slot.HAT
+            state = state.copy(
+                pet = pet,
+                equipped = eq,
+                owned = state.owned + eq.values,
+                skins = de.knuffi.core.Skins.costumes.map { it.id }.toSet(),
+                petKind = if (pet.isCat) de.knuffi.core.PetKind.CAT else state.petKind,
+                settings = (if (scene == "toys") state.settings.copy(toyLadder = 4, toyPlanes = 4, toyFootprints = 4, toyPaint = 4) else state.settings)
+                    .copy(overlayPinned = intent.getStringExtra("debug_pinned") != null, graphics3d = intent.getStringExtra("debug_2d") == null),
+                inventory = state.inventory + mapOf("carrot" to 2, "pumpkin" to 1, "flour" to 3, "milk" to 2, "strawberry" to 2, "tomato" to 2, "cheese" to 1),
+                finds = mapOf("f_shell" to 2, "f_snail" to 1, "f_pebble" to 1, "f_clover" to 1, "f_feather_blue" to 1),
+                visit = if (scene == "visit") de.knuffi.core.Visit(state.resting.first().id, System.currentTimeMillis() + 3_600_000L) else null,
+                friendship = if (scene == "visit") mapOf(de.knuffi.core.Friends.key(pet.id, state.resting.first().id) to 90) else emptyMap(),
+            )
+        }
+        return Launch(scene, state, hour)
     }
 
     fun initialRoute(scene: String?): Route = when (scene) {
@@ -114,6 +149,15 @@ object DebugScenes {
         "runner" -> Route.Game(MiniGame.RUNNER)
         "bubbles" -> Route.Game(MiniGame.BUBBLES)
         "simon" -> Route.Game(MiniGame.SIMON)
+        "cook" -> Route.Game(MiniGame.COOK)
+        "match" -> Route.Game(MiniGame.MATCH)
+        "flight" -> Route.Game(MiniGame.FLIGHT)
+        "stack" -> Route.Game(MiniGame.STACK)
+        "fishing" -> Route.Game(MiniGame.FISHING)
+        "puzzle" -> Route.Game(MiniGame.PUZZLE)
+        "coloring" -> Route.Game(MiniGame.COLORING)
+        "yarn" -> Route.Game(MiniGame.YARN)
+        "pacman" -> Route.Game(MiniGame.PACMAN)
         "settings" -> Route.Settings
         "gallery", "gallery1", "gallery2", "gallery3", "gallery4", "gallery5", "gallery6", "gallery7" -> Route.Gallery
         "widget" -> Route.WidgetPreview
@@ -125,6 +169,15 @@ object DebugScenes {
         "trips" -> Route.Trips
         "pass" -> Route.Pass
         "eventshop" -> Route.EventShop
+        "chat" -> Route.Chat
+        "job" -> Route.Job
+        "wardrobe" -> Route.Wardrobe
+        "kitchen" -> Route.Kitchen
+        "story" -> Route.Story
+        "finds" -> Route.Finds
+        "photos" -> Route.Photos
+        "diary" -> Route.Diary
+        "secrets" -> Route.Secrets
         else -> Route.Main
     }
 

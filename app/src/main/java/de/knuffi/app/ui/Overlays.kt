@@ -141,6 +141,11 @@ fun BoxScope.OverlayHost(state: GameState, debugScene: String?) {
                 is GameEvent.TripReturned -> overlays.add(OverlayItem.TripBack(e.petName, e.loot))
                 is GameEvent.Birthday -> overlays.add(OverlayItem.Birthday(e.petName, e.months, e.coins))
                 is GameEvent.PassTierUp -> toast("🎫", "Pass-Stufe ${e.tier}!", "Deine Belohnung wartet unter 🌍 Welt.")
+                is GameEvent.PrizeWon -> toast(e.emoji, "Gewonnen: ${e.name}!", if (e.skin) "Neuer Skin! Anziehen unter 👗 Garderobe." else "Besondere Ausrüstung! Anziehen unter 👗 Garderobe.")
+                is GameEvent.TalentUp -> toast(e.talent.emoji, "Talent ${e.talent.title}: Stufe ${e.level}!", e.talent.bonus)
+                is GameEvent.SecretFound -> toast(e.secret.emoji, "Geheimnis entdeckt!", "${e.secret.title} · +${e.secret.coins} 🪙")
+                is GameEvent.HiddenFound -> toast(e.emoji, "Gefunden!", "${e.name.replaceFirstChar { it.uppercase() }} · +${de.knuffi.core.Hidden.COINS} 🪙")
+                is GameEvent.JobUp -> toast(e.job.emoji, "Beförderung!", "${de.knuffi.core.Jobs.rank(e.level)} · Stufe ${e.level}")
                 else -> Unit
             }
         }
@@ -210,17 +215,22 @@ private fun EggFoundOverlay(line: EggLine, reason: String, onDone: () -> Unit) {
         Rays(p.gold, Modifier.size(460.dp))
         ConfettiLayer(Modifier.fillMaxSize(), 40)
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.scale(appear.value).padding(24.dp)) {
-            PetPortrait(look, Modifier.size(200.dp), sizeFactor = 0.62f) { pose, t ->
-                pose.eggWobble = sin(t * 2.5f) * 6f
-                val ph = t % 2f
-                if (ph < 0.3f) pose.eggWobble += sin(ph * 60f) * 8f
+            val basket = line == EggLine.KATZE
+            if (basket) {
+                Text("🧺", fontSize = 110.sp)
+            } else {
+                PetPortrait(look, Modifier.size(200.dp), sizeFactor = 0.62f) { pose, t ->
+                    pose.eggWobble = sin(t * 2.5f) * 6f
+                    val ph = t % 2f
+                    if (ph < 0.3f) pose.eggWobble += sin(ph * 60f) * 8f
+                }
             }
-            ExtrudedTitle("Ein neues Ei!", Color.White, p.goldDeep)
+            ExtrudedTitle(if (basket) "Ein Kätzchen!" else "Ein neues Ei!", Color.White, p.goldDeep)
             Spacer(Modifier.height(6.dp))
             Text("${line.emoji} ${line.title}", style = MaterialTheme.typography.titleLarge, color = p.gold)
             Spacer(Modifier.height(4.dp))
             Text(
-                "$reason. Ausbrüten kannst du es im Kuschelhaus unter 🌍 Welt.",
+                if (basket) "$reason: Ein Körbchen mit einem Kätzchen! Hol es im Kuschelhaus unter 🌍 Welt zu dir." else "$reason. Ausbrüten kannst du es im Kuschelhaus unter 🌍 Welt.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.White.copy(alpha = 0.9f),
                 textAlign = TextAlign.Center,
@@ -480,16 +490,18 @@ private fun HatchOverlay(state: GameState, onDone: () -> Unit) {
                 pose.armL = 0.8f + 0.2f * sin(t * 8f)
                 pose.armR = 0.8f
             }
-            ExtrudedTitle("Geschlüpft!", Color.White, p.pinkDeep)
+            val cat = state.pet?.isCat == true
+            ExtrudedTitle(if (cat) "Miau!" else "Geschlüpft!", Color.White, p.pinkDeep)
             Spacer(Modifier.height(6.dp))
             Text(
-                "Willkommen, ${state.pet?.name}! ${if (state.pet?.shiny == true) "Wow, es schillert! ✨ " else ""}Kümmere dich gut um dein neues ${state.pet?.form?.title ?: "Haustier"}. Wie es sich entwickelt, hängt ganz von dir ab.",
+                if (cat) "Willkommen zu Hause, ${state.pet?.name}! ${if (state.pet?.shiny == true) "Ihr Fell glitzert ganz besonders! ✨ " else ""}Dein Kätzchen möchte gefüttert, gestreichelt und bespielt werden. Wie es groß wird, hängt von dir ab."
+                else "Willkommen, ${state.pet?.name}! ${if (state.pet?.shiny == true) "Wow, es schillert! ✨ " else ""}Kümmere dich gut um dein neues ${state.pet?.form?.title ?: "Haustier"}. Wie es sich entwickelt, hängt ganz von dir ab.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.White.copy(alpha = 0.9f),
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(20.dp))
-            ClayTextButton("Los geht's!", onDone, emoji = "🐣")
+            ClayTextButton("Los geht's!", onDone, emoji = if (cat) "🐾" else "🐣")
         }
     }
 }

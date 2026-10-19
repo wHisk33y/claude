@@ -2,9 +2,14 @@ package de.knuffi.app.render
 
 import android.graphics.Color
 import de.knuffi.core.EggLine
+import de.knuffi.core.Emotion
 import de.knuffi.core.Form
 import de.knuffi.core.GameState
 import de.knuffi.core.Mood
+import de.knuffi.core.Skin
+import de.knuffi.core.SkinAura
+import de.knuffi.core.SkinPattern
+import de.knuffi.core.Skins
 import de.knuffi.core.Slot
 
 class PetColors(
@@ -17,6 +22,8 @@ class PetColors(
     val cheek: Int,
     val iris: Int,
     val eye: Int = 0xFF2A1F3D.toInt(),
+    /** Third pattern colour (e.g. the black patches of a calico cat). */
+    val extra: Int = accent2,
 )
 
 enum class Ears { NONE, BUNNY, CAT, ROUND, FOX, FIN, LEAF, BAT, HORSE, WRAPPER }
@@ -34,15 +41,18 @@ enum class Antenna {
 }
 
 enum class Wings { NONE, SMALL, DRAGON, ANGEL, FAIRY, BAT, JET, BEE, FEATHER }
-enum class Tail { NONE, DRAGON, FLUFFY, FISH, LEAF, BOLT, CAT, RAINBOW, FLAME, COMET, DINO }
-enum class EyeStyle { BIG, GRUMPY, GLOW }
-enum class Pattern { NONE, SPOTS, STRIPES, STARS, PANELS, SWIRL, BANDAGE, SPRINKLES, GALAXY, CRACKS, BUTTONS, BANDS, RIBS }
+enum class Tail { NONE, DRAGON, FLUFFY, FISH, LEAF, BOLT, CAT, RAINBOW, FLAME, COMET, DINO, KITTY }
+enum class EyeStyle { BIG, GRUMPY, GLOW, CAT }
+enum class Pattern {
+    NONE, SPOTS, STRIPES, STARS, PANELS, SWIRL, BANDAGE, SPRINKLES, GALAXY, CRACKS, BUTTONS, BANDS, RIBS,
+    TABBY, CALICO, TUXEDO, POINTS, HEARTS, ZIGZAG, SEEDS, ICING,
+}
 enum class Back { NONE, PLATES, SHELL, MANE, FRILL, CAPE }
-enum class Muzzle { NONE, SNOUT, NOSE, WHISKERS, BEAK, FANGS, CARROT }
+enum class Muzzle { NONE, SNOUT, NOSE, WHISKERS, BEAK, FANGS, CARROT, CAT }
 enum class Shape { ROUND, SQUARE, DROP }
 enum class Aura { NONE, FLAMES, BUBBLES, SNOW, HEARTS, LEAVES, STARS, SMOKE, BOLTS }
 
-class FormLook(
+data class FormLook(
     val colors: PetColors,
     val width: Float,
     val height: Float,
@@ -80,7 +90,7 @@ class FormLook(
 private fun c(hex: Long): Int = hex.toInt()
 
 /** Builds a full palette from a few key colours. */
-private fun pal(body: Long, accent: Long, accent2: Long, iris: Long, belly: Long? = null, eye: Long = 0xFF2A1F3D, cheek: Long = 0xFFFF9BB5): PetColors {
+private fun pal(body: Long, accent: Long, accent2: Long, iris: Long, belly: Long? = null, eye: Long = 0xFF2A1F3D, cheek: Long = 0xFFFF9BB5, extra: Long? = null): PetColors {
     val b = c(body)
     return PetColors(
         body = b,
@@ -92,8 +102,16 @@ private fun pal(body: Long, accent: Long, accent2: Long, iris: Long, belly: Long
         cheek = c(cheek),
         iris = c(iris),
         eye = c(eye),
+        extra = extra?.let { c(it) } ?: c(accent2),
     )
 }
+
+private fun catLook(width: Float, height: Float, bigBelly: Boolean = false, sparkles: Boolean = false) = FormLook(
+    pal(0xFFF2A65A, 0xFFFFB3C6, 0xFFD2722A, 0xFFE8A93A, belly = 0xFFFFF0DC),
+    width, height,
+    ears = Ears.CAT, tail = Tail.KITTY, muzzle = Muzzle.CAT, eyes = EyeStyle.CAT,
+    pattern = Pattern.TABBY, bigBelly = bigBelly, sparkles = sparkles,
+)
 
 object Looks {
     private val looks: Map<Form, FormLook> = mapOf(
@@ -259,15 +277,93 @@ object Looks {
         Form.SCHLEIMI to FormLook(pal(0xFF8AE86A, 0xFFD8FF9A, 0xFF4EB83A, 0xFF2A5A1E), 1.08f, 0.9f, shape = Shape.DROP, jelly = true, bigBelly = true, aura = Aura.BUBBLES),
         Form.HEXKATZE to FormLook(pal(0xFF3A3450, 0xFF9A6AE8, 0xFFFFD24D, 0xFFFFD24D, eye = 0xFF1A1426), 0.9f, 0.96f, ears = Ears.CAT, tail = Tail.CAT, antenna = Antenna.WITCH, muzzle = Muzzle.WHISKERS),
         Form.KUERBISKOENIG to FormLook(pal(0xFFFF8A2E, 0xFF9A5AE8, 0xFFFFD24D, 0xFF3A1E00, eye = 0xFFFFE066), 1.1f, 0.94f, pattern = Pattern.RIBS, crown = true, aura = Aura.FLAMES, eyes = EyeStyle.GLOW, sparkles = true),
+
+        // Echte Katzen: the colours come from the fur, see [Looks.compose].
+        Form.KAETZCHEN to catLook(0.9f, 0.8f),
+        Form.JUNGKATZE to catLook(0.88f, 0.9f),
+        Form.WILDFANG to catLook(0.9f, 0.88f),
+        Form.HALBSTARKE to catLook(0.86f, 0.98f),
+        Form.MOTZKATZE to catLook(0.9f, 0.94f),
+        Form.MAEUSEJAEGER to catLook(0.84f, 1.02f),
+        Form.PUMMELKATZE to catLook(1.14f, 0.9f, bigBelly = true),
+        Form.SCHMUSEKATZE to catLook(0.96f, 0.98f),
+        Form.STREUNER to catLook(0.9f, 0.96f),
+        Form.GLUECKSKATZE to catLook(0.94f, 1.0f, sparkles = true),
     )
 
     private val shinyCache = HashMap<Form, FormLook>()
+    private val composed = java.util.concurrent.ConcurrentHashMap<String, FormLook>()
 
     fun of(form: Form): FormLook = looks[form] ?: looks.getValue(Form.BABY)
 
+    private fun pattern(p: SkinPattern): Pattern? = when (p) {
+        SkinPattern.NONE -> null
+        SkinPattern.TABBY -> Pattern.TABBY
+        SkinPattern.CALICO -> Pattern.CALICO
+        SkinPattern.TUXEDO -> Pattern.TUXEDO
+        SkinPattern.POINTS -> Pattern.POINTS
+        SkinPattern.STRIPES -> Pattern.STRIPES
+        SkinPattern.SPOTS -> Pattern.SPOTS
+        SkinPattern.STARS -> Pattern.STARS
+        SkinPattern.GALAXY -> Pattern.GALAXY
+        SkinPattern.HEARTS -> Pattern.HEARTS
+        SkinPattern.ZIGZAG -> Pattern.ZIGZAG
+        SkinPattern.SEEDS -> Pattern.SEEDS
+        SkinPattern.ICING -> Pattern.ICING
+        SkinPattern.RIBS -> Pattern.RIBS
+    }
+
+    private fun aura(a: SkinAura): Aura? = when (a) {
+        SkinAura.NONE -> null
+        SkinAura.SNOW -> Aura.SNOW
+        SkinAura.HEARTS -> Aura.HEARTS
+        SkinAura.STARS -> Aura.STARS
+        SkinAura.BUBBLES -> Aura.BUBBLES
+        SkinAura.LEAVES -> Aura.LEAVES
+        SkinAura.FLAMES -> Aura.FLAMES
+        SkinAura.SMOKE -> Aura.SMOKE
+    }
+
+    /** Paints a skin (cat fur or festival costume) over a form. */
+    fun withSkin(base: FormLook, skin: Skin): FormLook {
+        val k = base.colors
+        val col = pal(
+            skin.body,
+            skin.accent ?: k.accent.toLong(),
+            skin.accent2 ?: k.accent2.toLong(),
+            skin.iris ?: k.iris.toLong(),
+            belly = skin.belly,
+            eye = k.eye.toLong(),
+            cheek = k.cheek.toLong(),
+            extra = skin.extra,
+        )
+        return base.copy(
+            colors = col,
+            // A fur decides the whole coat; a costume keeps the form's own pattern unless it brings one.
+            pattern = pattern(skin.pattern) ?: if (skin.fur) Pattern.NONE else base.pattern,
+            aura = aura(skin.aura) ?: base.aura,
+            sparkles = base.sparkles || skin.sparkle,
+        )
+    }
+
+    /** The final look of a pet: form, cat fur, festival costume and the shiny variant. */
+    fun compose(form: Form, fur: String?, skin: String?, shiny: Boolean): FormLook {
+        if (fur == null && skin == null) return if (shiny) shiny(form) else of(form)
+        val key = "${form.name}|$fur|$skin|$shiny"
+        return composed.getOrPut(key) {
+            var fl = of(form)
+            Skins[fur]?.let { fl = withSkin(fl, it) }
+            Skins[skin]?.let { fl = withSkin(fl, it) }
+            // Real cats don't change colour when they are rare, they just sparkle.
+            if (shiny) fl = if (form.isCat || skin != null) fl.copy(sparkles = true) else shift(fl)
+            fl
+        }
+    }
+
     /** Shiny variant: hue-shifted colours plus sparkles. */
-    fun shiny(form: Form): FormLook = shinyCache.getOrPut(form) {
-        val base = of(form)
+    fun shiny(form: Form): FormLook = shinyCache.getOrPut(form) { shift(of(form)) }
+
+    private fun shift(base: FormLook): FormLook {
         val k = base.colors
         fun h(color: Int, deg: Float): Int {
             val hsv = FloatArray(3)
@@ -282,8 +378,8 @@ object Looks {
             return Color.HSVToColor(Color.alpha(color), hsv)
         }
         val d = 150f
-        val col = PetColors(h(k.body, d), h(k.light, d), h(k.shade, d), h(k.belly, d), h(k.accent, 60f), h(k.accent2, 60f), k.cheek, h(k.iris, d), k.eye)
-        base.withColors(col, sparkle = true)
+        val col = PetColors(h(k.body, d), h(k.light, d), h(k.shade, d), h(k.belly, d), h(k.accent, 60f), h(k.accent2, 60f), k.cheek, h(k.iris, d), k.eye, h(k.extra, 60f))
+        return base.withColors(col, sparkle = true)
     }
 
     /** Colours and pattern of an egg of each line. */
@@ -300,6 +396,7 @@ object Looks {
         EggLine.ZUCKER -> pal(0xFFFFE8F4, 0xFFFF6AA8, 0xFF8FD8FF, 0xFF000000)
         EggLine.FROST -> pal(0xFFE8F6FF, 0xFF8FD0FF, 0xFFFFFFFF, 0xFF000000)
         EggLine.GRUSEL -> pal(0xFFFFA24D, 0xFF3A2E4A, 0xFF7A4AD6, 0xFF000000)
+        EggLine.KATZE -> pal(0xFFE8C08A, 0xFFFF8FB8, 0xFFB07A4A, 0xFF000000)
     }
 }
 
@@ -319,9 +416,16 @@ data class PetLook(
     val hungry: Boolean = false,
     val line: EggLine = EggLine.KNUFFEL,
     val shiny: Boolean = false,
+    val fur: String? = null,
+    val skin: String? = null,
+    val emotion: Emotion? = null,
+    /** Tool of the current job, shown while working. */
+    val tool: String? = null,
+    val back: String? = null,
 ) {
-    val formLook: FormLook get() = if (shiny) Looks.shiny(form) else Looks.of(form)
+    val formLook: FormLook get() = Looks.compose(form, fur, skin, shiny)
     val isEgg: Boolean get() = form == Form.EGG
+    val isCat: Boolean get() = form.isCat
 
     companion object {
         fun of(state: GameState): PetLook? {
@@ -341,6 +445,11 @@ data class PetLook(
                 hungry = pet.satiety < 30,
                 line = pet.line,
                 shiny = pet.shiny,
+                fur = pet.fur,
+                skin = pet.skin,
+                emotion = if (pet.alive && !pet.isEgg) pet.emotion(System.currentTimeMillis()) else null,
+                tool = pet.job?.tool,
+                back = state.equipped[Slot.BACK],
             )
         }
 
@@ -357,6 +466,9 @@ data class PetLook(
             hatchTaps = pet.hatchTaps,
             line = pet.line,
             shiny = pet.shiny,
+            fur = pet.fur,
+            skin = pet.skin,
+            back = state.equipped[Slot.BACK],
         )
     }
 }

@@ -69,7 +69,7 @@ object Leveling {
                 else -> f(Role.TEEN)
             }
             Stage.TEEN -> when {
-                bad -> Form.SCHATTLING
+                bad -> f(Role.SHADOW) ?: Form.SCHATTLING
                 legendReady(care) -> f(Role.LEGEND)
                 sporty -> f(Role.ADULT_SPORTY)
                 foodie -> f(Role.ADULT_FOODIE)
@@ -84,7 +84,7 @@ object Leveling {
 enum class QuestKind { COUNT, MAX }
 
 /** What a quest needs so that it can be rolled. */
-enum class QuestNeed { NONE, STEPS, RESTING }
+enum class QuestNeed { NONE, STEPS, RESTING, JOB, CHAT }
 
 @kotlinx.serialization.Serializable
 enum class QuestType(
@@ -125,6 +125,10 @@ enum class QuestType(
     SIMON_LEVEL("Schaffe {n} Töne bei Melodie", "🎵", 6, 20, 25, QuestKind.MAX, weekly = 10),
     STARS3("Hole 3 Sterne in einem Minispiel", "⭐", 1, 25, 25, weekly = 5),
     STICKER("Sammle {n} Sticker", "🎴", 1, 15, 15, weekly = 8),
+    COOK("Koche {n} Gericht", "🍳", 1, 20, 20, weekly = 6),
+    WORK("Geh {n}-mal arbeiten", "💼", 1, 20, 20, weekly = 6, need = QuestNeed.JOB),
+    CHAT("Schreib {n} Nachrichten im Chat", "💬", 5, 15, 15, weekly = 25, need = QuestNeed.CHAT),
+    ROUTINE("Schaff den ganzen Tagesablauf", "🕰️", 1, 30, 30, weekly = 4),
     ;
 
     fun label(target: Int = this.target): String = template.replace("{n}", TimeUtil.formatNumber(target))
@@ -137,20 +141,22 @@ object Quests {
     const val BONUS_XP = 30
     const val WEEKLY_BONUS_COINS = 150
 
-    private fun allowed(t: QuestType, stepsAvailable: Boolean, hasResting: Boolean) = when (t.need) {
+    private fun allowed(t: QuestType, stepsAvailable: Boolean, hasResting: Boolean, hasJob: Boolean, canChat: Boolean) = when (t.need) {
         QuestNeed.NONE -> true
         QuestNeed.STEPS -> stepsAvailable
         QuestNeed.RESTING -> hasResting
+        QuestNeed.JOB -> hasJob
+        QuestNeed.CHAT -> canChat
     }
 
-    fun roll(day: Long, stepsAvailable: Boolean, hasResting: Boolean = false): List<QuestProgress> {
-        val pool = QuestType.entries.filter { allowed(it, stepsAvailable, hasResting) }
+    fun roll(day: Long, stepsAvailable: Boolean, hasResting: Boolean = false, hasJob: Boolean = false, canChat: Boolean = false): List<QuestProgress> {
+        val pool = QuestType.entries.filter { allowed(it, stepsAvailable, hasResting, hasJob, canChat) }
         val rnd = Random(day * 7919L + 17L)
         return pool.shuffled(rnd).take(PER_DAY).map { QuestProgress(it, it.target) }
     }
 
-    fun rollWeek(week: Long, stepsAvailable: Boolean, hasResting: Boolean = false): List<QuestProgress> {
-        val pool = QuestType.entries.filter { it.weekly > 0 && allowed(it, stepsAvailable, hasResting) }
+    fun rollWeek(week: Long, stepsAvailable: Boolean, hasResting: Boolean = false, hasJob: Boolean = false, canChat: Boolean = false): List<QuestProgress> {
+        val pool = QuestType.entries.filter { it.weekly > 0 && allowed(it, stepsAvailable, hasResting, hasJob, canChat) }
         val rnd = Random(week * 104729L + 5L)
         return pool.shuffled(rnd).take(PER_WEEK).map { QuestProgress(it, it.weekly) }
     }
@@ -260,7 +266,30 @@ enum class Achievement(
     QUESTS_20("Aufgabenjäger", "Schließe 20 Tagesaufgaben ab", "📜", 80, 20, { it.counters.quests.toLong() }),
     QUESTS_100("Aufgabenmeister", "Schließe 100 Tagesaufgaben ab", "📚", 250, 100, { it.counters.quests.toLong() }),
     NIGHT_OWL("Nachteule", "Schau zwischen 0 und 4 Uhr nachts vorbei", "🦉", 25, 1, { if (it.counters.nightOwl) 1L else 0L }),
-    PERFECT("Rundum glücklich", "Alle Werte gleichzeitig über 90", "🌈", 50, 1, { if (it.counters.perfectCare) 1L else 0L });
+    PERFECT("Rundum glücklich", "Alle Werte gleichzeitig über 90", "🌈", 50, 1, { if (it.counters.perfectCare) 1L else 0L }),
+    COOK_1("Hobbykoch", "Koche dein erstes Gericht", "🍳", 30, 1, { it.counters.cooked.toLong() }),
+    COOK_25("Sternekoch", "Koche 25 Gerichte", "👨‍🍳", 200, 25, { it.counters.cooked.toLong() }),
+    GAMES_ALL("Allrounder", "Spiele jedes Minispiel mindestens einmal", "🎲", 150, 14, { s -> s.counters.bests.size.toLong() }),
+    FINDS_10("Schatzsucher", "Sammle 10 verschiedene Fundstücke", "🐚", 80, 10, { s -> s.finds.count { it.value > 0 }.toLong() }),
+    FINDSET_1("Vitrine voll", "Vervollständige eine Fundstück-Sammlung", "🏺", 120, 1, { it.findSetsDone.size.toLong() }),
+    STORY_1("Geschichtenerzähler", "Erlebe eine ganze Geschichte", "📖", 100, 1, { it.story.finished.size.toLong() }),
+    STORY_ALL("Abenteurer", "Erlebe alle Geschichten", "🧭", 300, 3, { it.story.finished.size.toLong() }),
+    FRIENDS_BEST("Beste Freunde", "Mach zwei Haustiere zu besten Freunden", "🤝", 200, 1, { s -> s.friendship.values.count { Friends.level(it) >= 4 }.toLong() }),
+    VISITS_10("Gastgeber", "Lade 10-mal Besuch ein", "🏠", 100, 10, { it.counters.visits.toLong() }),
+    ROUTINE_1("Gute Gewohnheit", "Schaff einen ganzen Tagesablauf", "🕰️", 40, 1, { it.counters.routines.toLong() }),
+    ROUTINE_10("Uhrwerk", "Schaff 10-mal den ganzen Tagesablauf", "⏰", 200, 10, { it.counters.routines.toLong() }),
+    PHOTO_1("Klick!", "Mach dein erstes Foto", "📸", 20, 1, { it.counters.photos.toLong() }),
+    PHOTO_25("Fotograf", "Mach 25 Fotos", "🖼️", 120, 25, { it.counters.photos.toLong() }),
+    SHIFT_25("Fleißig", "Geh 25-mal arbeiten", "💼", 150, 25, { it.counters.shifts.toLong() }),
+    CHAT_50("Plaudertasche", "Schreib 50 Nachrichten im Chat", "💬", 100, 50, { it.counters.chats.toLong() }),
+    PRIZE_4("Glückspilz", "Gewinne 4 Fest-Preise", "🎁", 150, 4, { it.counters.prizes.toLong() }),
+    PLANES_20("Pilot", "Fang 20 Papierflieger", "✈️", 80, 20, { it.counters.planes.toLong() }),
+    WIPES_30("Putzteufel", "Wisch 30 Farbkleckse weg", "🧽", 80, 30, { it.counters.wipes.toLong() }),
+    LEVEL_40("Legende", "Erreiche Level 40", "🏵️", 400, 40, { it.counters.maxLevel.toLong() }),
+    SECRETS_3("Geheimagent", "Entdecke 3 Geheimnisse", "🕵️", 100, 3, { it.secrets.size.toLong() }),
+    SECRETS_ALL("Meisterdetektiv", "Entdecke alle Geheimnisse", "🗝️", 500, Secret.entries.size, { it.secrets.size.toLong() }),
+    HIDDEN_1("Gefunden!", "Finde einen versteckten Gegenstand", "🔍", 20, 1, { it.counters.hiddenFound.toLong() }),
+    DIARY_7("Tagebuchschreiber", "Sammle 7 Tagebucheinträge", "📔", 80, 7, { it.diary.size.toLong() });
 
     fun progress(state: GameState): Long = metric(state).coerceAtMost(target.toLong())
 

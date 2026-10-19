@@ -215,7 +215,7 @@ fun KuschelhausScreen(state: GameState, onBack: () -> Unit, onTrips: () -> Unit)
 @Composable
 private fun EggCard(state: GameState, line: EggLine, full: Boolean, onHatch: () -> Unit) {
     val p = LocalPalette.current
-    val look = remember(line) { PetLook(Form.EGG, Mood.HAPPY, line = line) }
+    val look = remember(line) { eggPreview(line) }
     SurfaceCard(Modifier.width(150.dp), contentPadding = PaddingValues(12.dp)) {
         Box {
             PetPortrait(look, Modifier.fillMaxWidth().height(96.dp), sizeFactor = 0.8f)
@@ -225,7 +225,7 @@ private fun EggCard(state: GameState, line: EggLine, full: Boolean, onHatch: () 
         Text(line.description, style = MaterialTheme.typography.bodySmall, color = p.textMuted, maxLines = 2, minLines = 2)
         Spacer(Modifier.height(8.dp))
         ClayTextButton(
-            if (full) "Kein Platz" else "Ausbrüten",
+            if (full) "Kein Platz" else if (line == EggLine.KATZE) "Abholen" else "Ausbrüten",
             onHatch,
             small = true,
             enabled = !full,
@@ -267,6 +267,12 @@ private fun RestingCard(
         }
         Text(pet.name, style = MaterialTheme.typography.titleSmall, color = p.text, maxLines = 1)
         Text("${pet.form.title} · Lv ${pet.level}", style = MaterialTheme.typography.bodySmall, color = p.textMuted, maxLines = 1)
+        val host = state.pet
+        if (host != null && !pet.isEgg) {
+            val pts = state.friendship[de.knuffi.core.Friends.key(host.id, pet.id)] ?: 0
+            val lvl = de.knuffi.core.Friends.level(pts)
+            Text("${"💗".repeat(lvl)}${"🤍".repeat(4 - lvl)} ${de.knuffi.core.Friends.titles[lvl]}", style = MaterialTheme.typography.labelSmall, color = p.textMuted, maxLines = 1)
+        }
         Spacer(Modifier.height(8.dp))
         if (trip == null) {
             ClayTextButton("Aktivieren", onSwitch, small = true, modifier = Modifier.fillMaxWidth(), color = p.pink, deep = p.pinkDeep)
@@ -274,6 +280,9 @@ private fun RestingCard(
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (!pet.isEgg) {
                     ClayTextButton("🎒", onTrip, small = true, modifier = Modifier.weight(1f), color = p.sky, deep = p.skyDeep)
+                }
+                if (!pet.isEgg && state.pet?.alive == true && state.pet?.isEgg == false) {
+                    ClayTextButton("🏠", { GameRepository.perform(Action.Invite(pet.id)) }, small = true, modifier = Modifier.weight(1f), color = p.mint, deep = p.mintDeep)
                 }
                 ClayTextButton("👋", onRelease, small = true, modifier = Modifier.weight(1f), color = Color(0xFF9A8FB0), deep = Color(0xFF6E6484))
             }
@@ -288,7 +297,7 @@ private fun EmptySlot(modifier: Modifier = Modifier) {
     val p = LocalPalette.current
     Box(
         modifier
-            .height(236.dp)
+            .height(258.dp)
             .clip(RoundedCornerShape(24.dp))
             .border(2.dp, p.textMuted.copy(alpha = 0.25f), RoundedCornerShape(24.dp))
             .background(p.track.copy(alpha = p.track.alpha * 0.4f)),

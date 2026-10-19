@@ -11,6 +11,7 @@ import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sin
 
@@ -203,6 +204,7 @@ class PropRenderer : Painter() {
             style == "bed_race" -> intArrayOf(0xFFA8D0FF.toInt(), 0xFF4C8DFF.toInt(), 0xFF22509E.toInt())
             style == "bed_canopy" -> intArrayOf(0xFFFFD0E4.toInt(), 0xFFFF8FB8.toInt(), 0xFFC24A7E.toInt())
             style == "bed_cloud" -> intArrayOf(0xFFE8F4FF.toInt(), 0xFFB0D4FF.toInt(), 0xFF6A98D8.toInt())
+            more.bedColors(style) != null -> more.bedColors(style)!!
             else -> intArrayOf(0xFFB8C8FF.toInt(), 0xFF8C9CF4.toInt(), 0xFF5463C7.toInt())
         }
         if (blanket > 0.01f) {
@@ -278,7 +280,10 @@ class PropRenderer : Painter() {
         shaded(c, path, Color.WHITE, 0xFFC8D0E0.toInt(), 0xFF7A84A0.toInt(), outline = false)
     }
 
+    private val more = MoreFurniture()
+
     private fun styledBedBack(c: Canvas, x: Float, groundY: Float, s: Float, l: Float, r: Float, style: String) {
+        if (more.bedBack(c, x, groundY, s, l, r, style)) return
         when (style) {
             "bed_cloud" -> {
                 Shapes.cloud(path, l + s * 0.12f, groundY - s * 0.55f, s * 0.3f)
@@ -443,11 +448,15 @@ class PropRenderer : Painter() {
 
     // ------------------------------------------------------------------ ball, pill
 
-    fun ball(c: Canvas, x: Float, groundY: Float, height: Float, r: Float, rot: Float, alpha: Float) {
+    fun ball(c: Canvas, x: Float, groundY: Float, height: Float, r: Float, rot: Float, alpha: Float, yarn: Boolean = false) {
         if (alpha <= 0.01f) return
         val y = groundY - r - height
         val shadowA = (0.35f * alpha / (1f + height / (r * 3f))).coerceIn(0f, 0.35f)
         ellipseShadow(c, x, groundY, r * (1.1f - (height / (r * 12f)).coerceAtMost(0.5f)), r * 0.25f, shadowA)
+        if (yarn) {
+            yarn(c, x, y, r, rot, alpha)
+            return
+        }
         c.saveLayerAlpha(x - r * 1.1f, y - r * 1.1f, x + r * 1.1f, y + r * 1.1f, (alpha * 255).toInt())
         val colors = intArrayOf(0xFFFF5E6C.toInt(), 0xFFFFFFFF.toInt(), 0xFF4DA8FF.toInt(), 0xFFFFFFFF.toInt(), 0xFFFFD43B.toInt(), 0xFFFFFFFF.toInt())
         rect.set(x - r, y - r, x + r, y + r)
@@ -461,6 +470,76 @@ class PropRenderer : Painter() {
         fill.shader = null
         fill.color = Colors.alpha(Color.WHITE, 0.85f)
         c.drawOval(x - r * 0.55f, y - r * 0.62f, x - r * 0.15f, y - r * 0.38f, fill)
+        c.restore()
+    }
+
+    /** A hidden object: small, a little tilted and half transparent, with a faint twinkle now and then. */
+    fun peek(c: Canvas, text: String, x: Float, y: Float, size: Float, t: Float) {
+        c.save()
+        c.rotate(-18f, x, y)
+        emoji.textSize = size
+        emoji.alpha = 215
+        c.drawText(text, x, y + size * 0.35f, emoji)
+        emoji.alpha = 255
+        c.restore()
+        val tw = ((t * 0.5f) % 4f)
+        if (tw < 0.4f) {
+            val k = kotlin.math.sin(tw / 0.4f * Math.PI.toFloat())
+            Shapes.sparkle(path, x + size * 0.5f, y - size * 0.5f, size * 0.3f * k)
+            fill.shader = null
+            fill.color = Colors.alpha(Color.WHITE, 0.9f * k)
+            c.drawPath(path, fill)
+        }
+    }
+
+    /** A small flying friend (butterfly) that flaps its wings. */
+    fun flyer(c: Canvas, text: String, x: Float, y: Float, size: Float, t: Float) {
+        c.save()
+        c.scale(0.55f + 0.45f * abs(sin(t * 15f)), 1f, x, y)
+        emoji.textSize = size
+        emoji.alpha = 255
+        c.drawText(text, x, y + size * 0.35f, emoji)
+        c.restore()
+    }
+
+    /** A small name plate. */
+    fun nameTag(c: Canvas, name: String, x: Float, y: Float, size: Float) {
+        text.textSize = size
+        val tw = text.measureText(name)
+        rect.set(x - tw / 2f - size * 0.7f, y - size * 0.25f, x + tw / 2f + size * 0.7f, y + size * 1.15f)
+        fill.shader = null
+        fill.color = Colors.alpha(0xFF2A1F4A.toInt(), 0.72f)
+        c.drawRoundRect(rect, size, size, fill)
+        text.color = Color.WHITE
+        c.drawText(name, x, y + size * 0.8f, text)
+    }
+
+    /** A ball of wool for cats, with a loose thread. */
+    private fun yarn(c: Canvas, x: Float, y: Float, r: Float, rot: Float, alpha: Float) {
+        c.saveLayerAlpha(x - r * 3f, y - r * 1.2f, x + r * 1.2f, y + r * 1.5f, (alpha * 255).toInt())
+        val base = 0xFFFF6F91.toInt()
+        line.shader = null
+        line.color = Colors.darken(base, 0.1f)
+        line.strokeWidth = r * 0.12f
+        path.reset()
+        path.moveTo(x - r * 0.6f, y + r * 0.8f)
+        path.quadTo(x - r * 1.6f, y + r * 1.3f, x - r * 2.6f, y + r * 1.05f)
+        c.drawPath(path, line)
+        shader(radial(x - r * 0.35f, y - r * 0.4f, r * 1.6f, intArrayOf(Colors.lighten(base, 0.4f), base, Colors.darken(base, 0.3f)), floatArrayOf(0f, 0.5f, 1f)))
+        c.drawCircle(x, y, r, fill)
+        fill.shader = null
+        c.save()
+        c.rotate(rot, x, y)
+        line.color = Colors.alpha(Colors.darken(base, 0.35f), 0.7f)
+        line.strokeWidth = r * 0.07f
+        for (k in -2..2) {
+            rect.set(x - r * 0.95f, y - r * (0.3f + 0.12f * k), x + r * 0.95f, y + r * (0.3f - 0.12f * k))
+            c.drawArc(rect, 200f + k * 10f, 140f, false, line)
+        }
+        line.color = Colors.alpha(Colors.lighten(base, 0.5f), 0.6f)
+        rect.set(x - r * 0.7f, y - r * 0.9f, x + r * 0.7f, y + r * 0.9f)
+        c.drawArc(rect, 100f, 160f, false, line)
+        c.restore()
         c.restore()
     }
 
@@ -531,7 +610,7 @@ class PropRenderer : Painter() {
 
     // ------------------------------------------------------------------ speech bubble
 
-    fun speech(c: Canvas, msg: String, ax: Float, ay: Float, sceneW: Float, size: Float, alpha: Float) {
+    fun speech(c: Canvas, msg: String, ax: Float, ay: Float, sceneW: Float, size: Float, alpha: Float, minTop: Float = 0f) {
         if (alpha < 0.02f) return
         text.textSize = size
         val tw = text.measureText(msg)
@@ -541,7 +620,8 @@ class PropRenderer : Painter() {
         val bh = size + padY * 2f
         val tail = size * 0.6f
         val cx = ax.coerceIn(bw / 2f + size * 0.4f, sceneW - bw / 2f - size * 0.4f)
-        val bottom = ay - tail
+        // Keep the bubble on screen when the pet is high up (e.g. on top of the ladder).
+        val bottom = max(ay - tail, minTop + bh + size * 0.6f)
         val top = bottom - bh
         val scale = 0.75f + 0.25f * alpha
         c.save()

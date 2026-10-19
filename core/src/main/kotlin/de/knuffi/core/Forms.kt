@@ -39,10 +39,16 @@ enum class EggLine(
     ZUCKER("Zucker-Ei", "🍭", "Riecht nach Zuckerwatte und Karamell."),
     FROST("Frost-Ei", "❄️", "Eiskalt! Gibt es nur zum Winterzauber.", eventOnly = true),
     GRUSEL("Grusel-Ei", "🎃", "Huuuh! Gibt es nur zu Halloween.", eventOnly = true),
+
+    /** Real cats for the cat mode. Not an egg but a basket with a kitten in it. */
+    KATZE("Katzenkörbchen", "🧺", "Ein kuscheliges Körbchen. Darin schläft ein kleines Kätzchen."),
     ;
 
     /** All creatures (without the egg) that can hatch from this line. */
     val forms: List<Form> get() = Form.entries.filter { it.line == this && it != Form.EGG }
+
+    /** Fantasy egg lines (everything but the real cat). */
+    val fantasy: Boolean get() = this != KATZE
 }
 
 /** The place of a form in its family tree. */
@@ -196,13 +202,29 @@ enum class Form(
     SCHLEIMI(Stage.ADULT, "Schleimi", "Ein glibberiger, gefräßiger Schleim.", EggLine.GRUSEL, Role.ADULT_FOODIE),
     HEXKATZE(Stage.ADULT, "Hexkatze", "Eine schwarze Katze mit Hexenhut.", EggLine.GRUSEL, Role.ADULT_BALANCED),
     KUERBISKOENIG(Stage.ADULT, "Kürbiskönig", "Der König der Halloween-Nacht. Legendär!", EggLine.GRUSEL, Role.LEGEND),
+
+    // Echte Katze (Katzen-Modus)
+    KAETZCHEN(Stage.BABY, "Kätzchen", "Winzig, tapsig und unendlich neugierig.", EggLine.KATZE, Role.BABY),
+    JUNGKATZE(Stage.CHILD, "Jungkatze", "Jagt alles, was sich bewegt, am liebsten Wollknäuel.", EggLine.KATZE, Role.CHILD),
+    WILDFANG(Stage.CHILD, "Wildfang", "Ein bisschen kratzbürstig, aber eigentlich verschmust.", EggLine.KATZE, Role.CHILD_B),
+    HALBSTARKE(Stage.TEEN, "Halbstarke Katze", "Lange Beine, große Pläne.", EggLine.KATZE, Role.TEEN),
+    MOTZKATZE(Stage.TEEN, "Motzkatze", "Faucht gern mal, wenn ihr etwas nicht passt.", EggLine.KATZE, Role.TEEN_B),
+    MAEUSEJAEGER(Stage.ADULT, "Mäusejägerin", "Schlank, schnell und immer auf der Lauer.", EggLine.KATZE, Role.ADULT_SPORTY),
+    PUMMELKATZE(Stage.ADULT, "Pummelkatze", "Rund, gemütlich und ein echter Feinschmecker.", EggLine.KATZE, Role.ADULT_FOODIE),
+    SCHMUSEKATZE(Stage.ADULT, "Schmusekatze", "Schnurrt, sobald man sie nur anschaut.", EggLine.KATZE, Role.ADULT_BALANCED),
+    STREUNER(Stage.ADULT, "Streunerkatze", "Etwas zerzaust, aber treu wie Gold.", EggLine.KATZE, Role.SHADOW),
+    GLUECKSKATZE(Stage.ADULT, "Glückskatze", "Seidiges Fell und ein Blick voller Weisheit. Legendär!", EggLine.KATZE, Role.LEGEND),
     ;
 
     val isLegend: Boolean get() = role == Role.LEGEND
+    val isCat: Boolean get() = line == EggLine.KATZE
 
     companion object {
-        /** All creatures that can be collected (without the egg). */
-        val creatures: List<Form> get() = entries.filter { it != EGG }
+        /** All fantasy creatures that can be collected (without the egg and the real cats). */
+        val creatures: List<Form> get() = entries.filter { it != EGG && it.line.fantasy }
+
+        /** The real cats of the cat mode. */
+        val cats: List<Form> get() = entries.filter { it.isCat }
 
         fun find(line: EggLine, role: Role): Form? = entries.firstOrNull { it.line == line && it.role == role }
     }

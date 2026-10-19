@@ -107,11 +107,12 @@ fun WorldScreen(state: GameState, onOpen: (Route) -> Unit) {
                     badge = if (state.totalEggs > 0) "🥚 ${state.totalEggs}" else null,
                     modifier = Modifier.weight(1f).staggered(1),
                 ) { onOpen(Route.Kuschelhaus) }
+                val cats = Form.cats.count { state.discovered(it) }
                 WorldTile(
                     "📖", "Album",
-                    "${state.discoveredCount} / ${Form.creatures.size} Wesen",
+                    if (state.catMode) "$cats / ${Form.cats.size} Katzenformen" else "${state.discoveredCount} / ${Form.creatures.size} Wesen",
                     Color(0xFFB9A8FF), Color(0xFF7FB8FF),
-                    progress = state.discoveredCount / Form.creatures.size.toFloat(),
+                    progress = if (state.catMode) cats / Form.cats.size.toFloat() else state.discoveredCount / Form.creatures.size.toFloat(),
                     modifier = Modifier.weight(1f).staggered(2),
                 ) { onOpen(Route.Album) }
             }
@@ -159,6 +160,64 @@ fun WorldScreen(state: GameState, onOpen: (Route) -> Unit) {
                     progress = passTier / SeasonPass.TIERS.toFloat(),
                     modifier = Modifier.weight(1f).staggered(6),
                 ) { onOpen(Route.Pass) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                WorldTile(
+                    "🍳", "Küche",
+                    "${de.knuffi.core.Recipes.all.count { de.knuffi.core.Recipes.canCook(state, it) && de.knuffi.core.Engine.playerLevel(state) >= it.minLevel }} Rezepte bereit",
+                    Color(0xFFFFB86A), Color(0xFFFF7A5A),
+                    modifier = Modifier.weight(1f).staggered(7),
+                ) { onOpen(Route.Kitchen) }
+                val story = de.knuffi.core.Stories.current(state)
+                val storyReady = de.knuffi.core.Stories.canPlay(state, TimeUtil.epochDay(now, zone))
+                WorldTile(
+                    "📜", "Geschichten",
+                    when {
+                        story == null -> "Alle erlebt"
+                        storyReady -> "Neues Kapitel!"
+                        else -> "Morgen geht's weiter"
+                    },
+                    Color(0xFFFFE08A), Color(0xFFB99AFF),
+                    badge = if (storyReady) "📖 1" else null,
+                    modifier = Modifier.weight(1f).staggered(8),
+                ) { onOpen(Route.Story) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                WorldTile(
+                    "🐚", "Fundstücke",
+                    "${state.finds.count { it.value > 0 }} / ${de.knuffi.core.Finds.all.size} gefunden",
+                    Color(0xFF8FE0FF), Color(0xFFFFD08A),
+                    progress = state.finds.count { it.value > 0 } / de.knuffi.core.Finds.all.size.toFloat(),
+                    modifier = Modifier.weight(1f).staggered(9),
+                ) { onOpen(Route.Finds) }
+                WorldTile(
+                    "📸", "Fotoalbum",
+                    "${state.counters.photos} Fotos gemacht",
+                    Color(0xFFFF9EC4), Color(0xFF7FD3FF),
+                    modifier = Modifier.weight(1f).staggered(10),
+                ) { onOpen(Route.Photos) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                WorldTile(
+                    "📔", "Tagebuch",
+                    "${state.diary.size} ${if (state.diary.size == 1) "Eintrag" else "Einträge"}",
+                    Color(0xFFB9A8FF), Color(0xFFFF9EC4),
+                    modifier = Modifier.weight(1f).staggered(11),
+                ) { onOpen(Route.Diary) }
+                WorldTile(
+                    "🔍", "Geheimnisse",
+                    "${state.secrets.size} / ${de.knuffi.core.Secret.entries.size} entdeckt",
+                    Color(0xFF6A5AD6), Color(0xFF2EC4A0),
+                    progress = state.secrets.size / de.knuffi.core.Secret.entries.size.toFloat(),
+                    badge = if (!state.daily.hiddenFound) "👀" else null,
+                    modifier = Modifier.weight(1f).staggered(12),
+                ) { onOpen(Route.Secrets) }
             }
         }
         if (event == null) {
@@ -288,11 +347,11 @@ private fun EventBanner(state: GameState, today: java.time.LocalDate, modifier: 
                 color = Color.White.copy(alpha = 0.9f),
                 modifier = Modifier.weight(1f),
             )
-            ClayTextButton("Fest-Laden", onShop, small = true, emoji = "🛍️", color = LocalPalette.current.gold, deep = LocalPalette.current.goldDeep)
+            ClayTextButton("Gewinne & Laden", onShop, small = true, emoji = "🎡", color = LocalPalette.current.gold, deep = LocalPalette.current.goldDeep)
         }
         Spacer(Modifier.height(6.dp))
         Text(
-            "Sammle ${event.tokenName} ${event.tokenEmoji} mit Aufgaben, Minispielen, Ernten und Ausflügen.",
+            "Sammle ${event.tokenName} ${event.tokenEmoji} mit Aufgaben, Minispielen, Ernten und Ausflügen. Dafür gibt es Skins und besondere Ausrüstung zu gewinnen, und jeden Tag ein Glücksrad!",
             style = MaterialTheme.typography.bodySmall,
             color = Color.White.copy(alpha = 0.85f),
         )

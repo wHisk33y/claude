@@ -80,7 +80,10 @@ fun rememberHaptic(): () -> Unit {
     val haptics = LocalHapticFeedback.current
     val enabled = LocalHapticsEnabled.current
     return remember(haptics, enabled) {
-        { if (enabled) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+        {
+            if (enabled) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            de.knuffi.app.sound.Sounds.play(de.knuffi.app.sound.Sfx.CLICK)
+        }
     }
 }
 

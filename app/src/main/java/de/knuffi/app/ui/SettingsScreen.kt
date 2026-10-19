@@ -68,7 +68,10 @@ import de.knuffi.core.Settings
 import de.knuffi.core.LookStyle
 import de.knuffi.core.ThemeMode
 import de.knuffi.core.TimeUtil
+import de.knuffi.core.ToyKind
+import de.knuffi.core.ToyTuning
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 private val themeOrder = listOf(ThemeMode.SYSTEM, ThemeMode.LIGHT, ThemeMode.DARK)
 
@@ -143,6 +146,21 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = p.textMuted,
                 )
+                Spacer(Modifier.height(16.dp))
+                Text("Haustier-Grafik", style = MaterialTheme.typography.titleSmall, color = p.text)
+                Spacer(Modifier.height(10.dp))
+                SegmentedControl(
+                    listOf("🧊 Echtes 3D", "✏️ Gezeichnet"),
+                    if (s.graphics3d) 0 else 1,
+                    { update(s.copy(graphics3d = it == 0)) },
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    if (de.knuffi.app.render.gl.Pet3D.broken) "3D wird von diesem Handy leider nicht unterstützt, deshalb wird gezeichnet."
+                    else "Echtes 3D sieht plastischer aus und braucht etwas mehr Akku. Auf älteren Handys läuft „Gezeichnet“ flüssiger.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = p.textMuted,
+                )
             }
 
             SectionHeader("${state.pet?.name ?: "Knuffi"} auf dem Bildschirm", "📱")
@@ -211,6 +229,51 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
                     }
                 }
             }
+
+            SurfaceCard(Modifier.fillMaxWidth().padding(top = 10.dp)) {
+                SwitchRow("Namensschild", "Zeigt den Namen über bzw. unter dem Haustier auf dem Startbildschirm", s.showNameTag) { update(s.copy(showNameTag = it)) }
+                SwitchRow("Oben links anheften", "Das schwebende Haustier sitzt still in der Ecke. Geht auch mit Doppeltippen", s.overlayPinned) { update(s.copy(overlayPinned = it)) }
+            }
+
+            SectionHeader("Bildschirm-Spielereien", "🪄")
+            SurfaceCard(Modifier.fillMaxWidth()) {
+                Text(
+                    "Was ${state.pet?.name ?: "dein Haustier"} im Zimmer, auf dem Live-Hintergrund und als schwebendes Haustier anstellt. Ganz links = aus.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = p.textMuted,
+                )
+                for (kind in ToyKind.entries) {
+                    Spacer(Modifier.height(12.dp))
+                    LevelSlider(
+                        title = "${kind.emoji} ${kind.title}",
+                        level = ToyTuning.level(s, kind),
+                        labels = if (kind == ToyKind.FOOTPRINTS) ToyTuning.footprintTitles else ToyTuning.titles,
+                        describe = { toyDescription(kind, it) },
+                    ) { update(ToyTuning.with(GameRepository.state.value.settings, kind, it)) }
+                }
+            }
+
+            SectionHeader("Ton & Spiele", "🔊")
+            SurfaceCard(Modifier.fillMaxWidth()) {
+                LevelSlider(
+                    title = "Lautstärke",
+                    level = s.soundVolume,
+                    labels = listOf("Aus", "Leise", "Mittel", "Laut", "Sehr laut"),
+                    describe = { if (it == 0) "Die App ist stumm." else "Geräusche bei Aktionen, in Minispielen und wenn deine Katze schnurrt." },
+                ) {
+                    update(GameRepository.state.value.settings.copy(soundVolume = it))
+                    de.knuffi.app.sound.Sounds.play(de.knuffi.app.sound.Sfx.POP)
+                }
+                Spacer(Modifier.height(14.dp))
+                Text("Spieltempo der Minispiele", style = MaterialTheme.typography.titleSmall, color = p.text)
+                Spacer(Modifier.height(8.dp))
+                SegmentedControl(listOf("🐢 Langsam", "Normal", "🐇 Schnell"), s.gameSpeed.coerceIn(0, 2), { update(s.copy(gameSpeed = it)) })
+                Spacer(Modifier.height(6.dp))
+                Text("Langsam gibt mehr Zeit zum Reagieren. Die ruhigen Spiele (Puzzle, Ausmalen, Wollknäuel) haben nie Zeitdruck.", style = MaterialTheme.typography.bodySmall, color = p.textMuted)
+            }
+
+            SectionHeader("Wetter", "🌦️")
+            WeatherSettings(state)
 
             SectionHeader("Schwierigkeit", "⚔️")
             for (d in Difficulty.entries) {
@@ -345,7 +408,7 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
                         color = p.textMuted,
                     )
                     Spacer(Modifier.height(8.dp))
-                    ClayTextButton("Neues Ei beginnen", { confirmNewEgg = true }, small = true, emoji = "🥚", color = p.violet, deep = p.violetDeep)
+                    ClayTextButton(if (state.catMode) "Neues Kätzchen holen" else "Neues Ei beginnen", { confirmNewEgg = true }, small = true, emoji = if (state.catMode) "🐱" else "🥚", color = p.violet, deep = p.violetDeep)
                 }
             }
 
@@ -431,6 +494,14 @@ fun ConfirmDialog(title: String, text: String, confirm: String, onConfirm: () ->
     )
 }
 
+private fun toyDescription(kind: ToyKind, level: Int): String = when {
+    level == 0 -> "Aus."
+    kind == ToyKind.LADDER -> "Stellt eine Leiter auf und klettert hoch, um dir zu winken."
+    kind == ToyKind.PLANE -> "Faltet Papierflieger und wirft sie. Tippe einen Flieger an, um ihn zu fangen!"
+    kind == ToyKind.FOOTPRINTS -> "Hinterlässt beim Laufen Fußspuren, die nach etwa ${ToyTuning.footprintSeconds(level).toInt().let { if (it >= 60) "${it / 60} Min" else "$it Sek" }} verblassen."
+    else -> "Malt Farbkleckse an Wand und Boden (höchstens ${ToyTuning.maxSplashes(level)}). Wisch sie mit dem Finger weg!"
+}
+
 private fun hoursText(h: Double): String {
     val half = (h * 2).roundToInt() / 2.0
     val text = if (half % 1.0 == 0.0) "${half.toInt()}" else "${half.toInt()},5"
@@ -480,6 +551,93 @@ private fun LevelSlider(title: String, level: Int, labels: List<String>, describ
     }
     Spacer(Modifier.height(4.dp))
     Text(describe(shown), style = MaterialTheme.typography.bodySmall, color = p.textMuted)
+}
+
+@Composable
+private fun WeatherSettings(state: GameState) {
+    val p = LocalPalette.current
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val s = state.settings
+    var city by remember { mutableStateOf(s.weatherPlace) }
+    var busy by remember { mutableStateOf(false) }
+    val now = System.currentTimeMillis()
+    val w = de.knuffi.core.Weather.current(state, now, GameRepository.zone)
+    fun fetch(lat: Double, lon: Double, place: String) {
+        busy = true
+        scope.launch {
+            val ok = de.knuffi.app.data.WeatherFetcher.refresh(lat, lon, place)
+            busy = false
+            GameRepository.message(if (ok) "Wetter aktualisiert! ${GameRepository.current.weather.kind.emoji}" else "Das Wetter konnte nicht geladen werden. Ist das Internet an?")
+        }
+    }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            val loc = de.knuffi.app.data.WeatherFetcher.lastLocation(context)
+            if (loc != null) {
+                GameRepository.perform(Action.UpdateSettings(GameRepository.current.settings.copy(weatherLat = 0.0, weatherLon = 0.0, weatherPlace = "Mein Standort")))
+                fetch(loc.first, loc.second, "Mein Standort")
+            } else {
+                GameRepository.message("Kein Standort bekannt. Gib einfach deine Stadt ein.")
+            }
+        }
+    }
+    SurfaceCard(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(w.kind.emoji, style = MaterialTheme.typography.headlineMedium)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text("${w.kind.title}, ${w.tempC} °C${if (w.place.isNotEmpty()) " · ${w.place}" else ""}", style = MaterialTheme.typography.titleSmall, color = p.text)
+                Text(de.knuffi.core.Weather.hint(w), style = MaterialTheme.typography.bodySmall, color = p.textMuted)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        SegmentedControl(
+            listOf("🎲 Simuliert", "🌍 Echtes Wetter"),
+            if (s.weatherMode == de.knuffi.core.WeatherMode.REAL) 1 else 0,
+            { update -> GameRepository.perform(Action.UpdateSettings(s.copy(weatherMode = if (update == 1) de.knuffi.core.WeatherMode.REAL else de.knuffi.core.WeatherMode.SIMULATED))) },
+        )
+        Spacer(Modifier.height(8.dp))
+        if (s.weatherMode == de.knuffi.core.WeatherMode.SIMULATED) {
+            Text("Das Wetter wird passend zur Jahreszeit ausgedacht. Kein Internet nötig.", style = MaterialTheme.typography.bodySmall, color = p.textMuted)
+        } else {
+            Text("Das echte Wetter kommt vom kostenlosen Dienst Open-Meteo. Dafür braucht die App Internet und deinen ungefähren Ort.", style = MaterialTheme.typography.bodySmall, color = p.textMuted)
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = city,
+                onValueChange = { city = it.take(40) },
+                label = { Text("Stadt") },
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = p.pink, focusedLabelColor = p.pink, cursorColor = p.pink),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ClayTextButton("Stadt suchen", {
+                    busy = true
+                    scope.launch {
+                        val r = de.knuffi.app.data.WeatherFetcher.geocode(city)
+                        if (r == null) {
+                            busy = false
+                            GameRepository.message("Diese Stadt wurde nicht gefunden.")
+                        } else {
+                            city = r.third
+                            GameRepository.perform(Action.UpdateSettings(GameRepository.current.settings.copy(weatherLat = r.first, weatherLon = r.second, weatherPlace = r.third)))
+                            fetch(r.first, r.second, r.third)
+                        }
+                    }
+                }, emoji = "🔎", small = true, enabled = city.isNotBlank() && !busy, color = p.sky, deep = p.skyDeep)
+                ClayTextButton("Mein Standort", {
+                    permission.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                }, emoji = "📍", small = true, enabled = !busy, color = p.mint, deep = p.mintDeep)
+            }
+            if (state.weather.fetchedAt > 0) {
+                Spacer(Modifier.height(6.dp))
+                Text("Zuletzt aktualisiert vor ${TimeUtil.formatDuration(now - state.weather.fetchedAt)}.", style = MaterialTheme.typography.labelSmall, color = p.textMuted)
+            }
+        }
+    }
 }
 
 @Composable

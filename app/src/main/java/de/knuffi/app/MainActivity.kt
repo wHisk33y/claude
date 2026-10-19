@@ -12,6 +12,8 @@ import de.knuffi.app.screen.ScreenPet
 import de.knuffi.app.steps.StepTracker
 import de.knuffi.app.ui.AppRoot
 import de.knuffi.core.Action
+import kotlinx.coroutines.launch
+import androidx.lifecycle.lifecycleScope
 
 class MainActivity : ComponentActivity() {
 
@@ -19,6 +21,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         GameRepository.init(this)
+        de.knuffi.app.sound.Sounds.init(applicationContext)
         val debug = if (BuildConfig.DEBUG) DebugScenes.fromIntent(intent) else null
         if (debug != null) {
             GameRepository.enterPreview(debug.state)
@@ -49,6 +52,7 @@ class MainActivity : ComponentActivity() {
         GameRepository.tick(userPresent = true)
         StepTracker.start(this)
         Notifier.cancelCare(this)
+        lifecycleScope.launch { de.knuffi.app.data.WeatherFetcher.refreshIfNeeded(this@MainActivity) }
     }
 
     override fun onStop() {

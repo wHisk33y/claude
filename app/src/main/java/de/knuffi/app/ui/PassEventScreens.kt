@@ -161,6 +161,11 @@ fun EventShopScreen(state: GameState, onBack: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 Text("Gerade ist kein Fest", style = MaterialTheme.typography.titleLarge, color = p.text)
                 Text("${next.title} beginnt in $days Tagen.", style = MaterialTheme.typography.bodyMedium, color = p.textMuted, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "Dort gibt es zu gewinnen: " + de.knuffi.core.EventPrizes.of(next).joinToString(", ") { "${it.emoji} ${it.name}" } + ". Dazu ein tägliches Glücksrad!",
+                    style = MaterialTheme.typography.bodyMedium, color = p.text, textAlign = TextAlign.Center,
+                )
             }
         } else {
             EventOffers(state, event, today)
@@ -199,6 +204,8 @@ private fun EventOffers(state: GameState, event: de.knuffi.core.SeasonEvent, tod
                 }
             }
         }
+        item { EventPrizeSection(state, event) }
+        item { de.knuffi.app.ui.components.SectionHeader("Fest-Laden", "🛍️") }
         items(EventShop.offers(event), key = { it.id }) { offer ->
             OfferRow(state, offer, event.tokenEmoji)
         }

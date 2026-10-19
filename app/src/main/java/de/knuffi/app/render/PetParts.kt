@@ -262,6 +262,47 @@ internal fun PetRenderer.drawTailPart(c: Canvas, fl: FormLook, pose: PetPose, bw
                 c.restore()
             }
         }
+        Tail.KITTY -> {
+            val tc = if (fl.pattern == Pattern.POINTS) col.accent2 else col.body
+            val curl = sin(t * 1.7f) * 0.5f + 0.5f
+            path.reset()
+            path.moveTo(bx - side * u * 0.05f, by + u * 0.06f)
+            path.cubicTo(
+                bx + side * u * 0.45f, by + u * 0.12f,
+                bx + side * u * 0.42f, by - u * 0.4f,
+                bx + side * u * (0.5f + 0.12f * curl), by - u * (0.6f + 0.05f * wag),
+            )
+            line.shader = null
+            line.color = Colors.darken(tc, 0.22f)
+            line.strokeWidth = u * 0.155f
+            c.drawPath(path, line)
+            line.color = tc
+            line.strokeWidth = u * 0.12f
+            c.drawPath(path, line)
+            // rings for tabbies, a coloured tip for the others
+            val pm = android.graphics.PathMeasure(path, false)
+            val len = pm.length
+            val pos = FloatArray(2)
+            if (fl.pattern == Pattern.TABBY) {
+                fill.shader = null
+                fill.color = Colors.alpha(col.accent2, 0.85f)
+                for (k in 1..4) {
+                    pm.getPosTan(len * (0.2f + k * 0.17f), pos, null)
+                    c.drawCircle(pos[0], pos[1], u * 0.055f, fill)
+                }
+            } else if (fl.pattern == Pattern.CALICO || fl.pattern == Pattern.TUXEDO) {
+                pm.getPosTan(len, pos, null)
+                fill.shader = null
+                fill.color = if (fl.pattern == Pattern.TUXEDO) col.belly else col.extra
+                c.drawCircle(pos[0], pos[1], u * 0.065f, fill)
+            }
+            line.color = Colors.alpha(col.light, 0.5f)
+            line.strokeWidth = u * 0.03f
+            c.save()
+            c.translate(-u * 0.02f, -u * 0.02f)
+            c.drawPath(path, line)
+            c.restore()
+        }
         Tail.RAINBOW -> {
             val colors = intArrayOf(0xFFFF7A9A.toInt(), 0xFFFFC46A.toInt(), 0xFFFFF07A.toInt(), 0xFF8AE8A0.toInt(), 0xFF8AC8FF.toInt(), 0xFFB99AFF.toInt())
             for ((i, k) in colors.withIndex()) {
@@ -1053,6 +1094,139 @@ internal fun PetRenderer.drawPatternPart(c: Canvas, fl: FormLook, pose: PetPose,
             }
             stroke(c, path3, Colors.alpha(Colors.darken(col.body, 0.25f), 0.5f), u * 0.035f)
         }
+        Pattern.TABBY -> {
+            // the "M" on the forehead
+            path3.reset()
+            for (k in -1..1) {
+                val x = fx * 0.8f + k * bw * 0.16f
+                path3.moveTo(x, top + bh * 0.08f)
+                path3.lineTo(x + k * bw * 0.03f, top + bh * (if (k == 0) 0.42f else 0.34f))
+            }
+            stroke(c, path3, Colors.alpha(pc, 0.8f), u * 0.045f)
+            // stripes on the sides
+            path3.reset()
+            for (s in intArrayOf(-1, 1)) {
+                val sf = s.toFloat()
+                for (k in 0..3) {
+                    val y = top + bh * (0.55f + k * 0.34f)
+                    path3.moveTo(sf * bw * 1.05f, y)
+                    path3.quadTo(sf * bw * 0.82f, y + bh * 0.04f, sf * bw * (0.6f - 0.04f * k), y + bh * 0.16f)
+                }
+            }
+            stroke(c, path3, Colors.alpha(pc, 0.75f), u * 0.05f)
+            // cheek lines
+            path3.reset()
+            for (s in intArrayOf(-1, 1)) {
+                path3.moveTo(fx + s * bw * 0.62f, cy + bh * 0.02f)
+                path3.lineTo(fx + s * bw * 0.86f, cy - bh * 0.06f)
+            }
+            stroke(c, path3, Colors.alpha(pc, 0.6f), u * 0.03f)
+        }
+        Pattern.CALICO -> {
+            fun patch(x: Float, y: Float, r: Float, color: Int, seed: Int) {
+                path3.reset()
+                for (i in 0..8) {
+                    val a = i / 8f * (Math.PI * 2).toFloat()
+                    val rr = r * (0.8f + 0.35f * hash(i, seed))
+                    val px = x + kotlin.math.cos(a) * rr
+                    val py = y + sin(a) * rr * 0.85f
+                    if (i == 0) path3.moveTo(px, py) else path3.lineTo(px, py)
+                }
+                path3.close()
+                fill.color = Colors.alpha(color, 0.95f)
+                c.drawPath(path3, fill)
+            }
+            patch(-bw * 0.62f + fx * 0.3f, top + bh * 0.3f, bw * 0.42f, pc, 3)
+            patch(bw * 0.78f, cy + bh * 0.2f, bw * 0.36f, col.extra, 7)
+            patch(-bw * 0.85f, cy + bh * 0.62f, bw * 0.3f, col.extra, 11)
+            patch(bw * 0.55f, top + bh * 0.18f, bw * 0.22f, col.extra, 5)
+            patch(bw * 0.2f, bottom - bh * 0.15f, bw * 0.26f, pc, 9)
+        }
+        Pattern.TUXEDO -> {
+            fill.color = col.belly
+            c.drawOval(fx * 0.5f - bw * 0.42f, cy + bh * 0.22f, fx * 0.5f + bw * 0.42f, bottom + bh * 0.2f, fill)
+            c.drawOval(fx - u * 0.22f, cy + bh * 0.06f, fx + u * 0.22f, cy + bh * 0.48f, fill)
+            path3.reset()
+            path3.moveTo(fx * 0.8f, top + bh * 0.18f)
+            path3.lineTo(fx - u * 0.03f, cy + bh * 0.1f)
+            path3.lineTo(fx + u * 0.03f, cy + bh * 0.1f)
+            path3.close()
+            c.drawPath(path3, fill)
+        }
+        Pattern.POINTS -> {
+            shaderFill(radial(fx, cy + bh * 0.18f, bw * 0.62f, intArrayOf(Colors.alpha(pc, 0.95f), Colors.alpha(pc, 0.6f), Colors.alpha(pc, 0f)), floatArrayOf(0f, 0.55f, 1f)))
+            c.drawCircle(fx, cy + bh * 0.18f, bw * 0.62f, fill)
+            fill.shader = null
+        }
+        Pattern.HEARTS -> for (i in 0 until 8) {
+            val x = (hash(i, 21) - 0.5f) * bw * 1.8f
+            val y = top + bh * 0.15f + hash(i, 23) * bh * 1.7f
+            if (abs(x - fx) < bw * 0.55f && abs(y - cy) < bh * 0.4f) continue
+            Shapes.heart(path3, x, y, u * (0.09f + 0.04f * hash(i, 25)))
+            fill.color = Colors.alpha(pc, 0.85f)
+            c.drawPath(path3, fill)
+        }
+        Pattern.ZIGZAG -> {
+            val y0 = cy + bh * 0.5f
+            path3.reset()
+            path3.moveTo(-bw * 1.3f, y0)
+            var x = -bw * 1.3f
+            var up = true
+            while (x < bw * 1.3f) {
+                x += bw * 0.2f
+                path3.lineTo(x, y0 + if (up) -bh * 0.12f else bh * 0.04f)
+                up = !up
+            }
+            path3.lineTo(bw * 1.3f, y0 + bh * 0.25f)
+            path3.lineTo(-bw * 1.3f, y0 + bh * 0.25f)
+            path3.close()
+            fill.color = Colors.alpha(col.accent, 0.9f)
+            c.drawPath(path3, fill)
+            fill.color = Colors.alpha(pc, 0.9f)
+            for (i in 0 until 5) {
+                val dx = (hash(i, 31) - 0.5f) * bw * 1.6f
+                val dy = top + bh * 0.2f + hash(i, 33) * bh * 0.5f
+                if (abs(dx - fx) < bw * 0.5f) continue
+                c.drawCircle(dx, dy, u * 0.05f, fill)
+            }
+        }
+        Pattern.SEEDS -> {
+            fill.color = Colors.alpha(col.accent, 0.95f)
+            c.drawRect(-bw * 1.5f, bottom - bh * 0.22f, bw * 1.5f, bottom + bh, fill)
+            fill.color = Colors.alpha(Colors.lighten(col.accent, 0.5f), 0.9f)
+            c.drawRect(-bw * 1.5f, bottom - bh * 0.27f, bw * 1.5f, bottom - bh * 0.22f, fill)
+            fill.color = Colors.alpha(pc, 0.9f)
+            for (i in 0 until 10) {
+                val x = (hash(i, 41) - 0.5f) * bw * 1.7f
+                val y = top + bh * 0.25f + hash(i, 43) * bh * 1.35f
+                if (abs(x - fx) < bw * 0.55f && abs(y - cy) < bh * 0.42f) continue
+                Shapes.drop(path3, x, y, u * 0.035f)
+                c.drawPath(path3, fill)
+            }
+        }
+        Pattern.ICING -> {
+            path3.reset()
+            val y0 = top + bh * 0.42f
+            path3.moveTo(-bw * 1.3f, top - bh * 0.2f)
+            path3.lineTo(-bw * 1.3f, y0)
+            var x = -bw * 1.3f
+            var k = 0
+            while (x < bw * 1.3f) {
+                val drip = if (k % 3 == 1) bh * 0.22f else bh * 0.08f
+                path3.quadTo(x + bw * 0.1f, y0 + drip, x + bw * 0.2f, y0)
+                x += bw * 0.2f
+                k++
+            }
+            path3.lineTo(bw * 1.3f, top - bh * 0.2f)
+            path3.close()
+            fill.color = Colors.alpha(pc, 0.92f)
+            c.drawPath(path3, fill)
+            val colors = intArrayOf(0xFFFF6A8A.toInt(), 0xFF6AC8FF.toInt(), 0xFFFFE06A.toInt(), 0xFF8AE88A.toInt())
+            for (i in 0 until 6) {
+                fill.color = colors[i % colors.size]
+                c.drawCircle((hash(i, 51) - 0.5f) * bw * 1.4f, top + bh * (0.12f + 0.2f * hash(i, 53)), u * 0.022f, fill)
+            }
+        }
     }
 }
 
@@ -1122,6 +1296,34 @@ internal fun PetRenderer.drawMuzzle(c: Canvas, fl: FormLook, pose: PetPose, bw: 
             path.quadTo(fx - u * 0.02f, my + u * 0.1f, fx - u * 0.09f, my - u * 0.05f)
             path.close()
             shaded(c, path, Colors.lighten(col.accent, 0.4f), col.accent, Colors.darken(col.accent, 0.3f))
+        }
+        Muzzle.CAT -> {
+            val pad = if (fl.pattern == Pattern.POINTS) Colors.lighten(col.accent2, 0.15f) else Colors.lerp(col.belly, Color.WHITE, 0.3f)
+            for (s in intArrayOf(-1, 1)) {
+                ovalPath(path, fx + s * u * 0.075f - u * 0.085f, my - u * 0.06f, fx + s * u * 0.075f + u * 0.085f, my + u * 0.06f)
+                shaded(c, path, Colors.lighten(pad, 0.4f), pad, Colors.darken(pad, 0.12f), outline = false)
+                fill.shader = null
+                fill.color = Colors.alpha(Colors.darken(pad, 0.4f), 0.5f)
+                for (k in 0..2) c.drawCircle(fx + s * u * (0.05f + k * 0.03f), my - u * 0.01f + (k % 2) * u * 0.025f, u * 0.008f, fill)
+            }
+            path.reset()
+            path.moveTo(fx - u * 0.045f, my - u * 0.075f)
+            path.lineTo(fx + u * 0.045f, my - u * 0.075f)
+            path.quadTo(fx + u * 0.01f, my - u * 0.01f, fx, my - u * 0.02f)
+            path.quadTo(fx - u * 0.01f, my - u * 0.01f, fx - u * 0.045f, my - u * 0.075f)
+            path.close()
+            shaded(c, path, 0xFFFFD0DC.toInt(), 0xFFFF8FAA.toInt(), 0xFFC25A78.toInt(), outline = false)
+            val dark = Color.red(col.body) + Color.green(col.body) + Color.blue(col.body) < 300
+            val whisker = if (dark) Colors.alpha(Color.WHITE, 0.85f) else Colors.alpha(Colors.darken(col.body, 0.6f), 0.55f)
+            for (s in intArrayOf(-1, 1)) {
+                val sf = s.toFloat()
+                path3.reset()
+                for (k in -1..1) {
+                    path3.moveTo(fx + sf * u * 0.13f, my + k * u * 0.025f)
+                    path3.quadTo(fx + sf * bw * 0.6f, my + k * u * 0.05f - u * 0.03f, fx + sf * bw * 0.86f, my + k * u * 0.075f - u * 0.01f)
+                }
+                stroke(c, path3, whisker, u * 0.011f)
+            }
         }
         Muzzle.FANGS -> Unit // drawn after the mouth
         Muzzle.CARROT -> {
@@ -1200,6 +1402,14 @@ internal fun PetRenderer.drawEggDecor(c: Canvas, eggLine: EggLine, col: PetColor
     fill.shader = null
     when (eggLine) {
         EggLine.KNUFFEL -> Unit
+        EggLine.KATZE -> for (i in 0 until 4) {
+            // paw prints
+            val x = (hash(i, 61) - 0.5f) * ew * 1.2f
+            val y = -eh * (0.4f + i * 0.33f)
+            fill.color = Colors.alpha(col.accent2, 0.8f)
+            c.drawOval(x - ew * 0.1f, y - ew * 0.06f, x + ew * 0.1f, y + ew * 0.09f, fill)
+            for (k in -1..1) c.drawCircle(x + k * ew * 0.08f, y - ew * 0.12f - (if (k == 0) ew * 0.03f else 0f), ew * 0.04f, fill)
+        }
         EggLine.WALD -> {
             for (i in 0 until 5) {
                 val x = (hash(i, 1) - 0.5f) * ew * 1.5f

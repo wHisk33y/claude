@@ -19,7 +19,19 @@ class SceneModel {
     var look: PetLook? = null
     var needs: List<Need> = emptyList()
     var showBubble: Boolean = true
+
+    /** Pixels at the top that are covered by UI (speech bubbles stay below). */
+    var safeTop: Float = 0f
     var furniture: Furnishing = Furnishing()
+
+    /** A pet visiting from the Kuschelhaus. */
+    var guest: PetLook? = null
+
+    /** Name tag under the pet (home screen wallpaper). */
+    var nameTag: String? = null
+
+    /** Today's hidden object, if not found yet. */
+    var hidden: de.knuffi.core.HiddenItem? = null
 }
 
 /**
@@ -30,7 +42,9 @@ class SceneRenderer {
     val layout = SceneLayout()
     val room = RoomRenderer()
     val pet = PetRenderer()
+    private val guestPet = PetRenderer()
     val props = PropRenderer()
+    val toyArt = ToyRenderer()
     private var cache: Bitmap? = null
     private var cacheKey = ""
     private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
@@ -38,6 +52,26 @@ class SceneRenderer {
 
     /** Pet bounds in canvas coordinates. */
     val petBounds = RectF()
+    private val hiddenRect = RectF()
+
+    /** True if (x, y) hits today's hidden object. */
+    fun hitHidden(x: Float, y: Float): Boolean = !hiddenRect.isEmpty && hiddenRect.contains(x, y)
+
+    /** Things in the cosy room that react to taps: "picture", "window", "lamp" or null. */
+    fun hitObject(x: Float, y: Float, room: String): String? {
+        if (!this.room.isCozy(room)) return null
+        val L = layout
+        val win = L.window
+        val pl = L.w * 0.6f
+        val pr = L.w * 0.86f
+        val pb = win.top + win.height() * 0.55f
+        if (x in pl..pr && y in win.top..pb) return "picture"
+        if (win.contains(x, y)) return "window"
+        val lx = L.w * 0.53f
+        val ly = win.top + win.height() * 0.2f
+        if (kotlin.math.hypot(x - lx, y - ly) < L.w * 0.08f) return "lamp"
+        return null
+    }
     var headNX = 0.5f
         private set
     var headNY = 0.5f
@@ -59,6 +93,8 @@ class SceneRenderer {
         d.maxX = layout.maxX
         d.bowlX = layout.bowlX
         d.bedX = layout.bedX
+        // On the home screen the ladder reaches almost up to the clock.
+        d.toys.ladderHeight = if (kind == LayoutKind.WALLPAPER) max(1.55f, (layout.groundY - h * 0.2f) / layout.petSize) else 1.55f
     }
 
     fun release() {
@@ -77,7 +113,7 @@ class SceneRenderer {
         cacheKey = key
     }
 
-    fun draw(c: Canvas, w: Float, h: Float, kind: LayoutKind, m: SceneModel, d: PetDirector, ps: ParticleSystem?, t: Float) {
+    fun draw(c: Canvas, w: Float, h: Float, kind: LayoutKind, m: SceneModel, d: PetDirector, ps: ParticleSystem?, t: Float, guest: PetDirector? = null, friends: FriendPlay? = null) {
         configure(d, w, h, kind)
         val L = layout
         val f = m.furniture
@@ -86,12 +122,41 @@ class SceneRenderer {
         cache?.let { c.drawBitmap(it, 0f, 0f, bitmapPaint) }
         room.drawAnimated(c, L, m.room, m.hour, t, f)
 
+        val toys = d.toys
+        // Paint on the wall sits behind everything else.
+        for (sp in toys.splashes) {
+            if (sp.onFloor) continue
+            val sx = sp.x * w
+            val sy = L.groundY - sp.lift * L.petSize
+            sp.sx = sx
+            sp.sy = sy
+            sp.sr = sp.size * L.petSize
+            toyArt.splash(c, sp, sx, sy, sp.sr)
+        }
+
         val look = m.look
         val cozy = room.isCozy(m.room)
         val pr = d.props
         val propS = L.propSize
         val bedS = propS * 0.92f
         val backY = L.backGroundY
+
+        // Footprints and paint on the floor
+        val life = de.knuffi.core.ToyTuning.footprintSeconds(d.toyConfig.footprints)
+        for (fp in toys.footprints) {
+            val fy = L.groundY + (backY - L.groundY) * fp.z + L.petSize * 0.01f
+            val age = (t - fp.born) / life.coerceAtLeast(0.1f)
+            toyArt.footprint(c, fp, fp.x * w, fy, L.petSize * 0.055f * (1f - 0.2f * fp.z), (1f - age).coerceIn(0f, 1f))
+        }
+        for (sp in toys.splashes) {
+            if (!sp.onFloor) continue
+            val sx = sp.x * w
+            val sy = L.groundY + L.h * 0.015f
+            sp.sx = sx
+            sp.sy = sy
+            sp.sr = sp.size * L.petSize
+            toyArt.splash(c, sp, sx, sy, sp.sr)
+        }
 
         // Pet placement with depth
         val z = d.z
@@ -125,6 +190,35 @@ class SceneRenderer {
         // Tub (behind the pet part)
         if (pr.tub > 0.01f) props.tubBack(c, pr.tubX * w, L.groundY, L.petSize, pr.tub, t)
 
+        // Today's hidden object peeks out somewhere
+        val hid = m.hidden
+        if (hid != null) {
+            val hx = hid.spot.x * w
+            val hy = hid.spot.y * h
+            val hs = L.petSize * 0.16f
+            props.peek(c, hid.emoji, hx, hy, hs, t)
+            hiddenRect.set(hx - hs * 1.2f, hy - hs * 1.2f, hx + hs * 1.2f, hy + hs * 1.2f)
+        } else {
+            hiddenRect.setEmpty()
+        }
+
+        // The ladder stands behind the pet
+        if (toys.ladderExtend > 0.01f) {
+            toyArt.ladder(c, toys.ladderX * w, L.groundY, toys.ladderHeight * L.petSize, L.petSize * 0.5f, toys.ladderExtend)
+        }
+
+        // A visiting friend walks around behind the pet
+        val gl = m.guest
+        if (gl != null && guest != null && !guest.hidden) {
+            guest.minX = L.minX
+            guest.maxX = L.maxX
+            val gz = guest.z
+            val gs = L.petSize * 0.85f * (1f - 0.2f * gz)
+            val gFloor = L.groundY + (backY - L.groundY) * gz
+            if (guest.showsShadow) guestPet.drawShadow(c, guest.x * w, gFloor, gs, guest.pose, gl)
+            guestPet.draw(c, guest.x * w, gFloor - guest.yOffset * gs, gs, gl, guest.pose)
+        }
+
         // The pet
         if (look != null) {
             if (d.showsShadow) pet.drawShadow(c, px, floorY, petSize, d.pose, look)
@@ -141,17 +235,51 @@ class SceneRenderer {
             props.bedFront(c, L.bedX * w, backY, bedS, pr.blanket, cozy, t, f.bed)
         }
         if (pr.tub > 0.01f) props.tubFront(c, pr.tubX * w, L.groundY, L.petSize, pr.tub, if (pr.inTub) 1f else 0.5f, t)
-        if (pr.ball) props.ball(c, pr.bx * w, L.groundY, pr.by * L.petSize, L.petSize * 0.13f, pr.brot, pr.ballAlpha)
+        if (pr.ball) props.ball(c, pr.bx * w, L.groundY, pr.by * L.petSize, L.petSize * 0.13f, pr.brot, pr.ballAlpha, yarn = look?.isCat == true)
+        if (friends != null && friends.ballVisible && gl != null) {
+            props.ball(c, friends.ballX * w, L.groundY, friends.ballH * L.petSize, L.petSize * 0.12f, friends.ballRot, 1f, yarn = look?.isCat == true)
+        }
+        if (pr.folding >= 0f && look != null) {
+            // paper in the hands that turns into a plane
+            val hx = px + d.pose.turn * petSize * 0.08f
+            val hy = ground - petSize * 0.36f
+            if (pr.folding < 0.5f) {
+                val k = 1f - pr.folding
+                toyArt.paper(c, hx, hy, petSize * 0.16f * (0.6f + 0.4f * k), pr.folding * 180f)
+            } else {
+                toyArt.plane(c, hx, hy, petSize * 0.13f, -10f, 1f, 1f)
+            }
+        }
+        toys.plane?.let { pl ->
+            val sx = pl.x * w
+            val sy = L.groundY - pl.h * L.petSize - L.petSize * 0.04f
+            pl.sx = sx
+            pl.sy = sy
+            pl.sr = L.petSize * 0.2f
+            toyArt.plane(c, sx, sy, L.petSize * 0.2f, pl.angle, if (pl.vx < 0f) -1f else 1f, pl.alpha)
+        }
         pr.pill?.let { props.floatingItem(c, pr.pillX * w, ground - pr.pillY * petSize, petSize * 0.2f, it, t) }
         for (i in 0 until m.poops.coerceAtMost(3)) props.stink(c, poopX(i) * w, poopBottom, poopR, t, i)
 
         room.drawLighting(c, L, m.room, m.hour, t, m.lightsOff, m.darkUi, f)
         ps?.draw(c, w, h)
+        d.companion?.let { props.flyer(c, it, d.companionX * w, d.companionY * h, L.petSize * 0.17f, t) }
+
+        val tag = m.nameTag
+        if (tag != null && look != null && !look.isEgg) {
+            props.nameTag(c, tag, px, floorY + L.petSize * 0.08f, max(L.w * 0.032f, petSize * 0.075f))
+        }
+
+        val gb = guest?.bubble
+        if (m.showBubble && gl != null && guest != null && gb != null && !guest.hidden) {
+            val gs = L.petSize * 0.85f
+            props.speech(c, gb, guestPet.head.x, guestPet.head.y - gs * 0.04f, w, max(L.w * 0.04f, gs * 0.1f), guest.bubbleAlpha, m.safeTop)
+        }
 
         val bubble = d.bubble
         if (m.showBubble && bubble != null && look != null) {
             val size = max(L.w * 0.042f, petSize * 0.1f)
-            props.speech(c, bubble, pet.head.x, pet.head.y - petSize * 0.04f, w, size, d.bubbleAlpha)
+            props.speech(c, bubble, pet.head.x, pet.head.y - petSize * 0.04f, w, size, d.bubbleAlpha, m.safeTop)
         }
     }
 }

@@ -65,6 +65,29 @@ private fun themeFor(game: MiniGame) = when (game) {
     MiniGame.RUNNER -> GameTheme(Color(0xFFFFC48A), Color(0xFFFFE9B0), Color(0xFFFF7A5A), Color(0xFFD1503A))
     MiniGame.BUBBLES -> GameTheme(Color(0xFF3FB8E8), Color(0xFF9CE8F0), Color(0xFF2EA8D6), Color(0xFF1A78A8))
     MiniGame.SIMON -> GameTheme(Color(0xFFD8B0FF), Color(0xFFFFD0E8), Color(0xFFB27CFF), Color(0xFF7E50D6))
+    MiniGame.COOK -> GameTheme(Color(0xFFFFE0B8), Color(0xFFFFF4E0), Color(0xFFFF8A5C), Color(0xFFD1603A))
+    MiniGame.MATCH -> GameTheme(Color(0xFFFFC2DC), Color(0xFFFFF0C8), Color(0xFFFF6FA8), Color(0xFFD14A80))
+    MiniGame.FLIGHT -> GameTheme(Color(0xFF8FD0FF), Color(0xFFE8F6FF), Color(0xFF4DA8FF), Color(0xFF2A70C8))
+    MiniGame.STACK -> GameTheme(Color(0xFF8A6AC8), Color(0xFFFFC2DC), Color(0xFFB27CFF), Color(0xFF7E50D6))
+    MiniGame.FISHING -> GameTheme(Color(0xFF4FB8E8), Color(0xFFB8ECFF), Color(0xFF2EA8D6), Color(0xFF1A78A8))
+    MiniGame.PUZZLE -> GameTheme(Color(0xFFE8F4FF), Color(0xFFFFE8F4), Color(0xFF7C9CFF), Color(0xFF5070D6))
+    MiniGame.COLORING -> GameTheme(Color(0xFFFFF6E8), Color(0xFFF0E8FF), Color(0xFFFFA24D), Color(0xFFD1782A))
+    MiniGame.YARN -> GameTheme(Color(0xFFFFF0F6), Color(0xFFE8F6FF), Color(0xFFFF6F91), Color(0xFFD14A6A))
+    MiniGame.PACMAN -> GameTheme(Color(0xFF4A2E8A), Color(0xFF8A7CFF), Color(0xFF7C6CFF), Color(0xFF4A3BC4))
+}
+
+/** Emojis that tell what the newer games are about. */
+private fun previewEmojis(game: MiniGame): List<String> = when (game) {
+    MiniGame.COOK -> listOf("🥕", "🍅", "🧀", "🍲")
+    MiniGame.MATCH -> listOf("🍬", "🍩", "🍪", "🧁", "🍭")
+    MiniGame.FLIGHT -> listOf("✈️", "⭕", "☁️", "⛈️")
+    MiniGame.STACK -> listOf("🛏️", "🛏️", "🛏️")
+    MiniGame.FISHING -> listOf("🎣", "🐟", "🐠", "🐡")
+    MiniGame.PUZZLE -> listOf("🧩", "🧩", "🧩")
+    MiniGame.COLORING -> listOf("🖍️", "🎨", "🌸", "💜")
+    MiniGame.YARN -> listOf("🧶", "🧶", "🧶")
+    MiniGame.PACMAN -> listOf("🍬", "🍪", "👻", "👻")
+    else -> emptyList()
 }
 
 @Composable
@@ -126,14 +149,7 @@ fun GamesScreen(state: GameState, onStart: (MiniGame) -> Unit) {
 private fun GameCard(state: GameState, game: MiniGame, look: PetLook?, blocker: String?, modifier: Modifier = Modifier, onStart: () -> Unit) {
     val p = LocalPalette.current
     val theme = themeFor(game)
-    val best = when (game) {
-        MiniGame.CATCH -> state.counters.bestCatch.takeIf { it > 0 }?.let { "🏅 $it Punkte" }
-        MiniGame.MEMORY -> state.counters.bestMemoryMoves.takeIf { it > 0 }?.let { "🏅 $it Züge" }
-        MiniGame.WHACK -> state.counters.bestWhack.takeIf { it > 0 }?.let { "🏅 $it Treffer" }
-        MiniGame.RUNNER -> state.counters.bestRunner.takeIf { it > 0 }?.let { "🏅 $it m" }
-        MiniGame.BUBBLES -> state.counters.bestBubbles.takeIf { it > 0 }?.let { "🏅 $it Blasen" }
-        MiniGame.SIMON -> state.counters.bestSimon.takeIf { it > 0 }?.let { "🏅 $it Töne" }
-    }
+    val best = Engine.best(state, game)?.let { "🏅 $it ${game.unit}" }
     val maxCoins = Engine.gameMaxCoins(game)
     val start = { if (blocker == null) onStart() else GameRepository.message(blocker) }
     SurfaceCard(modifier.fillMaxWidth(), onClick = start, contentPadding = PaddingValues(0.dp)) {
@@ -157,7 +173,13 @@ private fun GameCard(state: GameState, game: MiniGame, look: PetLook?, blocker: 
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(game.title, style = MaterialTheme.typography.titleLarge, color = p.text)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(game.title, style = MaterialTheme.typography.titleLarge, color = p.text)
+                        if (game.calm) {
+                            Spacer(Modifier.width(8.dp))
+                            Pill("🌿 ruhig", color = p.mint.copy(alpha = 0.25f))
+                        }
+                    }
                     Text(game.description, style = MaterialTheme.typography.bodyMedium, color = p.textMuted)
                 }
             }
@@ -195,7 +217,24 @@ private fun GamePreview(game: MiniGame, look: PetLook?, theme: GameTheme, modifi
             MiniGame.RUNNER -> drawRunner(t, look, renderer, pose, emoji)
             MiniGame.BUBBLES -> drawBubbles(t, look, renderer, pose, emoji)
             MiniGame.SIMON -> drawSimon(t, look, renderer, pose, emoji)
+            else -> drawGeneric(t, look, renderer, pose, emoji, previewEmojis(game))
         }
+    }
+}
+
+private fun DrawScope.drawGeneric(t: Float, look: PetLook?, renderer: PetRenderer, pose: PetPose, paint: Paint, emojis: List<String>) {
+    val w = size.width
+    val h = size.height
+    for ((i, e) in emojis.withIndex()) {
+        val x = w * (0.45f + 0.5f * (i + 0.5f) / emojis.size)
+        val y = h * 0.45f + sin(t * 2f + i * 1.3f) * h * 0.12f
+        emojiAt(paint, e, x, y, h * 0.24f)
+    }
+    drawPet(renderer, pose, look, w * 0.2f, h * 0.95f, h * 0.55f, t) {
+        eyes = de.knuffi.app.render.EyeShape.HAPPY
+        mouth = de.knuffi.app.render.MouthShape.OPEN
+        armR = 0.7f + 0.3f * sin(t * 5f)
+        turn = 0.4f
     }
 }
 

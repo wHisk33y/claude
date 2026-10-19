@@ -72,6 +72,7 @@ import de.knuffi.app.ui.components.lighter
 import de.knuffi.app.ui.components.rememberHaptic
 import de.knuffi.app.ui.components.staggered
 import de.knuffi.app.ui.theme.LocalPalette
+import androidx.compose.ui.layout.onSizeChanged
 import de.knuffi.core.Action
 import de.knuffi.core.Catalog
 import de.knuffi.core.DailyRewards
@@ -84,11 +85,13 @@ import de.knuffi.core.Pet
 private enum class Sheet { FOOD, CARE }
 
 @Composable
-fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () -> Unit, onOpenShop: () -> Unit) {
+fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () -> Unit, onOpenShop: () -> Unit, onOpen: (Route) -> Unit = {}) {
     val pet = state.pet ?: return
     var sheet by remember { mutableStateOf<Sheet?>(null) }
+    var moodSheet by remember { mutableStateOf(false) }
     val act: (Action) -> Unit = { GameRepository.perform(it) }
     val navSpace = bottomBarSpace()
+    var hudPx by remember { mutableStateOf(0) }
     val dockHeight = if (pet.isEgg) (if (state.count(Catalog.GLITTER) > 0 || pet.shiny) 160.dp else 112.dp) else 124.dp
 
     Box(Modifier.fillMaxSize()) {
@@ -101,13 +104,14 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
                     .shadow(12.dp, RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp))
                     .clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp)),
                 hourOverride = debugHour,
+                topInsetPx = hudPx,
                 onPetTap = { act(if (pet.isEgg) Action.HatchTap else Action.Stroke) },
                 onStroke = { act(Action.Stroke) },
             )
             Spacer(Modifier.height(navSpace + dockHeight - 34.dp))
         }
 
-        Hud(state, pet, onOpenSettings, Modifier.align(Alignment.TopCenter))
+        Hud(state, pet, onOpenSettings, Modifier.align(Alignment.TopCenter).onSizeChanged { hudPx = it.height }, onMood = { moodSheet = true }, onOpen = onOpen)
 
         Column(
             Modifier
@@ -145,6 +149,7 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
         }
     }
 
+    if (moodSheet) MoodSheet(state) { moodSheet = false }
     when (sheet) {
         Sheet.FOOD -> ItemSheet(
             title = "Was gibt's zu essen?",
@@ -181,7 +186,7 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
 }
 
 @Composable
-private fun Hud(state: GameState, pet: Pet, onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
+private fun Hud(state: GameState, pet: Pet, onOpenSettings: () -> Unit, modifier: Modifier = Modifier, onMood: () -> Unit = {}, onOpen: (Route) -> Unit = {}) {
     val p = LocalPalette.current
     Column(
         modifier
@@ -213,8 +218,84 @@ private fun Hud(state: GameState, pet: Pet, onOpenSettings: () -> Unit, modifier
                 GlassIconButton("⚙️", onOpenSettings, size = 42.dp)
             }
         }
+        if (!pet.isEgg && pet.alive) {
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                val e = pet.emotion(System.currentTimeMillis())
+                Row(
+                    Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(p.glass)
+                        .border(1.dp, p.glassBorder, RoundedCornerShape(50))
+                        .clickable { onMood() }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(e.emoji, fontSize = 18.sp)
+                    Spacer(Modifier.width(6.dp))
+                    Text(e.title, style = MaterialTheme.typography.labelLarge, color = p.text)
+                }
+                Spacer(Modifier.width(6.dp))
+                val w = de.knuffi.core.Weather.current(state, System.currentTimeMillis(), GameRepository.zone)
+                Text(
+                    "${w.kind.emoji} ${w.tempC}°",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = p.text,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(p.glass)
+                        .border(1.dp, p.glassBorder, RoundedCornerShape(50))
+                        .clickable { onMood() }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                )
+                Spacer(Modifier.weight(1f))
+                HudButton("📸", null) { onOpen(Route.Photos) }
+                Spacer(Modifier.width(6.dp))
+                HudButton("👗", null) { onOpen(Route.Wardrobe) }
+                Spacer(Modifier.width(6.dp))
+                HudButton("💼", if (pet.level < de.knuffi.core.Jobs.UNLOCK_LEVEL) "${de.knuffi.core.Jobs.UNLOCK_LEVEL}" else null) { onOpen(Route.Job) }
+                Spacer(Modifier.width(6.dp))
+                HudButton("💬", if (pet.level < de.knuffi.core.Chat.UNLOCK_LEVEL) "${de.knuffi.core.Chat.UNLOCK_LEVEL}" else null) { onOpen(Route.Chat) }
+            }
+        }
+        val guest = state.visit?.let { v -> state.resting.firstOrNull { it.id == v.petId } }
+        if (guest != null) {
+            Row(
+                Modifier
+                    .padding(top = 8.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(p.glass)
+                    .border(1.dp, p.glassBorder, RoundedCornerShape(50))
+                    .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("🏠 ${guest.name} ist zu Besuch", style = MaterialTheme.typography.labelLarge, color = p.text)
+                Spacer(Modifier.width(8.dp))
+                ClayTextButton("Zusammen spielen", { GameRepository.perform(Action.PlayTogether) }, small = true, emoji = "🤝", color = p.mint, deep = p.mintDeep)
+            }
+        }
         if (Engine.canClaimDaily(state, System.currentTimeMillis(), GameRepository.zone)) {
             GiftButton(state, Modifier.align(Alignment.End).padding(top = 10.dp, end = 4.dp))
+        }
+    }
+}
+
+/** Round glass button in the HUD; [lock] shows the level it opens at. */
+@Composable
+private fun HudButton(emoji: String, lock: String?, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    Box {
+        GlassIconButton(emoji, onClick, size = 42.dp, modifier = Modifier.then(if (lock != null) Modifier.graphicsLayer { alpha = 0.6f } else Modifier))
+        if (lock != null) {
+            Text(
+                "🔒$lock",
+                fontSize = 9.sp,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .clip(RoundedCornerShape(50))
+                    .background(p.violet)
+                    .padding(horizontal = 4.dp),
+            )
         }
     }
 }
@@ -324,13 +405,13 @@ private fun ActionDock(pet: Pet, modifier: Modifier = Modifier, onFeed: () -> Un
     val p = LocalPalette.current
     GlassPanel(modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)) {
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            StatAction("🍙", "Füttern", pet.satiety, p.satiety, p.orangeDeep, onFeed, alert = pet.satiety < 30, modifier = Modifier.staggered(0))
+            StatAction(if (pet.isCat) "🐟" else "🍙", "Füttern", pet.satiety, p.satiety, p.orangeDeep, onFeed, alert = pet.satiety < 30, modifier = Modifier.staggered(0))
             StatAction(
                 "🎾", "Spielen", pet.joy, p.joy, p.pinkDeep, { act(Action.Play) },
                 enabled = !pet.sleeping, alert = pet.joy < 30 && !pet.sleeping, modifier = Modifier.staggered(1),
             )
             StatAction(
-                if (pet.poops > 0) "💩" else "🫧", "Putzen", pet.hygiene, p.hygiene, p.skyDeep, { act(Action.Clean) },
+                if (pet.poops > 0) "💩" else if (pet.isCat) "✨" else "🫧", if (pet.isCat) "Bürsten" else "Putzen", pet.hygiene, p.hygiene, p.skyDeep, { act(Action.Clean) },
                 alert = pet.poops > 0 || pet.hygiene < 30, modifier = Modifier.staggered(2),
             )
             StatAction(
@@ -489,7 +570,7 @@ private fun ItemSheet(
                                         },
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    Text(item.emoji, fontSize = 36.sp)
+                                    Text(item.icon(state.catMode), fontSize = 36.sp)
                                 }
                                 Text(
                                     if (item.unlimited) "∞" else "×${state.count(item.id)}",
@@ -502,7 +583,7 @@ private fun ItemSheet(
                                 )
                             }
                             Text(
-                                item.name,
+                                item.label(state.catMode),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = p.text,
                                 textAlign = TextAlign.Center,

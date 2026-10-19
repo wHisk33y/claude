@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.service.wallpaper.WallpaperService
+import android.view.MotionEvent
 import android.view.SurfaceHolder
 import androidx.core.content.res.ResourcesCompat
 import de.knuffi.app.R
@@ -41,6 +42,8 @@ class KnuffiWallpaperService : WallpaperService() {
     private inner class PetEngine : Engine() {
         private val handler = Handler(Looper.getMainLooper())
         private val director = PetDirector(seed = 11)
+        private val friends = de.knuffi.app.render.FriendPlay(23)
+        private val guest = PetDirector(seed = 13).apply { place(0.7f); toyConfig.ladder = 0; toyConfig.planes = 0; toyConfig.paint = 0; toyConfig.footprints = 0 }
         private val particles = ParticleSystem()
         private val scene = SceneRenderer()
         private val model = SceneModel()
@@ -62,6 +65,8 @@ class KnuffiWallpaperService : WallpaperService() {
             particles.typeface = tf
             val today = LocalDate.now()
             model.weather = RoomRenderer.weatherFor(today.toEpochDay(), today.monthValue)
+            setTouchEventsEnabled(true)
+            director.onToy = { kind -> if (!GameRepository.previewMode && !isPreview) GameRepository.perform(Action.Toy(kind)) }
             scope = MainScope().also { s ->
                 s.launch {
                     GameRepository.events.collect { if (visible) director.onEvent(it, particles, scene.headNX, scene.headNY) }
@@ -106,8 +111,30 @@ class KnuffiWallpaperService : WallpaperService() {
             return null
         }
 
+        private var lastTouchX = 0f
+        private var lastTouchY = 0f
+
+        override fun onTouchEvent(event: MotionEvent) {
+            // Swiping over paint splashes wipes them away. The launcher still scrolls its pages.
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    lastTouchX = event.x
+                    lastTouchY = event.y
+                }
+                MotionEvent.ACTION_MOVE -> if (director.toys.splashes.isNotEmpty()) {
+                    val dist = kotlin.math.hypot(event.x - lastTouchX, event.y - lastTouchY)
+                    director.wipe(event.x, event.y, dist / (kotlin.math.min(width, height) * 0.5f), particles, width, height)
+                    lastTouchX = event.x
+                    lastTouchY = event.y
+                }
+            }
+            super.onTouchEvent(event)
+        }
+
         private fun handleTap(x: Float, y: Float) {
             if (width <= 0f || height <= 0f) return
+            if (director.tapToys(x, y, particles, width, height)) return
+            if (director.toys.splashes.isNotEmpty()) director.wipe(x, y, 0.34f, particles, width, height)
             val b = scene.petBounds
             val pad = b.width() * 0.2f
             val look = model.look
@@ -117,6 +144,7 @@ class KnuffiWallpaperService : WallpaperService() {
                     GameRepository.perform(Action.HatchTap)
                 } else {
                     director.onTap()
+                    GameRepository.current.pet?.name?.let { director.say("Ich bin $it! 😊", 2f) }
                     GameRepository.perform(Action.Stroke)
                 }
             } else {
@@ -154,6 +182,10 @@ class KnuffiWallpaperService : WallpaperService() {
                 model.poops = state.pet?.poops ?: 0
                 model.lightsOff = state.pet?.sleeping == true
                 model.darkUi = darkMode(state)
+                director.toyConfig.from(state.settings)
+                model.guest = state.visit?.let { v -> state.resting.firstOrNull { it.id == v.petId } }?.let { PetLook.of(it, state).copy(hat = null, face = null, neck = null, back = null, sleeping = false, mood = de.knuffi.core.Mood.HAPPY) }
+                model.nameTag = state.pet?.name?.takeIf { state.settings.showNameTag }
+                model.weather = RoomRenderer.fromCore(de.knuffi.core.Weather.current(state, System.currentTimeMillis(), ZoneId.systemDefault()).kind)
             }
             var canvas: Canvas? = null
             val holder = surfaceHolder
@@ -166,8 +198,19 @@ class KnuffiWallpaperService : WallpaperService() {
                 if (canvas != null) {
                     scene.configure(director, width, height, LayoutKind.WALLPAPER)
                     director.update(t, model.look, model.needs, particles, scene.headNX, scene.headNY)
+                    val gl = model.guest
+                    if (gl != null) {
+                        guest.update(t + 3.7f, gl, emptyList(), particles, scene.headNX, scene.headNY)
+                        val st = GameRepository.current
+                        val pet = st.pet
+                        val v = st.visit
+                        val level = if (pet != null && v != null) de.knuffi.core.Friends.level(st.friendship[de.knuffi.core.Friends.key(pet.id, v.petId)] ?: 0) else 0
+                        friends.update(t, director, guest, level, particles)
+                    } else {
+                        friends.reset()
+                    }
                     particles.update(t)
-                    scene.draw(canvas, width, height, LayoutKind.WALLPAPER, model, director, particles, t)
+                    scene.draw(canvas, width, height, LayoutKind.WALLPAPER, model, director, particles, t, guest, friends)
                 }
             } catch (_: Exception) {
                 // Surface went away mid frame; the next visibility change restarts drawing.

@@ -25,6 +25,7 @@ class PetWorker(context: Context, params: WorkerParameters) : CoroutineWorker(co
                 GameRepository.perform(Action.StepReading(it), userPresent = false)
             }
         }
+        runCatching { de.knuffi.app.data.WeatherFetcher.refreshIfNeeded(ctx) }
         GameRepository.tick(userPresent = false, sync = true)
         runCatching { Notifier.checkAndNotify(ctx) }
         runCatching { WidgetUpdater.updateAll(ctx) }

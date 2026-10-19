@@ -99,6 +99,15 @@ sealed interface Route {
     data object Walk : Route
     data object Pass : Route
     data object EventShop : Route
+    data object Chat : Route
+    data object Job : Route
+    data object Wardrobe : Route
+    data object Kitchen : Route
+    data object Story : Route
+    data object Finds : Route
+    data object Photos : Route
+    data object Diary : Route
+    data object Secrets : Route
 }
 
 /** Space that scrolling pages keep free at the bottom for the floating navigation bar. */
@@ -118,6 +127,9 @@ fun AppRoot(debug: DebugScenes.Launch? = null) {
     val dark = isDarkTheme(state.settings.themeMode)
     KnuffiTheme(dark, adventure = state.settings.look == LookStyle.ABENTEUER) {
         SystemBars(dark)
+        LaunchedEffect(Unit) {
+            GameRepository.events.collect { de.knuffi.app.sound.Sounds.onEvent(it, GameRepository.current) }
+        }
         LaunchedEffect(Unit) {
             // Keep stats moving while the app is open.
             while (true) {
@@ -213,6 +225,7 @@ private fun MainNavigation(state: GameState, debug: DebugScenes.Launch?) {
                             debugHour = debug?.hour,
                             onOpenSettings = { route = Route.Settings },
                             onOpenShop = { tab = Tab.SHOP },
+                            onOpen = { route = it },
                         )
                         Tab.WORLD -> WorldScreen(state) {
                             backToKuschelhaus = false
@@ -240,6 +253,15 @@ private fun MainNavigation(state: GameState, debug: DebugScenes.Launch?) {
             Route.Walk -> WalkScreen(state, onBack = { route = Route.Main })
             Route.Pass -> PassScreen(state, onBack = { route = Route.Main })
             Route.EventShop -> EventShopScreen(state, onBack = { route = Route.Main })
+            Route.Chat -> ChatScreen(state, onBack = { route = Route.Main })
+            Route.Job -> JobScreen(state, onBack = { route = Route.Main })
+            Route.Wardrobe -> WardrobeScreen(state, onBack = { route = Route.Main })
+            Route.Kitchen -> KitchenScreen(state, onBack = { route = Route.Main }, onPlay = { route = Route.Game(it) })
+            Route.Story -> StoryScreen(state, onBack = { route = Route.Main })
+            Route.Finds -> FindsScreen(state, onBack = { route = Route.Main })
+            Route.Photos -> PhotoScreen(state, onBack = { route = Route.Main })
+            Route.Diary -> DiaryScreen(state, onBack = { route = Route.Main })
+            Route.Secrets -> SecretsScreen(state, onBack = { route = Route.Main })
         }
     }
 }
@@ -275,7 +297,7 @@ private fun FloatingNavBar(state: GameState, selected: Tab, modifier: Modifier =
                 .padding(6.dp),
         ) {
             val itemW = maxWidth / Tab.entries.size
-            // Sliding, glossy indicator
+            // Sliding indicator
             Box(
                 Modifier
                     .offset(x = itemW * index)
@@ -285,17 +307,7 @@ private fun FloatingNavBar(state: GameState, selected: Tab, modifier: Modifier =
                     .shadow(8.dp, RoundedCornerShape(24.dp), ambientColor = p.pink, spotColor = p.pink)
                     .clip(RoundedCornerShape(24.dp))
                     .background(Brush.linearGradient(listOf(p.pink, p.violet))),
-            ) {
-                Box(
-                    Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 4.dp)
-                        .fillMaxWidth(0.6f)
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.White.copy(alpha = 0.3f)),
-                )
-            }
+            )
             Row(Modifier.fillMaxSize()) {
                 for (t in Tab.entries) {
                     val active = t == selected

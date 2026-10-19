@@ -69,24 +69,30 @@ import de.knuffi.app.ui.components.staggered
 import de.knuffi.app.ui.theme.LocalPalette
 import de.knuffi.core.Action
 import de.knuffi.core.Catalog
+import de.knuffi.core.EggLine
 import de.knuffi.core.Form
 import de.knuffi.core.GameState
 import de.knuffi.core.Item
 import de.knuffi.core.ItemKind
 import de.knuffi.core.Mood
+import de.knuffi.core.Shop
 import de.knuffi.core.Slot
+import de.knuffi.core.TimeUtil
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.text.style.TextDecoration
 
 private data class ShopTab(val label: String, val kinds: List<ItemKind>, val top: Color, val bottom: Color)
 
 private val shopTabs = listOf(
-    ShopTab("🍙 Essen", listOf(ItemKind.FOOD), Color(0xFFFFD6A8), Color(0xFFFFB7C9)),
+    ShopTab("🍙 Essen", listOf(ItemKind.FOOD, ItemKind.INGREDIENT), Color(0xFFFFD6A8), Color(0xFFFFB7C9)),
     ShopTab("🧴 Pflege", listOf(ItemKind.CARE), Color(0xFFB8F0DC), Color(0xFFA8D8FF)),
     ShopTab("🥚 Eier", listOf(ItemKind.EGG), Color(0xFFFFF1C4), Color(0xFFFFD0E4)),
     ShopTab("🌱 Garten", listOf(ItemKind.SEED), Color(0xFFD0F5C8), Color(0xFFFFF0B0)),
-    ShopTab("🎀 Mode", listOf(ItemKind.HAT, ItemKind.FACE, ItemKind.NECK), Color(0xFFE2D6FF), Color(0xFFFFC8E4)),
+    ShopTab("🎀 Mode", listOf(ItemKind.HAT, ItemKind.FACE, ItemKind.NECK, ItemKind.BACK), Color(0xFFE2D6FF), Color(0xFFFFC8E4)),
     ShopTab(
         "🛋️ Zimmer",
-        listOf(ItemKind.ROOM, ItemKind.WALL, ItemKind.RUG, ItemKind.BED, ItemKind.PLANT, ItemKind.LAMP, ItemKind.PICTURE),
+        listOf(ItemKind.ROOM, ItemKind.WALL, ItemKind.RUG, ItemKind.BED, ItemKind.PLANT, ItemKind.LAMP, ItemKind.PICTURE, ItemKind.TOY, ItemKind.DECO),
         Color(0xFFBDE6FF),
         Color(0xFFD9CCFF),
     ),
@@ -122,7 +128,10 @@ fun ShopScreen(state: GameState) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf<Item?>(null) }
     val current = shopTabs[tab]
-    val shown = Catalog.items.filter { it.kind in current.kinds && !it.unlimited && (it.sold || it.id in state.owned) }
+    val shown = Catalog.items.filter {
+        it.kind in current.kinds && !it.unlimited && (it.sold || it.id in state.owned) &&
+            (it.kind != ItemKind.EGG || if (state.catMode) it.line == EggLine.KATZE else it.line != EggLine.KATZE || state.catsUnlocked)
+    }
     val navSpace = bottomBarSpace()
 
     LazyVerticalGrid(
@@ -136,11 +145,13 @@ fun ShopScreen(state: GameState) {
             Column {
                 ScreenHeader("Shop", "🛍️", "Leckereien, Eier, Mode und Möbel") { CoinPill(state.coins) }
                 Spacer(Modifier.height(8.dp))
+                ShopSpecials(state) { selected = it }
+                Spacer(Modifier.height(10.dp))
                 ShopTabs(tab) { tab = it }
                 if (current.kinds.first() == ItemKind.EGG) {
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Jede Ei-Sorte hat ihre eigene Familie. Ausgebrütet wird im Kuschelhaus unter 🌍 Welt.",
+                        if (state.catMode) "Ein Körbchen mit einem neuen Kätzchen. Abholen kannst du es im Kuschelhaus unter 🌍 Welt." else "Jede Ei-Sorte hat ihre eigene Familie. Ausgebrütet wird im Kuschelhaus unter 🌍 Welt.",
                         style = MaterialTheme.typography.bodySmall,
                         color = LocalPalette.current.textMuted,
                     )
@@ -155,12 +166,83 @@ fun ShopScreen(state: GameState) {
     selected?.let { item -> ItemDetailSheet(item, state) { selected = null } }
 }
 
+private fun shopDay(): Long = TimeUtil.epochDay(System.currentTimeMillis(), GameRepository.zone)
+
+/** Daily deal and mystery box above the tabs. */
+@Composable
+private fun ShopSpecials(state: GameState, onOpen: (Item) -> Unit) {
+    val p = LocalPalette.current
+    val deal = remember(shopDay()) { Shop.dealOf(shopDay()) }
+    val dealPrice = Shop.price(deal, shopDay())
+    val dealOwned = deal.id in state.owned
+    val level = state.pet?.level ?: 1
+    val mysteryLeft = remember(state.owned, level) { Shop.mysteryPool(state, level).size }
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
+        SurfaceCard(
+            Modifier.weight(1f).fillMaxHeight(),
+            onClick = { onOpen(deal) },
+            color = if (p.dark) p.surfaceAlt else Color(0xFFFFF3D6),
+            contentPadding = PaddingValues(12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(deal.icon(state.catMode), fontSize = 30.sp)
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "−${Shop.DEAL_PERCENT} %",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(p.red).padding(horizontal = 7.dp, vertical = 2.dp),
+                )
+            }
+            Text("Angebot des Tages", style = MaterialTheme.typography.labelMedium, color = p.textMuted)
+            Text(deal.label(state.catMode), style = MaterialTheme.typography.titleSmall, color = p.text, maxLines = 1)
+            if (dealOwned) {
+                Text("Im Besitz", style = MaterialTheme.typography.labelLarge, color = p.mintDeep)
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${deal.price}", style = MaterialTheme.typography.labelMedium.copy(textDecoration = TextDecoration.LineThrough), color = p.textMuted)
+                    Spacer(Modifier.width(6.dp))
+                    CoinIcon(size = 16.dp)
+                    Spacer(Modifier.width(3.dp))
+                    Text("$dealPrice", style = MaterialTheme.typography.titleSmall, color = p.text)
+                }
+            }
+        }
+        SurfaceCard(
+            Modifier.weight(1f).fillMaxHeight(),
+            onClick = if (mysteryLeft > 0 && state.coins >= Shop.MYSTERY_PRICE) ({ GameRepository.perform(Action.BuyMystery) }) else null,
+            color = if (p.dark) p.surfaceAlt else Color(0xFFEDE6FF),
+            contentPadding = PaddingValues(12.dp),
+        ) {
+            Text("🎁", fontSize = 30.sp)
+            Text("Wunderkiste", style = MaterialTheme.typography.titleSmall, color = p.text)
+            Text(
+                if (mysteryLeft > 0) "Ein zufälliges Teil, das du noch nicht hast. Antippen zum Öffnen!" else "Du hast schon alles!",
+                style = MaterialTheme.typography.bodySmall,
+                color = p.textMuted,
+            )
+            if (mysteryLeft > 0) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CoinIcon(size = 16.dp)
+                    Spacer(Modifier.width(3.dp))
+                    Text("${Shop.MYSTERY_PRICE}", style = MaterialTheme.typography.titleSmall, color = if (state.coins >= Shop.MYSTERY_PRICE) p.text else p.red)
+                }
+            }
+        }
+    }
+}
+
+/** An egg, or a kitten for the cat basket. */
+fun eggPreview(line: EggLine): PetLook =
+    if (line == EggLine.KATZE) PetLook(Form.KAETZCHEN, Mood.HAPPY, line = EggLine.KATZE, fur = "fur_tabby_grey") else PetLook(Form.EGG, Mood.HAPPY, line = line)
+
 private fun lookWith(state: GameState, item: Item): PetLook? {
     val base = PetLook.of(state)?.takeUnless { it.isEgg }?.copy(mood = Mood.HAPPY, sleeping = false, sick = false) ?: return null
     return when (item.kind) {
         ItemKind.HAT -> base.copy(hat = item.id)
         ItemKind.FACE -> base.copy(face = item.id)
         ItemKind.NECK -> base.copy(neck = item.id)
+        ItemKind.BACK -> base.copy(back = item.id)
         else -> base
     }
 }
@@ -176,10 +258,11 @@ private fun ShopTile(item: Item, state: GameState, tab: ShopTab, modifier: Modif
     val eggLine = item.line
     val tryOn = when {
         item.kind.wearable -> lookWith(state, item)
-        item.kind == ItemKind.EGG && eggLine != null -> PetLook(Form.EGG, Mood.HAPPY, line = eggLine)
+        item.kind == ItemKind.EGG && eggLine != null -> eggPreview(eggLine)
         else -> null
     }
     val eggs = if (eggLine != null && item.kind == ItemKind.EGG) state.eggCount(eggLine) else 0
+    val price = Shop.price(item, shopDay())
     val float by rememberInfiniteTransition(label = "float").animateFloat(
         -1f, 1f, infiniteRepeatable(tween(1600 + (item.id.hashCode() and 0x1FF)), RepeatMode.Reverse), label = "f",
     )
@@ -218,7 +301,7 @@ private fun ShopTile(item: Item, state: GameState, tab: ShopTab, modifier: Modif
                 )
             } else {
                 Text(
-                    item.emoji,
+                    item.icon(state.catMode),
                     fontSize = 50.sp,
                     modifier = Modifier.graphicsLayer {
                         translationY = float * 4.dp.toPx()
@@ -259,7 +342,7 @@ private fun ShopTile(item: Item, state: GameState, tab: ShopTab, modifier: Modif
             }
         }
         Spacer(Modifier.height(8.dp))
-        Text(item.name, style = MaterialTheme.typography.titleSmall, color = p.text, maxLines = 1, modifier = Modifier.padding(horizontal = 4.dp))
+        Text(item.label(state.catMode), style = MaterialTheme.typography.titleSmall, color = p.text, maxLines = 1, modifier = Modifier.padding(horizontal = 4.dp))
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
             if (owned) {
@@ -268,10 +351,14 @@ private fun ShopTile(item: Item, state: GameState, tab: ShopTab, modifier: Modif
                 CoinIcon(size = 18.dp)
                 Spacer(Modifier.width(5.dp))
                 Text(
-                    "${item.price}",
+                    "$price",
                     style = MaterialTheme.typography.titleSmall,
-                    color = if (state.coins >= item.price) p.text else p.red,
+                    color = if (state.coins >= price) p.text else p.red,
                 )
+                if (price != item.price) {
+                    Spacer(Modifier.width(6.dp))
+                    Text("−${Shop.DEAL_PERCENT} %", style = MaterialTheme.typography.labelMedium, color = p.red)
+                }
             }
         }
     }
@@ -343,7 +430,7 @@ private fun ItemDetailSheet(item: Item, state: GameState, onDismiss: () -> Unit)
                 item.kind == ItemKind.EGG && eggLine != null -> {
                     Box(Modifier.size(200.dp), contentAlignment = Alignment.Center) {
                         Rays(p.gold, Modifier.fillMaxSize())
-                        PetPortrait(remember(eggLine) { PetLook(Form.EGG, Mood.HAPPY, line = eggLine) }, Modifier.fillMaxSize(), sizeFactor = 0.6f, groundFactor = 0.88f)
+                        PetPortrait(remember(eggLine) { eggPreview(eggLine) }, Modifier.fillMaxSize(), sizeFactor = 0.6f, groundFactor = 0.88f)
                     }
                 }
                 item.cosmetic -> {
@@ -366,11 +453,11 @@ private fun ItemDetailSheet(item: Item, state: GameState, onDismiss: () -> Unit)
                 }
                 else -> Box(Modifier.size(150.dp), contentAlignment = Alignment.Center) {
                     Rays(p.gold, Modifier.fillMaxSize())
-                    Text(item.emoji, fontSize = 76.sp)
+                    Text(item.icon(state.catMode), fontSize = 76.sp)
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Text(item.name, style = MaterialTheme.typography.headlineSmall, color = p.text)
+            Text(item.label(state.catMode), style = MaterialTheme.typography.headlineSmall, color = p.text)
             Text(item.description, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, color = p.textMuted)
             if (item.kind == ItemKind.EGG && eggLine != null) {
                 Spacer(Modifier.height(10.dp))
@@ -420,9 +507,10 @@ private fun ItemDetailSheet(item: Item, state: GameState, onDismiss: () -> Unit)
                 }
                 level < item.minLevel -> ClayTextButton("Ab Level ${item.minLevel}", {}, enabled = false, emoji = "🔒", modifier = Modifier.fillMaxWidth())
                 else -> {
-                    val affordable = state.coins >= item.price
+                    val price = Shop.price(item, shopDay())
+                    val affordable = state.coins >= price
                     ClayTextButton(
-                        if (affordable) "Kaufen für ${item.price} 🪙" else "Noch ${item.price - state.coins} 🪙 sparen",
+                        if (affordable) "Kaufen für $price 🪙" else "Noch ${price - state.coins} 🪙 sparen",
                         { act(Action.Buy(item.id)) },
                         enabled = affordable,
                         emoji = "🛒",
