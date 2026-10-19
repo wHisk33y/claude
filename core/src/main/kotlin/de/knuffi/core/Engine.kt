@@ -44,6 +44,8 @@ sealed interface Action {
     data class HatchEgg(val line: EggLine, val name: String) : Action
     data class SwitchPet(val petId: Long) : Action
     data class ReleasePet(val petId: Long) : Action
+    /** Says goodbye to several pets at once. The active pet may be among them if another one can take over. */
+    data class ReleasePets(val petIds: Set<Long>) : Action
     data object BuyRestSlot : Action
 
     // Garden
@@ -888,7 +890,8 @@ object Engine {
                 is Action.MarkNotified -> s = s.copy(notifyLog = s.notifyLog + (action.key to now))
                 is Action.HatchEgg -> hatchEgg(action.line, action.name, now)
                 is Action.SwitchPet -> switchPet(action.petId, now)
-                is Action.ReleasePet -> releasePet(action.petId, now)
+                is Action.ReleasePet -> releasePets(setOf(action.petId), now)
+                is Action.ReleasePets -> releasePets(action.petIds, now)
                 Action.BuyRestSlot -> buyRestSlot()
                 is Action.Plant -> plant(action.plot, action.seedId, now)
                 is Action.Water -> water(action.plot, now)
@@ -1078,13 +1081,30 @@ object Engine {
             message("Hallo ${target.name}! 👋")
         }
 
-        private fun releasePet(petId: Long, now: Long) {
-            val pet = s.resting.firstOrNull { it.id == petId } ?: return
-            if (s.onTrip(petId) != null) return
+        private fun releasePets(petIds: Set<Long>, now: Long) {
+            val active = s.pet?.takeIf { it.alive && it.id in petIds }
+            // The active pet can only leave if someone else takes over (preferably a hatched one).
+            val stays = s.resting.filter { it.id !in petIds && s.onTrip(it.id) == null }
+            val successor = if (active == null) null else stays.firstOrNull { !it.isEgg } ?: stays.firstOrNull()
+            if (active != null && successor == null) message("${active.name} bleibt bei dir. Ganz ohne Haustier geht es nicht.")
+            val leaving = listOfNotNull(active?.takeIf { successor != null }) +
+                s.resting.filter { it.id in petIds && s.onTrip(it.id) == null }
+            if (leaving.isEmpty()) return
+            val gone = leaving.map { it.id }.toSet()
             s = s.copy(
-                resting = s.resting.filter { it.id != petId },
-                memorials = if (pet.isEgg) s.memorials else s.memorials + Memorial(pet.name, pet.form, pet.level, pet.bornAt, now, pet.shiny),
+                pet = successor ?: s.pet,
+                resting = s.resting.filter { it.id !in gone && it.id != successor?.id },
+                memorials = s.memorials + leaving.filter { !it.isEgg }.map { Memorial(it.name, it.form, it.level, it.bornAt, now, it.shiny) },
+                visit = s.visit?.takeIf { successor == null && it.petId !in gone },
+                friendship = s.friendship.filterKeys { key -> key.split("-").none { id -> id.toLongOrNull()?.let { it in gone } == true } },
+                lastSimulated = if (successor != null) now else s.lastSimulated,
             )
+            val names = leaving.map { it.name }
+            message(
+                if (names.size == 1) "${names[0]} ist zu einer lieben Familie gezogen. 💫"
+                else "${names.size} Haustiere sind zu lieben Familien gezogen. 💫",
+            )
+            if (successor != null) message("Hallo ${successor.name}! Jetzt bist du dran. 👋")
         }
 
         private fun buyRestSlot() {

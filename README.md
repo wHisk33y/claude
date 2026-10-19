@@ -35,7 +35,8 @@ Eine neue Version lässt sich einfach über die alte installieren, dein Spielsta
   Ei → Baby → Kind → Teenager → Erwachsen. Was entsteht, hängt von deiner Pflege ab, und mit perfekter Pflege
   gibt es eine legendäre Form. Selten schlüpft ein *schillerndes* Wesen ✨ (mit Glitzerstaub garantiert).
 - **Kuschelhaus**: Sammle viele Haustiere, eins ist aktiv, die anderen ruhen und brauchen keine Pflege.
-  Eier ausbrüten, Haustiere wechseln und neue Plätze anbauen.
+  Eier ausbrüten, Haustiere wechseln und neue Plätze anbauen. Wird es zu voll, wählst du mit *Aufräumen*
+  mehrere Haustiere auf einmal aus (auch das aktive, wenn ein anderes übernimmt) und verabschiedest sie.
 - **Sammelalbum**: alle Wesen als Silhouetten zum Entdecken, schillernde Varianten und 48 Sticker in 6 Sets.
 - **Garten**: säen, gießen und ernten (Karotten, Erdbeeren, Kürbisse, Zauberblumen …). Je nach Jahreszeit
   wachsen manche Pflanzen schneller.

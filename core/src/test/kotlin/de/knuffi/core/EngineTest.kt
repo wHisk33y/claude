@@ -315,6 +315,60 @@ class EngineTest {
     }
 
     @Test
+    fun releasingSeveralPetsAtOnceCleansUp() {
+        var s = started()
+        val host = s.pet!!
+        val (a, b, c) = listOf("Anni", "Bo", "Cleo").mapIndexed { i, n -> host.copy(name = n, bornAt = t0 - (i + 1) * hour) }
+        s = s.copy(
+            resting = listOf(a, b, c),
+            visit = Visit(b.id, t0 + hour),
+            friendship = mapOf(Friends.key(host.id, a.id) to 30, Friends.key(host.id, c.id) to 10),
+        )
+        val o = Engine.perform(s, Action.ReleasePets(setOf(a.id, b.id)), t0, zone)
+        s = o.state
+        assertEquals(host.id, s.pet!!.id)
+        assertEquals(listOf(c.id), s.resting.map { it.id })
+        assertEquals(listOf("Anni", "Bo"), s.memorials.map { it.name })
+        assertEquals(null, s.visit)
+        assertEquals(setOf(Friends.key(host.id, c.id)), s.friendship.keys)
+        assertTrue(o.events.any { it is GameEvent.Message && it.text.startsWith("2 Haustiere") })
+    }
+
+    @Test
+    fun releasingActivePetHandsOverToAnother() {
+        var s = started()
+        val host = s.pet!!
+        val egg = Pet(name = "Eili", bornAt = t0 - 2 * hour)
+        val friend = host.copy(name = "Flocke", bornAt = t0 - hour)
+        s = s.copy(resting = listOf(egg, friend))
+        s = Engine.perform(s, Action.ReleasePets(setOf(host.id)), t0 + hour, zone).state
+        // A hatched pet is preferred over an egg.
+        assertEquals(friend.id, s.pet!!.id)
+        assertEquals(listOf(egg.id), s.resting.map { it.id })
+        assertEquals(listOf(host.name), s.memorials.map { it.name })
+        // Eggs leave without a star.
+        s = Engine.perform(s, Action.ReleasePet(egg.id), t0 + hour, zone).state
+        assertTrue(s.resting.isEmpty())
+        assertEquals(1, s.memorials.size)
+    }
+
+    @Test
+    fun lastPetAndTravellersStay() {
+        var s = started()
+        val host = s.pet!!
+        val o = Engine.perform(s, Action.ReleasePets(setOf(host.id)), t0, zone)
+        assertEquals(host.id, o.state.pet!!.id)
+        assertTrue(o.state.memorials.isEmpty())
+        assertTrue(o.events.any { it is GameEvent.Message && it.text.contains("bleibt bei dir") })
+
+        val traveller = host.copy(name = "Reisi", bornAt = t0 - hour)
+        s = s.copy(resting = listOf(traveller), trips = listOf(Trip(traveller.id, Destination.WIESE, t0, t0 + hour)))
+        s = Engine.perform(s, Action.ReleasePets(setOf(host.id, traveller.id)), t0, zone).state
+        assertEquals(host.id, s.pet!!.id)
+        assertEquals(listOf(traveller.id), s.resting.map { it.id })
+    }
+
+    @Test
     fun glitterMakesShinyHatch() {
         var s = Engine.perform(GameState(), Action.Start(Difficulty.RELAXED, "Glitzi", LookStyle.ZAUBER, EggLine.EINHORN), t0, zone).state
         s = s.copy(inventory = s.inventory + (Catalog.GLITTER to 1))

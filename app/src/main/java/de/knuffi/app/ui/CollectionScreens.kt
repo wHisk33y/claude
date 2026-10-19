@@ -1,9 +1,13 @@
 package de.knuffi.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -19,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +55,7 @@ import de.knuffi.app.ui.components.Pill
 import de.knuffi.app.ui.components.SectionHeader
 import de.knuffi.app.ui.components.SegmentedControl
 import de.knuffi.app.ui.components.SurfaceCard
+import de.knuffi.app.ui.components.rememberHaptic
 import de.knuffi.app.ui.components.staggered
 import de.knuffi.app.ui.theme.LocalPalette
 import de.knuffi.core.Action
@@ -70,33 +76,66 @@ fun KuschelhausScreen(state: GameState, onBack: () -> Unit, onTrips: () -> Unit)
     val now = rememberNow(10_000L)
     var hatchLine by remember { mutableStateOf<EggLine?>(null) }
     var release by remember { mutableStateOf<Pet?>(null) }
+    // "Aufräumen": pick several pets and say goodbye to all of them at once.
+    var tidying by remember { mutableStateOf(false) }
+    var picked by remember { mutableStateOf(emptySet<Long>()) }
+    var confirmTidy by remember { mutableStateOf(false) }
     val active = state.pet
     val full = active != null && active.alive && state.resting.size >= state.restSlots
+    // Same rules as the engine: travellers stay, the active pet only leaves if someone takes over.
+    val free = state.resting.filter { state.onTrip(it.id) == null }
+    val stays = free.filter { it.id !in picked }
+    val activeLeaves = active != null && active.alive && active.id in picked
+    val successor = if (activeLeaves) stays.firstOrNull { !it.isEgg } ?: stays.firstOrNull() else null
+    val leaving = listOfNotNull(active?.takeIf { activeLeaves }) + free.filter { it.id in picked }
+    fun toggle(id: Long) {
+        picked = if (id in picked) picked - id else picked + id
+    }
+    fun stopTidying() {
+        tidying = false
+        picked = emptySet()
+    }
+    BackHandler(enabled = tidying) { stopTidying() }
 
     Column(Modifier.fillMaxSize()) {
         PageHeader("Kuschelhaus", onBack) { CoinPill(state.coins) }
         LazyColumn(
-            Modifier.fillMaxSize(),
+            Modifier.fillMaxWidth().weight(1f),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (active != null) {
                 item {
-                    SurfaceCard(Modifier.fillMaxWidth().staggered(0)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            PetPortrait(PetLook.of(state), Modifier.size(110.dp))
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Pill("⭐ Aktiv", color = p.mint.copy(alpha = 0.25f))
-                                Spacer(Modifier.height(4.dp))
-                                Text(active.name, style = MaterialTheme.typography.titleLarge, color = p.text)
-                                Text(
-                                    "${if (active.shiny) "✨ " else ""}${active.form.title} · Level ${active.level}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = p.textMuted,
-                                )
-                                Text(active.line.title, style = MaterialTheme.typography.bodySmall, color = p.textMuted)
+                    Box(Modifier.fillMaxWidth().staggered(0)) {
+                        SurfaceCard(Modifier.fillMaxWidth()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                PetPortrait(PetLook.of(state), Modifier.size(110.dp))
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Pill("⭐ Aktiv", color = p.mint.copy(alpha = 0.25f))
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(active.name, style = MaterialTheme.typography.titleLarge, color = p.text)
+                                    Text(
+                                        "${if (active.shiny) "✨ " else ""}${active.form.title} · Level ${active.level}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = p.textMuted,
+                                    )
+                                    Text(active.line.title, style = MaterialTheme.typography.bodySmall, color = p.textMuted)
+                                }
                             }
+                        }
+                        if (tidying) {
+                            val canLeave = activeLeaves || (active.alive && stays.isNotEmpty())
+                            PickOverlay(
+                                picked = activeLeaves,
+                                enabled = canLeave,
+                                label = when {
+                                    activeLeaves -> "Zieht aus"
+                                    !canLeave && active.alive -> "Bleibt bei dir"
+                                    else -> null
+                                },
+                                onToggle = { toggle(active.id) },
+                            )
                         }
                     }
                 }
@@ -119,11 +158,22 @@ fun KuschelhausScreen(state: GameState, onBack: () -> Unit, onTrips: () -> Unit)
                 }
             }
             item {
-                Text(
-                    "Hier ruhen deine anderen Haustiere. Sie werden nicht hungrig und nicht müde. Nur dein aktives Haustier braucht Pflege.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = p.textMuted,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (tidying) {
+                            "Tippe alle Haustiere an, die ausziehen sollen. Haustiere auf Ausflug bleiben hier."
+                        } else {
+                            "Hier ruhen deine anderen Haustiere. Sie werden nicht hungrig und nicht müde. Nur dein aktives Haustier braucht Pflege."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = p.textMuted,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (!tidying && state.resting.isNotEmpty()) {
+                        Spacer(Modifier.width(10.dp))
+                        ClayTextButton("Aufräumen", { tidying = true }, emoji = "🧹", small = true, color = Color(0xFF9A8FB0), deep = Color(0xFF6E6484))
+                    }
+                }
             }
             val slots = state.resting.map<Pet, Pet?> { it } + List((state.restSlots - state.resting.size).coerceAtLeast(0)) { null }
             items(slots.chunked(2)) { row ->
@@ -132,12 +182,30 @@ fun KuschelhausScreen(state: GameState, onBack: () -> Unit, onTrips: () -> Unit)
                         if (pet == null) {
                             EmptySlot(Modifier.weight(1f))
                         } else {
-                            RestingCard(
-                                state, pet, now, Modifier.weight(1f),
-                                onSwitch = { GameRepository.perform(Action.SwitchPet(pet.id)) },
-                                onTrip = onTrips,
-                                onRelease = { release = pet },
-                            )
+                            Box(Modifier.weight(1f)) {
+                                RestingCard(
+                                    state, pet, now, Modifier.fillMaxWidth(),
+                                    onSwitch = { GameRepository.perform(Action.SwitchPet(pet.id)) },
+                                    onTrip = onTrips,
+                                    onRelease = { release = pet },
+                                )
+                                if (tidying) {
+                                    val travelling = state.onTrip(pet.id) != null
+                                    // The last pet that could take over for a leaving active pet can't leave too.
+                                    val lastHope = pet.id == successor?.id && stays.size == 1
+                                    PickOverlay(
+                                        picked = pet.id in picked && !travelling,
+                                        enabled = !travelling && !lastHope,
+                                        label = when {
+                                            travelling -> "Auf Ausflug"
+                                            pet.id == successor?.id -> "Wird aktiv ⭐"
+                                            pet.id in picked -> "Zieht aus"
+                                            else -> null
+                                        },
+                                        onToggle = { toggle(pet.id) },
+                                    )
+                                }
+                            }
                         }
                     }
                     if (row.size == 1) Spacer(Modifier.weight(1f))
@@ -178,6 +246,15 @@ fun KuschelhausScreen(state: GameState, onBack: () -> Unit, onTrips: () -> Unit)
                 }
             }
         }
+        if (tidying) {
+            TidyBar(
+                count = leaving.size,
+                allPicked = free.isNotEmpty() && free.all { it.id in picked } && !activeLeaves,
+                onAll = { picked = if (free.all { it.id in picked } && !activeLeaves) emptySet() else free.map { it.id }.toSet() },
+                onCancel = { stopTidying() },
+                onRelease = { confirmTidy = true },
+            )
+        }
     }
 
     hatchLine?.let { line ->
@@ -209,6 +286,121 @@ fun KuschelhausScreen(state: GameState, onBack: () -> Unit, onTrips: () -> Unit)
             onDismiss = { release = null },
             danger = true,
         )
+    }
+    if (confirmTidy && leaving.isNotEmpty()) {
+        ConfirmDialog(
+            title = if (leaving.size == 1) "${leaving[0].name} verabschieden?" else "${leaving.size} Haustiere verabschieden?",
+            text = goodbyeText(leaving, successor),
+            confirm = "Verabschieden",
+            onConfirm = {
+                GameRepository.perform(Action.ReleasePets(leaving.map { it.id }.toSet()))
+                confirmTidy = false
+                stopTidying()
+            },
+            onDismiss = { confirmTidy = false },
+            danger = true,
+        )
+    }
+}
+
+private fun namesText(names: List<String>): String = when {
+    names.size == 1 -> names[0]
+    names.size <= 5 -> names.dropLast(1).joinToString(", ") + " und " + names.last()
+    else -> names.take(4).joinToString(", ") + " und ${names.size - 4} weitere"
+}
+
+private fun goodbyeText(leaving: List<Pet>, successor: Pet?): String = buildString {
+    val one = leaving.size == 1
+    append("${namesText(leaving.map { it.name })} ${if (one) "zieht" else "ziehen"} dann zu ${if (one) "einer lieben Familie" else "lieben Familien"}.")
+    val stars = leaving.count { !it.isEgg }
+    if (stars > 0) append(if (stars == 1) " Am Sternenhimmel leuchtet ein Stern zur Erinnerung." else " Am Sternenhimmel leuchten $stars Sterne zur Erinnerung.")
+    val special = leaving.filter { it.shiny || it.form.isLegend }
+    if (special.isNotEmpty()) {
+        append("\n\nAchtung, ganz besonders: ")
+        append(namesText(special.map { "${it.name}${if (it.shiny) " ✨" else ""}${if (it.form.isLegend) " 👑" else ""}" }))
+    }
+    if (successor != null) append("\n\n${successor.name} wird dein aktives Haustier.")
+    append("\n\nDas kann man nicht rückgängig machen.")
+}
+
+@Composable
+private fun TidyBar(count: Int, allPicked: Boolean, onAll: () -> Unit, onCancel: () -> Unit, onRelease: () -> Unit) {
+    val p = LocalPalette.current
+    SurfaceCard(
+        Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 10.dp, top = 4.dp),
+        contentPadding = PaddingValues(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (count == 0) "Nichts ausgewählt" else "$count ausgewählt",
+                style = MaterialTheme.typography.titleSmall,
+                color = p.text,
+                modifier = Modifier.weight(1f),
+            )
+            ClayTextButton(if (allPicked) "Keine" else "Alle", onAll, small = true, color = p.sky, deep = p.skyDeep)
+            Spacer(Modifier.width(6.dp))
+            ClayTextButton("Fertig", onCancel, small = true, color = Color(0xFF9A8FB0), deep = Color(0xFF6E6484))
+        }
+        Spacer(Modifier.height(8.dp))
+        ClayTextButton(
+            if (count <= 1) "Verabschieden" else "$count verabschieden",
+            onRelease,
+            emoji = "👋",
+            enabled = count > 0,
+            modifier = Modifier.fillMaxWidth(),
+            color = p.red,
+            deep = p.redDeep,
+        )
+    }
+}
+
+/** Selection layer on top of a pet card while tidying up the Kuschelhaus. */
+@Composable
+private fun BoxScope.PickOverlay(picked: Boolean, enabled: Boolean, label: String?, onToggle: () -> Unit) {
+    val p = LocalPalette.current
+    val haptic = rememberHaptic()
+    val shape = RoundedCornerShape(24.dp)
+    Box(
+        Modifier
+            .matchParentSize()
+            .clip(shape)
+            .background(
+                when {
+                    picked -> p.red.copy(alpha = 0.16f)
+                    !enabled -> p.surface.copy(alpha = 0.6f)
+                    else -> Color.Transparent
+                },
+            )
+            .border(if (picked) 3.dp else 2.dp, if (picked) p.red else p.textMuted.copy(alpha = if (enabled) 0.35f else 0.15f), shape)
+            // Always swallow taps so the buttons below can't be pressed while tidying.
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                if (enabled) {
+                    haptic()
+                    onToggle()
+                }
+            },
+    ) {
+        if (enabled) {
+            Box(
+                Modifier
+                    .padding(10.dp)
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(if (picked) p.red else p.surface)
+                    .border(2.dp, if (picked) p.redDeep else p.textMuted.copy(alpha = 0.5f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (picked) Text("✓", color = Color.White, style = MaterialTheme.typography.titleSmall)
+            }
+        }
+        if (label != null) {
+            Pill(
+                label,
+                Modifier.align(Alignment.Center),
+                color = if (picked) p.red else p.surface,
+                textColor = if (picked) Color.White else p.text,
+            )
+        }
     }
 }
 
