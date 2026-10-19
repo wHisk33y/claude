@@ -132,7 +132,13 @@ fun BoxScope.OverlayHost(state: GameState, debugScene: String?) {
                 is GameEvent.Evolved -> overlays.add(OverlayItem.Evolution(e.from, e.to))
                 GameEvent.Hatched -> overlays.add(OverlayItem.Hatch)
                 is GameEvent.AchievementUnlocked -> toast(e.achievement.emoji, "Erfolg freigeschaltet!", "${e.achievement.title} · +${e.achievement.coins} 🪙")
-                is GameEvent.QuestDone -> toast(e.type.emoji, if (e.weekly) "Wochenaufgabe geschafft!" else "Tagesaufgabe geschafft!", "Hol dir deine Belohnung unter 🏆 Ziele.")
+                is GameEvent.QuestDone -> toast(e.type.emoji, if (e.monthly) "Monatsziel geschafft!" else if (e.weekly) "Wochenaufgabe geschafft!" else "Tagesaufgabe geschafft!", "Hol dir deine Belohnung unter 🏆 Ziele.")
+                is GameEvent.TrickPracticed -> if (e.learned) toast(e.trick.emoji, "Neues Kunststück!", "„${e.trick.title}“ klappt jetzt. Zeig es unter 🎓!")
+                is GameEvent.WishFulfilled -> toast("💖", "Wunsch erfüllt!", "${de.knuffi.core.Wishes.label(e.wish)} · +${e.coins} 🪙")
+                is GameEvent.WishMade -> toast("💭", "${state.pet?.name ?: "Dein Haustier"} wünscht sich etwas!", de.knuffi.core.Wishes.label(e.wish, state.pet?.isCat == true))
+                is GameEvent.AdventureStep -> toast(e.emoji, if (e.mapDone) "Abenteuerkarte geschafft!" else "Station erreicht: ${e.title}", e.reward)
+                is GameEvent.TournamentDone -> toast(e.cup.emoji, if (e.place == 1) "Gewonnen: ${e.cup.title}!" else "Platz ${e.place} beim ${e.cup.title}", "+${e.coins} 🪙")
+                is GameEvent.GoalDone -> toast(e.goal.emoji, "Sammelziel geschafft!", e.goal.rewardLabel)
                 is GameEvent.Message -> toast("💬", null, e.text)
                 is GameEvent.EggFound -> overlays.add(OverlayItem.EggFound(e.line, e.reason))
                 is GameEvent.NewForm -> toast(if (e.shiny) "✨" else "📖", if (e.shiny) "Schillernd! Neu im Album" else "Neu im Album!", e.form.title)
@@ -215,9 +221,9 @@ private fun EggFoundOverlay(line: EggLine, reason: String, onDone: () -> Unit) {
         Rays(p.gold, Modifier.size(460.dp))
         ConfettiLayer(Modifier.fillMaxSize(), 40)
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.scale(appear.value).padding(24.dp)) {
-            val basket = line == EggLine.KATZE
+            val basket = line.real
             if (basket) {
-                Text("🧺", fontSize = 110.sp)
+                Text(if (line == EggLine.KATZE) "🧺" else line.emoji, fontSize = 110.sp)
             } else {
                 PetPortrait(look, Modifier.size(200.dp), sizeFactor = 0.62f) { pose, t ->
                     pose.eggWobble = sin(t * 2.5f) * 6f
@@ -225,12 +231,18 @@ private fun EggFoundOverlay(line: EggLine, reason: String, onDone: () -> Unit) {
                     if (ph < 0.3f) pose.eggWobble += sin(ph * 60f) * 8f
                 }
             }
-            ExtrudedTitle(if (basket) "Ein Kätzchen!" else "Ein neues Ei!", Color.White, p.goldDeep)
+            val animal = when (line) {
+                EggLine.HASE -> "Ein Häschen"
+                EggLine.HAMSTER -> "Ein Hamster"
+                EggLine.MEERI -> "Ein Meerschweinchen"
+                else -> "Ein Kätzchen"
+            }
+            ExtrudedTitle(if (basket) "$animal!" else "Ein neues Ei!", Color.White, p.goldDeep)
             Spacer(Modifier.height(6.dp))
             Text("${line.emoji} ${line.title}", style = MaterialTheme.typography.titleLarge, color = p.gold)
             Spacer(Modifier.height(4.dp))
             Text(
-                if (basket) "$reason: Ein Körbchen mit einem Kätzchen! Hol es im Kuschelhaus unter 🌍 Welt zu dir." else "$reason. Ausbrüten kannst du es im Kuschelhaus unter 🌍 Welt.",
+                if (basket) "$reason: $animal im Körbchen! Hol es im Kuschelhaus unter 🌍 Welt zu dir." else "$reason. Ausbrüten kannst du es im Kuschelhaus unter 🌍 Welt.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.White.copy(alpha = 0.9f),
                 textAlign = TextAlign.Center,
@@ -491,10 +503,11 @@ private fun HatchOverlay(state: GameState, onDone: () -> Unit) {
                 pose.armR = 0.8f
             }
             val cat = state.pet?.isCat == true
-            ExtrudedTitle(if (cat) "Miau!" else "Geschlüpft!", Color.White, p.pinkDeep)
+            val small = state.pet?.isSmall == true
+            ExtrudedTitle(if (cat) "Miau!" else if (small) "Hallo!" else "Geschlüpft!", Color.White, p.pinkDeep)
             Spacer(Modifier.height(6.dp))
             Text(
-                if (cat) "Willkommen zu Hause, ${state.pet?.name}! ${if (state.pet?.shiny == true) "Ihr Fell glitzert ganz besonders! ✨ " else ""}Dein Kätzchen möchte gefüttert, gestreichelt und bespielt werden. Wie es groß wird, hängt von dir ab."
+                if (cat || small) "Willkommen zu Hause, ${state.pet?.name}! ${if (state.pet?.shiny == true) "Das Fell glitzert ganz besonders! ✨ " else ""}Dein ${state.pet?.form?.title ?: "Haustier"} möchte gefüttert, gestreichelt und bespielt werden. Wie es groß wird, hängt von dir ab."
                 else "Willkommen, ${state.pet?.name}! ${if (state.pet?.shiny == true) "Wow, es schillert! ✨ " else ""}Kümmere dich gut um dein neues ${state.pet?.form?.title ?: "Haustier"}. Wie es sich entwickelt, hängt ganz von dir ab.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.White.copy(alpha = 0.9f),

@@ -417,7 +417,7 @@ private fun EggCard(state: GameState, line: EggLine, full: Boolean, onHatch: () 
         Text(line.description, style = MaterialTheme.typography.bodySmall, color = p.textMuted, maxLines = 2, minLines = 2)
         Spacer(Modifier.height(8.dp))
         ClayTextButton(
-            if (full) "Kein Platz" else if (line == EggLine.KATZE) "Abholen" else "Ausbrüten",
+            if (full) "Kein Platz" else if (line.real) "Abholen" else "Ausbrüten",
             onHatch,
             small = true,
             enabled = !full,
@@ -474,7 +474,15 @@ private fun RestingCard(
                     ClayTextButton("🎒", onTrip, small = true, modifier = Modifier.weight(1f), color = p.sky, deep = p.skyDeep)
                 }
                 if (!pet.isEgg && state.pet?.alive == true && state.pet?.isEgg == false) {
-                    ClayTextButton("🏠", { GameRepository.perform(Action.Invite(pet.id)) }, small = true, modifier = Modifier.weight(1f), color = p.mint, deep = p.mintDeep)
+                    val visiting = state.visit?.petId == pet.id || state.visit2?.petId == pet.id
+                    ClayTextButton(
+                        if (visiting) "↩️" else "🏠",
+                        { GameRepository.perform(if (visiting) Action.SendHome(pet.id) else Action.Invite(pet.id)) },
+                        small = true,
+                        modifier = Modifier.weight(1f),
+                        color = if (visiting) p.orange else p.mint,
+                        deep = if (visiting) p.orangeDeep else p.mintDeep,
+                    )
                 }
                 ClayTextButton("👋", onRelease, small = true, modifier = Modifier.weight(1f), color = Color(0xFF9A8FB0), deep = Color(0xFF6E6484))
             }

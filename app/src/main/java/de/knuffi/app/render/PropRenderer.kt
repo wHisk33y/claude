@@ -492,6 +492,21 @@ class PropRenderer : Painter() {
         }
     }
 
+    /** A possible hiding place in hide and seek: a soft glowing ring with a question mark that wiggles. */
+    fun hideSpot(c: Canvas, x: Float, y: Float, r: Float, glow: Float, t: Float) {
+        val pulse = (sin(t * 3f + x * 0.01f) + 1f) / 2f
+        shader(radial(x, y, r * 1.8f, intArrayOf(Colors.alpha(0xFFFFF3B0.toInt(), 0.55f * (0.6f + 0.4f * pulse) * (0.4f + 0.6f * glow)), Colors.alpha(0xFFFFF3B0.toInt(), 0f))))
+        c.drawCircle(x, y, r * 1.8f, fill)
+        fill.shader = null
+        c.save()
+        c.rotate(sin(t * 6f + y * 0.02f) * 10f * (0.4f + 0.6f * glow), x, y)
+        emoji.textSize = r * 1.3f
+        emoji.alpha = (150 + 105 * glow).toInt().coerceIn(0, 255)
+        c.drawText(if (glow < 0.01f) "❌" else "❓", x, y + r * 0.45f, emoji)
+        emoji.alpha = 255
+        c.restore()
+    }
+
     /** A small flying friend (butterfly) that flaps its wings. */
     fun flyer(c: Canvas, text: String, x: Float, y: Float, size: Float, t: Float) {
         c.save()

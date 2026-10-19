@@ -98,6 +98,15 @@ object Sounds {
             is GameEvent.CoinsGained -> play(Sfx.COIN)
             is GameEvent.EggFound, is GameEvent.Birthday, is GameEvent.SecretFound -> play(Sfx.FANFARE)
             is GameEvent.HiddenFound -> play(Sfx.SPARKLE)
+            is GameEvent.TrickPracticed -> if (e.learned) play(Sfx.FANFARE) else if (e.success) play(Sfx.SUCCESS) else play(Sfx.BONK, 1.4f)
+            is GameEvent.TrickShown -> play(Sfx.SUCCESS)
+            is GameEvent.Touched -> when (e.zone) {
+                de.knuffi.core.TouchZone.BELLY -> play(Sfx.CHIRP, 1.4f)
+                else -> if (cat) play(Sfx.PURR) else play(Sfx.CHIRP, 1.15f)
+            }
+            is GameEvent.WishMade -> play(Sfx.SPARKLE)
+            is GameEvent.WishFulfilled, is GameEvent.TournamentDone, is GameEvent.GoalDone -> play(Sfx.FANFARE)
+            is GameEvent.AdventureStep -> play(if (e.mapDone) Sfx.FANFARE else Sfx.SUCCESS)
             else -> Unit
         }
     }

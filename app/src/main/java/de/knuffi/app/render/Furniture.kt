@@ -33,7 +33,7 @@ data class Furnishing(
         fun of(state: GameState, event: SeasonEvent?): Furnishing {
             val d = Catalog.defaultEquipped(state.settings.look)
             fun get(slot: Slot) = state.equipped[slot] ?: d.getValue(slot)
-            val trophies = (state.counters.prizes + state.story.finished.size + state.findSetsDone.size).coerceAtMost(8)
+            val trophies = (state.counters.prizes + state.story.finished.size + state.findSetsDone.size + state.cups.size).coerceAtMost(8)
             return Furnishing(get(Slot.WALL), get(Slot.RUG), get(Slot.BED), get(Slot.PLANT), get(Slot.LAMP), get(Slot.PICTURE), event, state.equipped[Slot.TOY], trophies, state.equipped[Slot.DECO])
         }
     }

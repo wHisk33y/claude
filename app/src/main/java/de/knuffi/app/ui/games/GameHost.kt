@@ -90,6 +90,12 @@ fun GameHost(game: MiniGame, state: GameState, onExit: () -> Unit) {
                 MiniGame.COLORING -> ColoringGame(startState, onFinished = finish, onBack = onExit)
                 MiniGame.YARN -> YarnGame(startState, onFinished = finish, onBack = onExit)
                 MiniGame.PACMAN -> PacmanGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.SPOT -> SpotGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.WORDS -> WordsGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.SHADOW -> ShadowGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.SPACE -> SpaceGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.JUMPER -> JumperGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.RACE -> RaceGame(startState, onFinished = finish, onBack = onExit)
             }
         }
         result?.let { score ->
@@ -110,6 +116,9 @@ private fun ResultOverlay(game: MiniGame, score: Int, state: GameState, onCollec
     val scoreText = when (game) {
         MiniGame.SIMON -> "$score ${if (score == 1) "Ton" else "Töne"}"
         MiniGame.COLORING -> "$score % ausgemalt"
+        MiniGame.SPOT -> "$score ${if (score == 1) "Unterschied" else "Unterschiede"}"
+        MiniGame.WORDS -> "$score ${if (score == 1) "Wort" else "Wörter"}"
+        MiniGame.SHADOW -> "$score von 10 richtig"
         else -> "$score ${game.unit}"
     }
     val appear = remember { Animatable(0.5f) }

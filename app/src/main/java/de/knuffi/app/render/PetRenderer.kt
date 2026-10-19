@@ -620,6 +620,7 @@ class PetRenderer {
 
     internal fun drawFront(c: Canvas, fl: FormLook, look: PetLook, pose: PetPose, bw: Float, bh: Float, top: Float, cy: Float, fx: Float) {
         val col = fl.colors
+        if (fl.ears == Ears.LOP) drawLopEars(c, fl, pose, bw, bh, top, fx)
         if (fl.headband) {
             c.save()
             c.clipPath(body)

@@ -44,10 +44,21 @@ for theme in light dark; do
 done
 
 # All creatures, clothes, eggs and shiny variants
-for page in 1 2 3 4 5 6 7; do
+for page in 1 2 3 4 5 6 7 8 9; do
   run_scene light "gallery$page"
   shot "gallery_$page" 9
 done
+
+# Small animals, tricks, the adventure map, the tournament and the newer games
+for scene in bunny hamster guinea jungle visit2 tricks adventuremap tournament spot words shadow space jumper race; do
+  run_scene light "$scene"
+  case $scene in
+    spot|words|shadow|space|jumper|race) shot "light_${scene}" 12 ;;
+    *) shot "light_${scene}" 8 ;;
+  esac
+done
+run_scene dark tricks
+shot dark_tricks 8
 
 # Furniture, festivals and the new celebrations
 for scene in furniture furniture2 furniture3 halloween winter eventshop eggfound birthday tripback; do

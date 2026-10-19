@@ -220,6 +220,48 @@ fun WorldScreen(state: GameState, onOpen: (Route) -> Unit) {
                 ) { onOpen(Route.Secrets) }
             }
         }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                val adv = state.adventure
+                val cost = de.knuffi.core.Adventure.cost(adv.station, adv.map)
+                WorldTile(
+                    "🗺️", "Abenteuerkarte",
+                    "Station ${adv.station} / ${de.knuffi.core.Adventure.STATIONS}",
+                    Color(0xFF7FD38A), Color(0xFF7FB8FF),
+                    progress = (adv.points / cost.toFloat()).coerceIn(0f, 1f),
+                    badge = if (adv.points >= cost) "🧭" else null,
+                    modifier = Modifier.weight(1f).staggered(13),
+                ) { onOpen(Route.Adventure) }
+                val tricks = state.pet?.let { de.knuffi.core.Tricks.learnedCount(it) } ?: 0
+                WorldTile(
+                    "🎓", "Kunststücke",
+                    "$tricks / ${de.knuffi.core.Trick.entries.size} gelernt",
+                    Color(0xFFFFC86A), Color(0xFFFF7AB6),
+                    progress = tricks / de.knuffi.core.Trick.entries.size.toFloat(),
+                    modifier = Modifier.weight(1f).staggered(14),
+                ) { onOpen(Route.Tricks) }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                val wins = de.knuffi.core.Cup.entries.sumOf { de.knuffi.core.Tournament.wins(state, it) }
+                WorldTile(
+                    "🏆", "Turnier",
+                    if (wins > 0) "$wins ${if (wins == 1) "Pokal" else "Pokale"} gewonnen" else "Hol dir den Pokal!",
+                    Color(0xFFFFD166), Color(0xFFFF9A4D),
+                    modifier = Modifier.weight(1f).staggered(15),
+                ) { onOpen(Route.Tournament) }
+                val goalsOpen = de.knuffi.core.LongGoal.entries.count { it.done(state) && !it.claimed(state) }
+                WorldTile(
+                    "🎯", "Sammelziele",
+                    "${de.knuffi.core.LongGoal.entries.count { it.claimed(state) }} / ${de.knuffi.core.LongGoal.entries.size} geschafft",
+                    Color(0xFFB99AFF), Color(0xFFFF9EC4),
+                    badge = if (goalsOpen > 0) "🎁 $goalsOpen" else null,
+                    progress = de.knuffi.core.LongGoal.entries.count { it.claimed(state) } / de.knuffi.core.LongGoal.entries.size.toFloat(),
+                    modifier = Modifier.weight(1f).staggered(16),
+                ) { onOpen(Route.Goals) }
+            }
+        }
         if (event == null) {
             item {
                 val (next, days) = EventCalendar.next(today)

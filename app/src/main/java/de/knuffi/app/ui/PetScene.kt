@@ -3,6 +3,7 @@ package de.knuffi.app.ui
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -12,12 +13,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.core.content.res.ResourcesCompat
 import de.knuffi.app.R
 import de.knuffi.app.data.GameRepository
@@ -36,6 +40,8 @@ import de.knuffi.app.ui.theme.LocalPalette
 import de.knuffi.core.Action
 import de.knuffi.core.Engine
 import de.knuffi.core.GameState
+import de.knuffi.core.TouchZone
+import de.knuffi.core.Wishes
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import java.time.LocalDate
@@ -103,8 +109,12 @@ fun PetPortrait(
 class SceneHandle {
     val director = PetDirector()
     val guest = PetDirector(5).apply { place(0.7f); toyConfig.ladder = 0; toyConfig.planes = 0; toyConfig.paint = 0; toyConfig.footprints = 0 }
+    val guest2 = PetDirector(11).apply { place(0.3f); toyConfig.ladder = 0; toyConfig.planes = 0; toyConfig.paint = 0; toyConfig.footprints = 0 }
 
     val friends = de.knuffi.app.render.FriendPlay()
+
+    /** The two guests playing with each other. */
+    val friends2 = de.knuffi.app.render.FriendPlay(seed = 33)
 
     /** Scene time of the last frame (for photos). */
     var lastT = 0f
@@ -136,6 +146,10 @@ fun PetScene(
     handle: SceneHandle = remember { SceneHandle() },
     onPetTap: () -> Unit = {},
     onStroke: () -> Unit = {},
+    /** A tap on a part of the pet (head, ears, belly …). Without it a tap counts as [onPetTap]. */
+    onTouch: ((TouchZone) -> Unit)? = null,
+    /** A running game in the room, it gets the taps first. */
+    roomGame: RoomGameSession? = null,
 ) {
     val look = remember(state.pet, state.equipped) { PetLook.of(state) }
     val needs = remember(state.pet) { state.pet?.needs() ?: emptyList() }
@@ -147,6 +161,9 @@ fun PetScene(
     val time = rememberFrameTime()
     val tap by rememberUpdatedState(onPetTap)
     val stroke by rememberUpdatedState(onStroke)
+    val touchCb by rememberUpdatedState(onTouch)
+    val session by rememberUpdatedState(roomGame)
+    val context = LocalContext.current
     val lookState by rememberUpdatedState(look)
     val d = handle.director
     val ps = handle.particles
@@ -175,6 +192,11 @@ fun PetScene(
     val guestLook = remember(state.visit, state.resting, state.equipped) {
         state.visit?.let { v -> state.resting.firstOrNull { it.id == v.petId } }?.let { PetLook.of(it, state).copy(hat = null, face = null, neck = null, back = null, sleeping = false, mood = de.knuffi.core.Mood.HAPPY) }
     }
+    val guestLook2 = remember(state.visit2, state.resting, state.equipped) {
+        state.visit2?.let { v -> state.resting.firstOrNull { it.id == v.petId } }?.let { PetLook.of(it, state).copy(hat = null, face = null, neck = null, back = null, sleeping = false, mood = de.knuffi.core.Mood.HAPPY) }
+    }
+    val wishText = remember(state.wish, state.pet?.form) { state.wish?.let { Wishes.text(it, state.pet?.isCat == true) } }
+    var lastDropAt by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
 
     LaunchedEffect(typeface) {
         r.setTypeface(typeface)
@@ -194,6 +216,20 @@ fun PetScene(
         d.onToy = if (interactive && !GameRepository.previewMode) { kind -> GameRepository.perform(Action.Toy(kind)) } else null
         d.onSound = if (interactive) { sfx -> de.knuffi.app.sound.Sounds.play(sfx) } else null
         handle.friends.onMoment = if (interactive && !GameRepository.previewMode) { m -> GameRepository.perform(Action.FriendPlay(m)) } else null
+        handle.friends2.onMoment = if (interactive && !GameRepository.previewMode) { m ->
+            GameRepository.current.visit2?.let { GameRepository.perform(Action.FriendPlay(m, it.petId)) }
+        } else null
+    }
+    // The pet hears blowing, clapping and singing while the app is open (if allowed in the settings).
+    val micOn = interactive && state.settings.micReactions && !GameRepository.previewMode
+    LifecycleResumeEffect(micOn) {
+        val mic = if (micOn) {
+            de.knuffi.app.sound.MicListener { kind ->
+                d.onVoice(kind, ps, r.headNX, r.headNY)
+                GameRepository.perform(Action.Voice(kind))
+            }.also { it.start(context) }
+        } else null
+        onPauseOrDispose { mic?.stop() }
     }
     DisposableEffect(Unit) {
         onDispose { r.release() }
@@ -201,9 +237,22 @@ fun PetScene(
 
     fun hitPet(x: Float, y: Float): Boolean {
         val b = r.petBounds
-        if (b.isEmpty) return false
+        if (b.isEmpty || d.hidden) return false
         val pad = b.width() * 0.15f
         return x >= b.left - pad && x <= b.right + pad && y >= b.top - pad && y <= b.bottom + pad
+    }
+
+    /** Which part of the pet a tap hit. */
+    fun zoneAt(x: Float, y: Float): TouchZone {
+        val b = r.petBounds
+        val rx = (x - b.centerX()) / b.width().coerceAtLeast(1f)
+        val ry = ((y - b.top) / b.height().coerceAtLeast(1f)).coerceIn(0f, 1f)
+        return when {
+            ry < 0.3f -> if (kotlin.math.abs(rx) > 0.26f) TouchZone.EARS else TouchZone.HEAD
+            ry < 0.58f -> if (kotlin.math.abs(rx) > 0.2f) TouchZone.CHEEKS else TouchZone.HEAD
+            ry < 0.86f -> TouchZone.BELLY
+            else -> TouchZone.FEET
+        }
     }
 
     val input = if (interactive) {
@@ -212,6 +261,10 @@ fun PetScene(
                 detectTapGestures { pos ->
                     val nx = pos.x / size.width
                     val ny = pos.y / size.height
+                    // the release after carrying the pet is not a tap
+                    if (System.currentTimeMillis() - lastDropAt < 400L) return@detectTapGestures
+                    val game = session
+                    if (game != null && !game.finished && game.tap(nx, ny, hitPet(pos.x, pos.y), d, ps, r.headNX, r.headNY)) return@detectTapGestures
                     if (d.tapToys(pos.x, pos.y, ps, size.width.toFloat(), size.height.toFloat())) return@detectTapGestures
                     if (interactive && r.hitHidden(pos.x, pos.y)) {
                         val h = de.knuffi.core.Hidden.today(GameRepository.current.daily.day)
@@ -260,8 +313,20 @@ fun PetScene(
                     }
                     if (d.toys.splashes.isNotEmpty()) d.wipe(pos.x, pos.y, 0.34f, ps, size.width.toFloat(), size.height.toFloat())
                     if (hitPet(pos.x, pos.y)) {
-                        if (lookState?.isEgg == true) d.onEggTap(ps, nx, ny) else d.onTap()
-                        tap()
+                        if (lookState?.isEgg == true) {
+                            d.onEggTap(ps, nx, ny)
+                            tap()
+                        } else {
+                            d.onTap()
+                            val cb = touchCb
+                            if (cb == null) {
+                                tap()
+                            } else {
+                                val zone = zoneAt(pos.x, pos.y)
+                                if (d.onTouch(zone, ps, r.headNX, r.headNY)) GameRepository.perform(Action.FindSecret(de.knuffi.core.Secret.TICKLE))
+                                cb(zone)
+                            }
+                        }
                     } else {
                         d.focus(nx, ny, r.centerNX, r.centerNY)
                         if (ny > 0.55f) d.pointAt(nx)
@@ -277,6 +342,7 @@ fun PetScene(
                     lastAngle = Float.NaN
                     spin = 0f
                 }) { change, drag ->
+                    if (d.carried) return@detectDragGestures
                     // circles around the pet make it dizzy (a secret)
                     val b = r.petBounds
                     if (interactive && !b.isEmpty) {
@@ -309,6 +375,41 @@ fun PetScene(
                     }
                 }
             }
+            .pointerInput(Unit) {
+                // Hold the pet to pick it up, drag to carry it around and let go (or throw it).
+                var carrying = false
+                val tracker = VelocityTracker()
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { pos ->
+                        carrying = false
+                        val game = session
+                        if ((game == null || game.finished) && hitPet(pos.x, pos.y) && lookState?.isEgg != true && d.grab()) {
+                            carrying = true
+                            tracker.resetTracking()
+                            GameRepository.perform(Action.Carry)
+                        }
+                    },
+                    onDragEnd = {
+                        if (carrying) {
+                            val v = tracker.calculateVelocity()
+                            val petPx = r.layout.petSize.coerceAtLeast(1f)
+                            d.drop(v.x / size.width, -v.y / petPx)
+                            lastDropAt = System.currentTimeMillis()
+                        }
+                        carrying = false
+                    },
+                    onDragCancel = {
+                        if (carrying) d.drop(0f, 0f)
+                        carrying = false
+                    },
+                ) { change, _ ->
+                    if (!carrying) return@detectDragGesturesAfterLongPress
+                    change.consume()
+                    tracker.addPosition(change.uptimeMillis, change.position)
+                    val L = r.layout
+                    d.carryTo(change.position.x / size.width, (L.groundY - change.position.y) / L.petSize.coerceAtLeast(1f) - 0.55f)
+                }
+            }
     } else Modifier
 
     Canvas(modifier.then(input)) {
@@ -328,21 +429,34 @@ fun PetScene(
         m.showBubble = showBubble
         m.safeTop = topInsetPx.toFloat()
         m.guest = guestLook
+        m.guest2 = if (guestLook != null) guestLook2 else null
         m.hidden = if (interactive) hiddenItem else null
         m.nameTag = if (kind == LayoutKind.WALLPAPER && state.settings.showNameTag) state.pet?.name else null
         d.toyConfig.from(state.settings)
+        d.wishText = if (interactive) wishText else null
         r.configure(d, w, h, kind)
         d.update(t, look, needs, ps, r.headNX, r.headNY)
+        val game = session
+        if (game != null) game.update(t, d, ps, r.headNX, r.headNY, m) else m.hideSpots = emptyList()
         if (guestLook != null) {
             handle.guest.update(t + 3.7f, guestLook, emptyList(), ps, r.headNX, r.headNY)
             val pet = state.pet
             val v = state.visit
             val level = if (pet != null && v != null) de.knuffi.core.Friends.level(state.friendship[de.knuffi.core.Friends.key(pet.id, v.petId)] ?: 0) else 0
             handle.friends.update(t, d, handle.guest, level, ps)
+            if (guestLook2 != null) {
+                handle.guest2.update(t + 7.1f, guestLook2, emptyList(), ps, r.headNX, r.headNY)
+                val v2 = state.visit2
+                val level2 = if (v != null && v2 != null) de.knuffi.core.Friends.level(state.friendship[de.knuffi.core.Friends.key(v.petId, v2.petId)] ?: 0) else 0
+                handle.friends2.update(t, handle.guest, handle.guest2, level2, ps)
+            } else {
+                handle.friends2.reset()
+            }
         } else {
             handle.friends.reset()
+            handle.friends2.reset()
         }
         ps.update(t)
-        drawIntoCanvas { c -> r.draw(c.nativeCanvas, w, h, kind, m, d, ps, t, handle.guest, handle.friends) }
+        drawIntoCanvas { c -> r.draw(c.nativeCanvas, w, h, kind, m, d, ps, t, handle.guest, handle.friends, if (guestLook2 != null) handle.guest2 else null) }
     }
 }

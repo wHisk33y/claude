@@ -27,6 +27,38 @@ class DecoFurniture : Painter() {
             "deco_piano" -> piano(c, x, g, s)
             "deco_fireplace" -> fireplace(c, x, g, s)
             "deco_tent" -> tent(c, x, g, s)
+            "deco_stage" -> stage(c, x, g, s)
+        }
+    }
+
+    private fun stage(c: Canvas, x: Float, g: Float, s: Float) {
+        // the platform
+        box(c, x - s * 0.6f, g - s * 0.2f, x + s * 0.6f, g, s * 0.04f, 0xFFB9824E.toInt(), 0xFF7A4E22.toInt(), shadow = s * 0.02f)
+        box(c, x - s * 0.62f, g - s * 0.25f, x + s * 0.62f, g - s * 0.18f, s * 0.03f, 0xFFFF8FB8.toInt(), 0xFFC23A7A.toInt())
+        // little light bulbs along the edge
+        fill.shader = null
+        for (k in 0 until 7) {
+            fill.color = if (k % 2 == 0) 0xFFFFF3B0.toInt() else 0xFFFFD166.toInt()
+            c.drawCircle(x - s * 0.5f + k * s * (1f / 6f), g - s * 0.1f, s * 0.025f, fill)
+        }
+        // curtains
+        for (k in intArrayOf(-1, 1)) {
+            val ox = x + k * s * 0.6f
+            path.reset()
+            path.moveTo(ox, g - s * 1.1f)
+            path.lineTo(ox - k * s * 0.3f, g - s * 1.1f)
+            path.quadTo(ox - k * s * 0.12f, g - s * 0.62f, ox - k * s * 0.04f, g - s * 0.25f)
+            path.lineTo(ox, g - s * 0.25f)
+            path.close()
+            shaded(c, path, 0xFFFF8FA8.toInt(), 0xFFE0405A.toInt(), 0xFF8A1A30.toInt(), outlineW = s * 0.01f)
+        }
+        // the top with stars
+        box(c, x - s * 0.66f, g - s * 1.2f, x + s * 0.66f, g - s * 1.04f, s * 0.05f, 0xFFFFD86A.toInt(), 0xFFC08000.toInt(), shadow = s * 0.015f)
+        fill.shader = null
+        fill.color = Colors.alpha(Color.WHITE, 0.9f)
+        for (k in 0 until 3) {
+            Shapes.softStar(path, x - s * 0.3f + k * s * 0.3f, g - s * 1.12f, s * 0.045f, s * 0.022f, 5, 0f)
+            c.drawPath(path, fill)
         }
     }
 

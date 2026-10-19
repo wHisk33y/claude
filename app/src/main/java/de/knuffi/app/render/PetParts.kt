@@ -335,6 +335,21 @@ internal fun PetRenderer.drawTailPart(c: Canvas, fl: FormLook, pose: PetPose, bw
             Shapes.softStar(path3, bx + side * u * 0.15f, by - u * 0.1f, u * 0.12f, u * 0.06f, 5, t * 30f)
             shaded(c, path3, Color.WHITE, col.accent, Colors.darken(col.accent, 0.25f), outline = false)
         }
+        Tail.POM -> {
+            // a round fluffy bunny tail
+            val r = u * 0.14f
+            val px = bx + side * u * 0.05f
+            val py = by + u * 0.1f + wag * u * 0.012f
+            val tc = Colors.lerp(col.belly, Color.WHITE, 0.45f)
+            ovalPath(path, px - r, py - r, px + r, py + r)
+            shaded(c, path, Color.WHITE, tc, Colors.darken(tc, 0.14f))
+            fill.shader = null
+            fill.color = Colors.alpha(Color.WHITE, 0.7f)
+            for (k in 0 until 4) {
+                val a = k * TAU / 4 + 0.6f
+                c.drawCircle(px + cos(a) * r * 0.8f, py + sin(a) * r * 0.8f, r * 0.32f, fill)
+            }
+        }
     }
 }
 
@@ -525,7 +540,46 @@ internal fun PetRenderer.drawEarsPart(c: Canvas, fl: FormLook, pose: PetPose, bw
             c.restore()
             c.restore()
         }
+        Ears.PETAL -> for (s in intArrayOf(-1, 1)) {
+            // small, soft, slightly drooping ears (hamsters and guinea pigs)
+            val sf = s.toFloat()
+            val x0 = sf * bw * 0.52f + fx * 0.35f
+            val y0 = top + bh * 0.2f
+            c.save()
+            c.rotate(sf * (30f + sin(t * 2f + s) * 4f) + lag * 0.6f, x0, y0)
+            ovalPath(path, x0 - u * 0.13f, y0 - u * 0.19f, x0 + u * 0.13f, y0 + u * 0.02f)
+            shaded(c, path, col.light, col.body, col.shade)
+            ovalPath(path2, x0 - u * 0.07f, y0 - u * 0.14f, x0 + u * 0.07f, y0 - u * 0.02f)
+            shaded(c, path2, Colors.lighten(col.accent, 0.35f), col.accent, Colors.darken(col.accent, 0.2f), outline = false)
+            c.restore()
+        }
         else -> Unit
+    }
+}
+
+/** Long ears hanging down at the sides of the head (lop rabbits). Drawn in front of the body. */
+internal fun PetRenderer.drawLopEars(c: Canvas, fl: FormLook, pose: PetPose, bw: Float, bh: Float, top: Float, fx: Float) {
+    val col = fl.colors
+    val lag = pose.earLag
+    for (s in intArrayOf(-1, 1)) {
+        val sf = s.toFloat()
+        val x0 = sf * bw * 0.62f + fx * 0.4f
+        val y0 = top + bh * 0.22f
+        c.save()
+        c.rotate(sf * (8f + sin(pose.t * 1.8f + s) * 3f) - lag * 0.4f, x0, y0)
+        path.reset()
+        path.moveTo(x0 - sf * u * 0.08f, y0 - u * 0.04f)
+        path.cubicTo(x0 + sf * u * 0.22f, y0 - u * 0.1f, x0 + sf * u * 0.3f, y0 + u * 0.36f, x0 + sf * u * 0.16f, y0 + u * 0.52f)
+        path.cubicTo(x0 + sf * u * 0.04f, y0 + u * 0.6f, x0 - sf * u * 0.1f, y0 + u * 0.36f, x0 - sf * u * 0.08f, y0 - u * 0.04f)
+        path.close()
+        shaded(c, path, col.light, col.body, col.shade)
+        path2.reset()
+        path2.moveTo(x0 - sf * u * 0.01f, y0 + u * 0.03f)
+        path2.cubicTo(x0 + sf * u * 0.16f, y0, x0 + sf * u * 0.2f, y0 + u * 0.32f, x0 + sf * u * 0.12f, y0 + u * 0.44f)
+        path2.cubicTo(x0 + sf * u * 0.05f, y0 + u * 0.47f, x0 - sf * u * 0.03f, y0 + u * 0.3f, x0 - sf * u * 0.01f, y0 + u * 0.03f)
+        path2.close()
+        shaded(c, path2, Colors.lighten(col.accent, 0.35f), col.accent, Colors.darken(col.accent, 0.15f), outline = false)
+        c.restore()
     }
 }
 
@@ -1335,10 +1389,53 @@ internal fun PetRenderer.drawMuzzle(c: Canvas, fl: FormLook, pose: PetPose, bw: 
             path.close()
             shaded(c, path, Colors.lighten(col.accent, 0.4f), col.accent, Colors.darken(col.accent, 0.3f))
         }
+        Muzzle.BUNNY -> {
+            // soft round cheeks, a wiggly pink nose and whiskers (the teeth come after the mouth)
+            val pad = Colors.lerp(col.belly, Color.WHITE, 0.35f)
+            for (s in intArrayOf(-1, 1)) {
+                ovalPath(path, fx + s * u * 0.07f - u * 0.085f, my - u * 0.06f, fx + s * u * 0.07f + u * 0.085f, my + u * 0.065f)
+                shaded(c, path, Colors.lighten(pad, 0.4f), pad, Colors.darken(pad, 0.12f), outline = false)
+            }
+            val wiggle = sin(pose.t * 9f) * u * 0.006f
+            path.reset()
+            path.moveTo(fx - u * 0.04f, my - u * 0.07f + wiggle)
+            path.lineTo(fx + u * 0.04f, my - u * 0.07f + wiggle)
+            path.quadTo(fx + u * 0.01f, my - u * 0.015f, fx, my - u * 0.02f)
+            path.quadTo(fx - u * 0.01f, my - u * 0.015f, fx - u * 0.04f, my - u * 0.07f + wiggle)
+            path.close()
+            shaded(c, path, 0xFFFFD0DC.toInt(), 0xFFFF8FAA.toInt(), 0xFFC25A78.toInt(), outline = false)
+            val dark = Color.red(col.body) + Color.green(col.body) + Color.blue(col.body) < 300
+            val whisker = if (dark) Colors.alpha(Color.WHITE, 0.8f) else Colors.alpha(Colors.darken(col.body, 0.55f), 0.5f)
+            for (s in intArrayOf(-1, 1)) {
+                val sf = s.toFloat()
+                path3.reset()
+                for (k in -1..1) {
+                    path3.moveTo(fx + sf * u * 0.14f, my + k * u * 0.025f)
+                    path3.quadTo(fx + sf * bw * 0.55f, my + k * u * 0.045f - u * 0.02f, fx + sf * bw * 0.78f, my + k * u * 0.065f)
+                }
+                stroke(c, path3, whisker, u * 0.01f)
+            }
+        }
     }
 }
 
 internal fun PetRenderer.drawFangs(c: Canvas, fl: FormLook, bh: Float, cy: Float, fx: Float) {
+    if (fl.muzzle == Muzzle.BUNNY) {
+        // two little front teeth
+        val my = cy + bh * 0.26f
+        fill.shader = null
+        for (s in intArrayOf(-1, 1)) {
+            val x0 = if (s < 0) fx - u * 0.036f else fx + u * 0.002f
+            rect.set(x0, my + u * 0.005f, x0 + u * 0.034f, my + u * 0.06f)
+            fill.color = Color.WHITE
+            c.drawRoundRect(rect, u * 0.01f, u * 0.01f, fill)
+            line.shader = null
+            line.color = Colors.alpha(0xFF6E5A5A.toInt(), 0.45f)
+            line.strokeWidth = u * 0.006f
+            c.drawRoundRect(rect, u * 0.01f, u * 0.01f, line)
+        }
+        return
+    }
     if (fl.muzzle != Muzzle.FANGS) return
     val my = cy + bh * 0.26f
     for (s in intArrayOf(-1, 1)) {
@@ -1534,6 +1631,98 @@ internal fun PetRenderer.drawEggDecor(c: Canvas, eggLine: EggLine, col: PetColor
             path3.quadTo(0f, -eh * 0.45f, ew * 0.45f, -eh * 0.72f)
             path3.quadTo(0f, -eh * 0.6f, -ew * 0.45f, -eh * 0.72f)
             c.drawPath(path3, fill)
+        }
+        EggLine.DSCHUNGEL -> {
+            // a vine with big leaves and some berries
+            path3.reset()
+            path3.moveTo(-ew * 1.2f, -eh * 0.9f)
+            path3.cubicTo(-ew * 0.4f, -eh * 1.3f, ew * 0.2f, -eh * 0.5f, ew * 1.2f, -eh * 1.0f)
+            stroke(c, path3, Colors.alpha(Colors.darken(col.accent, 0.2f), 0.8f), ew * 0.05f)
+            for (i in 0 until 4) {
+                val x = -ew * 0.9f + i * ew * 0.6f
+                val y = -eh * (0.95f + 0.12f * sin(i * 1.7f))
+                c.save()
+                c.rotate(-40f + i * 30f, x, y)
+                leaf(c, x, y, ew * 0.24f, ew * 0.1f, col.accent)
+                c.restore()
+            }
+            fill.color = Colors.alpha(col.accent2, 0.85f)
+            for (i in 0 until 5) c.drawCircle((hash(i, 11) - 0.5f) * ew * 1.4f, -eh * (0.3f + hash(i, 12) * 0.45f), ew * 0.05f, fill)
+        }
+        EggLine.WUESTE -> {
+            // two dunes and a sun
+            for (k in 1 downTo 0) {
+                path3.reset()
+                val base = -eh * (0.25f + k * 0.35f)
+                path3.moveTo(-ew * 1.3f, 0f)
+                path3.lineTo(-ew * 1.3f, base)
+                path3.quadTo(-ew * 0.5f, base - eh * 0.25f, ew * 0.1f, base)
+                path3.quadTo(ew * 0.7f, base + eh * 0.12f, ew * 1.3f, base - eh * 0.1f)
+                path3.lineTo(ew * 1.3f, 0f)
+                path3.close()
+                fill.color = Colors.alpha(if (k == 0) col.accent else Colors.lighten(col.accent, 0.3f), 0.75f)
+                c.drawPath(path3, fill)
+            }
+            val pulse = (sin(t * 2f) + 1f) / 2f
+            fill.color = Colors.alpha(0xFFFFC83D.toInt(), 0.75f + 0.25f * pulse)
+            c.drawCircle(ew * 0.35f, -eh * 1.3f, ew * 0.16f, fill)
+        }
+        EggLine.EDELSTEIN -> for (i in 0 until 5) {
+            // cut gems that twinkle
+            val x = (hash(i, 21) - 0.5f) * ew * 1.4f
+            val y = -eh * (0.35f + hash(i, 22) * 1.3f)
+            val r = ew * (0.1f + 0.06f * hash(i, 23))
+            path3.reset()
+            path3.moveTo(x, y - r)
+            path3.lineTo(x + r * 0.7f, y)
+            path3.lineTo(x, y + r)
+            path3.lineTo(x - r * 0.7f, y)
+            path3.close()
+            val k = if (i % 2 == 0) col.accent else col.accent2
+            shaded(c, path3, Colors.lighten(k, 0.5f), k, Colors.darken(k, 0.2f), outline = false)
+            val tw = (sin(t * 3f + i) + 1f) / 2f
+            fill.color = Colors.alpha(Color.WHITE, 0.4f + 0.5f * tw)
+            c.drawCircle(x - r * 0.2f, y - r * 0.3f, r * 0.15f, fill)
+        }
+        EggLine.HASE -> for (i in 0 until 3) {
+            // little carrots
+            val x = (i - 1) * ew * 0.55f
+            val y = -eh * (0.55f + (i % 2) * 0.45f)
+            c.save()
+            c.rotate(-25f + i * 25f, x, y)
+            path3.reset()
+            path3.moveTo(x - ew * 0.08f, y - ew * 0.1f)
+            path3.lineTo(x + ew * 0.08f, y - ew * 0.1f)
+            path3.lineTo(x, y + ew * 0.25f)
+            path3.close()
+            fill.color = Colors.alpha(0xFFFF9A3D.toInt(), 0.9f)
+            c.drawPath(path3, fill)
+            fill.color = Colors.alpha(0xFF5FB35A.toInt(), 0.9f)
+            for (k in -1..1) c.drawOval(x + k * ew * 0.05f - ew * 0.025f, y - ew * 0.24f, x + k * ew * 0.05f + ew * 0.025f, y - ew * 0.09f, fill)
+            c.restore()
+        }
+        EggLine.HAMSTER -> for (i in 0 until 7) {
+            // sunflower seeds
+            val x = (hash(i, 31) - 0.5f) * ew * 1.4f
+            val y = -eh * (0.3f + hash(i, 32) * 1.4f)
+            c.save()
+            c.rotate(hash(i, 33) * 180f, x, y)
+            fill.color = Colors.alpha(col.accent2, 0.85f)
+            c.drawOval(x - ew * 0.05f, y - ew * 0.1f, x + ew * 0.05f, y + ew * 0.1f, fill)
+            fill.color = Colors.alpha(Color.WHITE, 0.6f)
+            c.drawRect(x - ew * 0.008f, y - ew * 0.08f, x + ew * 0.008f, y + ew * 0.08f, fill)
+            c.restore()
+        }
+        EggLine.MEERI -> {
+            // hay
+            path3.reset()
+            for (i in 0 until 9) {
+                val x = (hash(i, 41) - 0.5f) * ew * 1.6f
+                val y = -eh * (0.2f + hash(i, 42) * 1.5f)
+                path3.moveTo(x - ew * 0.15f, y)
+                path3.quadTo(x, y - ew * 0.06f, x + ew * 0.15f, y + ew * 0.02f)
+            }
+            stroke(c, path3, Colors.alpha(col.accent2, 0.85f), ew * 0.03f)
         }
     }
 }

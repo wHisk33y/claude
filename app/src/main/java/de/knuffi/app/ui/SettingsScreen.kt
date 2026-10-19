@@ -86,6 +86,13 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
     val s = state.settings
     var goal by remember { mutableFloatStateOf(s.stepGoal.toFloat()) }
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            GameRepository.perform(Action.UpdateSettings(GameRepository.state.value.settings.copy(micReactions = true)))
+        } else {
+            GameRepository.message("Ohne Mikrofon kann dein Haustier dich leider nicht hören.")
+        }
+    }
     var wallpaperActive by remember { mutableStateOf(ScreenPet.isWallpaperActive(context)) }
     var batteryOk by remember { mutableStateOf(Battery.isIgnoring(context)) }
     var waitingForOverlayPermission by remember { mutableStateOf(false) }
@@ -371,6 +378,19 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
             SectionHeader("Bedienung", "🧩")
             SurfaceCard(Modifier.fillMaxWidth()) {
                 SwitchRow("Haptisches Feedback", "Kleine Vibrationen beim Tippen", s.haptics) { update(s.copy(haptics = it)) }
+                SwitchRow(
+                    "Stimme & Mikrofon",
+                    "Dein Haustier reagiert, wenn du klatschst, pustest, singst oder rufst. Es wird nichts aufgenommen oder gespeichert.",
+                    s.micReactions,
+                ) { on ->
+                    if (!on) {
+                        update(s.copy(micReactions = false))
+                    } else if (de.knuffi.app.sound.MicListener.allowed(context)) {
+                        update(s.copy(micReactions = true))
+                    } else {
+                        micLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                    }
+                }
             }
 
             val pet = state.pet

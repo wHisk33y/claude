@@ -57,6 +57,8 @@ import de.knuffi.app.ui.components.staggered
 import de.knuffi.app.ui.theme.LocalPalette
 import de.knuffi.core.Achievement
 import de.knuffi.core.Action
+import de.knuffi.core.Adventure
+import de.knuffi.core.LongGoal
 import de.knuffi.core.DailyRewards
 import de.knuffi.core.Engine
 import de.knuffi.core.EventCalendar
@@ -66,7 +68,7 @@ import de.knuffi.core.SeasonPass
 import de.knuffi.core.TimeUtil
 
 @Composable
-fun GoalsScreen(state: GameState, onOpenPass: () -> Unit) {
+fun GoalsScreen(state: GameState, onOpenPass: () -> Unit, onOpenAdventure: () -> Unit = {}) {
     val unlocked = Achievement.entries.count { state.isUnlocked(it) }
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -76,6 +78,7 @@ fun GoalsScreen(state: GameState, onOpenPass: () -> Unit) {
         item { ScreenHeader("Ziele", "🏆", "Belohnungen, Aufgaben, Pass und Erfolge") }
         item { DailyRewardCard(state, Modifier.staggered(0)) }
         item { PassCard(state, Modifier.staggered(1), onOpenPass) }
+        item { AdventureCard(state, Modifier.staggered(2), onOpenAdventure) }
         item { SectionHeader("Tagesaufgaben", "📋") }
         quests(state)
         item {
@@ -85,6 +88,25 @@ fun GoalsScreen(state: GameState, onOpenPass: () -> Unit) {
             }
         }
         weeklies(state)
+        if (state.monthly.goals.isNotEmpty()) {
+            item {
+                val today = java.time.LocalDate.now(GameRepository.zone)
+                val left = today.lengthOfMonth() - today.dayOfMonth + 1
+                SectionHeader("Monatsziele", "📅") {
+                    Pill(if (left <= 1) "Letzter Tag!" else "Noch $left Tage", color = LocalPalette.current.orange.copy(alpha = 0.2f))
+                }
+            }
+            monthlies(state)
+        }
+        item {
+            val done = LongGoal.entries.count { it.claimed(state) }
+            SectionHeader("Große Sammelziele", "🎯") {
+                Pill("$done / ${LongGoal.entries.size}", color = LocalPalette.current.pink.copy(alpha = 0.2f))
+            }
+        }
+        items(LongGoal.entries.sortedBy { if (it.claimed(state)) 2 else if (it.done(state)) 0 else 1 }, key = { "goal_${it.name}" }) { g ->
+            LongGoalCard(g, state)
+        }
         item {
             SectionHeader("Erfolge", "🏅") {
                 Pill("$unlocked / ${Achievement.entries.size}", color = LocalPalette.current.gold.copy(alpha = 0.25f))
@@ -223,6 +245,120 @@ private fun LazyListScope.weeklies(state: GameState) {
                     else -> Unit
                 }
             }
+        }
+    }
+}
+
+private fun LazyListScope.monthlies(state: GameState) {
+    val goals = state.monthly.goals
+    for ((i, q) in goals.withIndex()) {
+        item(key = "monthly_$i") {
+            val p = LocalPalette.current
+            SurfaceCard(Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    EmojiTile(q.type.emoji, size = 48.dp, color = if (q.done) p.mint else p.orange)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(q.type.label(q.target), style = MaterialTheme.typography.titleSmall, color = p.text)
+                        Spacer(Modifier.height(6.dp))
+                        GlossyBar(q.progress / q.target.toFloat(), p.orange, p.orangeDeep, Modifier.fillMaxWidth(), height = 10.dp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "${TimeUtil.formatNumber(q.progress)} / ${TimeUtil.formatNumber(q.target)} · ${Quests.monthlyCoins(q.type)} 🪙 + ${Quests.monthlyXp(q.type)} XP + 20 🧭",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = p.textMuted,
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    when {
+                        q.claimed -> DoneStamp()
+                        q.done -> ClayTextButton("Holen", { GameRepository.perform(Action.ClaimMonthly(i)) }, small = true, color = p.mint, deep = p.mintDeep)
+                        else -> Unit
+                    }
+                }
+            }
+        }
+    }
+    item(key = "monthly_bonus") {
+        val p = LocalPalette.current
+        val allClaimed = goals.isNotEmpty() && goals.all { it.claimed }
+        SurfaceCard(Modifier.fillMaxWidth(), color = if (p.dark) Color(0xFF4A3420) else Color(0xFFFFEBD6)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                EmojiTile("🥚", size = 48.dp, color = p.orange)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Monatsbonus", style = MaterialTheme.typography.titleSmall, color = p.text)
+                    Text(
+                        "Alle Monatsziele geschafft: +${Quests.MONTHLY_BONUS_COINS} 🪙, Glitzerstaub und ein seltenes Ei!",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = p.textMuted,
+                    )
+                }
+                when {
+                    state.monthly.bonusClaimed -> DoneStamp()
+                    allClaimed -> ClayTextButton("Holen", { GameRepository.perform(Action.ClaimMonthlyBonus) }, small = true, color = p.orange, deep = p.orangeDeep)
+                    else -> Unit
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LongGoalCard(g: LongGoal, state: GameState) {
+    val p = LocalPalette.current
+    val claimed = g.claimed(state)
+    val done = g.done(state)
+    val progress = g.progress(state)
+    SurfaceCard(Modifier.fillMaxWidth(), color = if (done && !claimed) (if (p.dark) Color(0xFF4A2A44) else Color(0xFFFFE6F2)) else p.surface) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            EmojiTile(g.emoji, size = 48.dp, color = if (claimed) p.mint else if (done) p.pink else p.violet)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(g.title, style = MaterialTheme.typography.titleSmall, color = p.text)
+                Text(g.description, style = MaterialTheme.typography.bodySmall, color = p.textMuted)
+                if (!claimed) {
+                    Spacer(Modifier.height(6.dp))
+                    GlossyBar(progress / g.target.toFloat(), p.pink, p.pinkDeep, Modifier.fillMaxWidth(), height = 10.dp)
+                    Spacer(Modifier.height(4.dp))
+                    Text("${TimeUtil.formatNumber(progress)} / ${TimeUtil.formatNumber(g.target)} · ${g.rewardLabel}", style = MaterialTheme.typography.labelMedium, color = p.textMuted)
+                }
+            }
+            Spacer(Modifier.width(10.dp))
+            when {
+                claimed -> DoneStamp()
+                done -> ClayTextButton("Holen", { GameRepository.perform(Action.ClaimGoal(g)) }, small = true, color = p.pink, deep = p.pinkDeep)
+                else -> Unit
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdventureCard(state: GameState, modifier: Modifier = Modifier, onOpen: () -> Unit) {
+    val p = LocalPalette.current
+    val a = state.adventure
+    val next = Adventure.next(state)
+    val cost = Adventure.cost(a.station, a.map)
+    val ready = a.points >= cost
+    SurfaceCard(modifier.fillMaxWidth(), onClick = onOpen, color = if (p.dark) Color(0xFF26402E) else Color(0xFFE6F8DC)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            EmojiTile("🗺️", size = 52.dp, color = p.mint)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Abenteuerkarte · Station ${a.station} / ${Adventure.STATIONS}", style = MaterialTheme.typography.titleSmall, color = p.text)
+                Spacer(Modifier.height(6.dp))
+                GlossyBar((a.points / cost.toFloat()).coerceIn(0f, 1f), p.mint, p.mintDeep, Modifier.fillMaxWidth(), height = 10.dp)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    if (ready) "Weiter nach ${next.emoji} ${next.title}! Dort wartet ${next.reward.emoji}" else "${a.points} / $cost 🧭 bis ${next.emoji} ${next.title}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (ready) p.mintDeep else p.textMuted,
+                    maxLines = 2,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Text("›", style = MaterialTheme.typography.headlineMedium, color = p.textMuted)
         }
     }
 }
@@ -427,6 +563,10 @@ private fun StatsCard(state: GameState) {
                 "✨" to ("Schillernde Wesen" to "${c.shinies}"),
                 "🧺" to ("Ernten" to "${c.harvests}"),
                 "🎒" to ("Ausflüge" to "${c.trips}"),
+                "🎓" to ("Gelernte Kunststücke" to "${state.allPets.sumOf { de.knuffi.core.Tricks.learnedCount(it) }}"),
+                "💭" to ("Erfüllte Wünsche" to "${c.wishes}"),
+                "🏆" to ("Turniersiege" to "${c.tournamentWins}"),
+                "🗺️" to ("Abenteuerkarten" to "${state.adventure.map}"),
                 "📅" to ("Tage gespielt" to "${c.daysPlayed}"),
             )
             for ((i, row) in rows.withIndex()) {

@@ -8,8 +8,13 @@ import de.knuffi.core.Job
 import de.knuffi.core.Mood
 import de.knuffi.core.Need
 import de.knuffi.core.ReactionKind
+import de.knuffi.core.EggLine
 import de.knuffi.core.ToyKind
 import de.knuffi.core.ToyTuning
+import de.knuffi.core.TouchZone
+import de.knuffi.core.Trick
+import de.knuffi.core.VoiceKind
+import de.knuffi.core.Wishes
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.max
@@ -63,6 +68,12 @@ class PetDirector(seed: Int = 7) {
     var onSound: ((de.knuffi.app.sound.Sfx) -> Unit)? = null
     private val rnd = Random(seed)
     private var cat = false
+
+    /** Real animals get brushed instead of bathed. */
+    private var real = false
+
+    /** The little sound of a small animal ("Piep!"), null for everyone else. */
+    private var squeak: String? = null
     private var emotion: Emotion? = null
     private var lastStepSign = 0f
     private var dirty = false
@@ -77,7 +88,30 @@ class PetDirector(seed: Int = 7) {
     /** Free for doing something together with a friend. */
     val canDuo: Boolean
         get() = !act.care && act !is Act.Sleeping && act !is Act.GoSleep && act !is Act.Ladder && act !is Act.Duo &&
-            act !is Act.PlanePlay && act !is Act.Paint && act !is Act.Wake
+            act !is Act.PlanePlay && act !is Act.Paint && act !is Act.Wake && act !is Act.Perform && !inRoomGame &&
+            act !is Act.Carried && act !is Act.Fall
+
+    /** Hanging from the player's finger. */
+    var carried = false
+        private set
+    private var carryH = 0f
+    private var fallV = 0f
+    private var fallVX = 0f
+
+    /** Text of the pet's current wish, said in a bubble now and then. */
+    var wishText: String? = null
+    private var nextWishBubble = 12f
+
+    /** True while a room game (hide and seek, tag, fetch) is running. */
+    val inRoomGame: Boolean get() = act is Act.Hiding || act is Act.Flee || act is Act.FetchBall
+
+    /** Called when the pet catches the thrown ball; true if it was still in the air. */
+    var onBallCatch: ((Boolean) -> Unit)? = null
+    private var ballHeld = false
+    private var ballHeldAt = 0f
+    private var fleeSafeUntil = 0f
+    private var lastClap = -10f
+    private val tickles = ArrayDeque<Float>()
 
     // World configuration
     var minX = 0.24f
@@ -191,6 +225,20 @@ class PetDirector(seed: Int = 7) {
         class Stretch : Act(2.2f)
         class Duo(val kind: FriendMoment, val lead: Boolean, val spot: Float, val partnerSpot: Float, d: Float) : Act(d)
 
+        // Tricks, touching, carrying, room games and voice
+        class Perform(val trick: Trick, val success: Boolean) : Act(if (trick == Trick.TANZ) 3.4f else if (success) 2.4f else 2.1f)
+        class EarWiggle : Act(1.4f)
+        class Bashful : Act(1.4f)
+        class Tickle : Act(1.6f)
+        class FootHop : Act(1.1f)
+        class Carried : Act(1e9f)
+        class Fall : Act(6f)
+        class Hiding : Act(1e9f)
+        class Flee : Act(1e9f)
+        class FetchBall : Act(1e9f)
+        class Windy : Act(2.2f)
+        class Sing : Act(3.4f)
+
         // Little hobbies, so the home screen never gets boring
         class Bubbles : Act(3.8f)
         class Music(val instrument: String) : Act(4f)
@@ -231,8 +279,204 @@ class PetDirector(seed: Int = 7) {
         start(Act.Duo(kind, lead, spot, partnerSpot, dur))
     }
 
-    /** A cat says things a bit differently. */
-    private fun line(normal: String, catLine: String): String = if (cat) catLine else normal
+    /** A cat says things a bit differently, small animals squeak now and then. */
+    private fun line(normal: String, catLine: String): String {
+        if (cat) return catLine
+        val sq = squeak
+        return if (sq != null && rnd.nextFloat() < 0.45f) "$sq $normal" else normal
+    }
+
+    // ------------------------------------------------------------------ tricks, touching, carrying
+
+    /** Shows a trick (or a clumsy try while it is still being learned). */
+    fun perform(trick: Trick, success: Boolean) {
+        if (act is Act.Sleeping || act is Act.GoSleep || carried || inRoomGame) return
+        start(Act.Perform(trick, success))
+    }
+
+    /**
+     * The pet was touched somewhere. Returns true when it was tickled a lot in a short time.
+     */
+    fun onTouch(zone: TouchZone, ps: ParticleSystem, headX: Float, headY: Float): Boolean {
+        if (act is Act.Sleeping) {
+            ps.add(Particle(PKind.HEART, headX, headY, 0f, -0.06f, 1.2f, 0.028f, 0xFFFF7FAF.toInt()))
+            return false
+        }
+        if (act.care || carried || inRoomGame || act is Act.GoSleep || act is Act.Wake) {
+            sqV += 4f
+            return false
+        }
+        var lots = false
+        when (zone) {
+            TouchZone.HEAD -> {
+                start(Act.Love())
+                say(line(listOf("Kopf kraulen ist schön!", "Mehr, bitte! 🥰", "Hach …").random(rnd), "Prrrrr … 😻"), 1.4f)
+                ps.burst(PKind.HEART, headX, headY, 3, 0.16f, 1.2f, 0.028f, ParticleSystem.HEART_COLORS, upward = true)
+            }
+            TouchZone.EARS -> {
+                start(Act.EarWiggle())
+                say(line("Hihi, meine Ohren!", "Mrrp! Meine Ohren!"), 1.3f)
+            }
+            TouchZone.CHEEKS -> {
+                start(Act.Bashful())
+                say(line(listOf("Bussi! 😚", "Hihi, das kitzelt!").random(rnd), "Miau! 😽"), 1.3f)
+            }
+            TouchZone.BELLY -> {
+                tickles.addLast(now)
+                while (tickles.isNotEmpty() && now - tickles.first() > 4f) tickles.removeFirst()
+                lots = tickles.size >= 6
+                if (lots) tickles.clear()
+                start(Act.Tickle())
+                say(
+                    if (lots) line("Hahaha, hör auf! 😂", "Mrrrhahaha! 😹")
+                    else line(listOf("Hihi!", "Kitzelig!", "Hahaha!").random(rnd), "Prrrhihi!"),
+                    1.2f,
+                )
+                ps.burst(PKind.SPARKLE, headX, headY + 0.08f, 4, 0.2f, 0.8f, 0.02f, ParticleSystem.SPARKLE_COLORS)
+            }
+            TouchZone.FEET -> {
+                start(Act.FootHop())
+                say(line("Meine Füße! 🦶", "Miau! Meine Pfoten!"), 1.2f)
+            }
+        }
+        return lots
+    }
+
+    /** Picks the pet up. Returns false if that is not possible right now. */
+    fun grab(): Boolean {
+        if (act is Act.Sleeping || act is Act.GoSleep || act is Act.Wake || act.care || inRoomGame) return false
+        start(Act.Carried())
+        carried = true
+        carryH = 0.3f
+        say(line(listOf("Huch! Hochgehoben!", "Wiii, ich fliege!").random(rnd), "Miau?! Runter!"), 1.4f)
+        return true
+    }
+
+    /** Moves the carried pet: [nx] across the room, [height] in pet sizes above the floor. */
+    fun carryTo(nx: Float, height: Float) {
+        if (!carried) return
+        val nxc = nx.coerceIn(0.06f, 0.94f)
+        if (abs(nxc - x) > 0.002f) facing = sign(nxc - x)
+        x = nxc
+        targetX = nxc
+        carryH = height.coerceIn(0f, 3.2f)
+    }
+
+    /** Lets go of the pet; it falls down (and may be thrown with [vx], [vy]). */
+    fun drop(vx: Float, vy: Float) {
+        if (!carried) return
+        carried = false
+        fallVX = vx.coerceIn(-1.6f, 1.6f)
+        fallV = vy.coerceIn(-2f, 5f)
+        start(Act.Fall())
+    }
+
+    // ------------------------------------------------------------------ room games
+
+    /** Hide and seek: the pet disappears (it is hiding somewhere). */
+    fun hide(ps: ParticleSystem, headX: Float, headY: Float) {
+        if (act is Act.Sleeping) return
+        ps.burst(PKind.SMOKE, x, headY + 0.1f, 8, 0.25f, 0.8f, 0.04f, intArrayOf(0x88FFFFFF.toInt()), gravity = -0.1f)
+        start(Act.Hiding())
+        hidden = true
+    }
+
+    /** The pet pops out of its hiding place at [nx]. */
+    fun reveal(nx: Float, ps: ParticleSystem, ny: Float) {
+        hidden = false
+        x = nx.coerceIn(minX, maxX)
+        targetX = x
+        z = 0f
+        start(Act.Cheer())
+        say(line(listOf("Buh! Gefunden! 😆", "Hihi, da bin ich!").random(rnd), "Miau! Erwischt!"), 1.6f)
+        ps.burst(PKind.SPARKLE, nx, ny, 12, 0.3f, 1f, 0.02f, ParticleSystem.SPARKLE_COLORS)
+    }
+
+    /** Tag: the pet runs around the room. */
+    fun startFlee() {
+        if (act is Act.Sleeping) return
+        start(Act.Flee())
+        say(line("Fang mich doch! 😝", "Miau! Fang mich!"), 1.6f)
+    }
+
+    /** A tap on the fleeing pet. Returns true if it counts as caught. */
+    fun caught(ps: ParticleSystem, headX: Float, headY: Float): Boolean {
+        if (act !is Act.Flee || now < fleeSafeUntil) return false
+        fleeSafeUntil = now + 0.8f
+        sqV += 7f
+        jump(0.3f, 0.35f)
+        say(line(listOf("Hihi, erwischt!", "Nochmal!", "Du bist schnell!").random(rnd), "Mau! Erwischt!"), 1f)
+        ps.burst(PKind.STAR, headX, headY, 6, 0.25f, 0.8f, 0.022f, ParticleSystem.STAR_COLORS, upward = true)
+        // run off in the other direction
+        targetX = if (x < (minX + maxX) / 2f) maxX - rnd.nextFloat() * 0.1f else minX + rnd.nextFloat() * 0.1f
+        return true
+    }
+
+    /** Fetch: the pet waits for the ball. */
+    fun startFetch() {
+        if (act is Act.Sleeping) return
+        props.ball = false
+        ballHeld = false
+        start(Act.FetchBall())
+        say(line("Wirf den Ball! 🎾", "Miau! Wirf das Knäuel!"), 1.6f)
+    }
+
+    /** Throws the ball towards [targetNX]. Returns false while the pet still has the last one. */
+    fun throwBall(targetNX: Float): Boolean {
+        if (act !is Act.FetchBall || (props.ball && !ballHeld)) return false
+        ballHeld = false
+        props.ball = true
+        props.ballAlpha = 1f
+        props.bx = 0.5f
+        props.by = 0.4f
+        props.bvx = (targetNX.coerceIn(0.05f, 0.95f) - 0.5f) * 0.95f
+        props.bvy = 3.3f + rnd.nextFloat() * 0.5f
+        return true
+    }
+
+    /** Ends a running room game. */
+    fun stopRoomGame() {
+        hidden = false
+        props.ball = false
+        ballHeld = false
+        if (inRoomGame) start(Act.Cheer())
+    }
+
+    // ------------------------------------------------------------------ voice
+
+    /** Reacts to what the microphone heard. */
+    fun onVoice(kind: VoiceKind, ps: ParticleSystem, headX: Float, headY: Float) {
+        if (carried || inRoomGame || act.care || act is Act.GoSleep || act is Act.Wake) return
+        if (act is Act.Sleeping) {
+            if (kind == VoiceKind.CLAP || kind == VoiceKind.LOUD) say("Mmh … *schnarch* … 💤", 1.4f)
+            return
+        }
+        when (kind) {
+            VoiceKind.BLOW -> {
+                start(Act.Windy())
+                say(line("Huiii, Wind! 🌬️", "Pfff! Miau!"), 1.4f)
+            }
+            VoiceKind.CLAP -> {
+                val twice = now - lastClap < 1.4f
+                lastClap = now
+                if (twice) {
+                    start(Act.Dance())
+                    say(line("Klatsch, klatsch! Tanzen! 💃", "Miau! Tanz mit!"), 1.6f)
+                } else {
+                    start(Act.Surprised())
+                    queue.addLast(Act.Hop())
+                }
+            }
+            VoiceKind.SING -> {
+                start(Act.Sing())
+                say(line(listOf("La la laaa! 🎶", "Ich sing mit! 🎵").random(rnd), "Miauuu~ 🎶"), 1.6f)
+            }
+            VoiceKind.LOUD -> {
+                start(Act.Shiver())
+                say(line("Huch, so laut! 🙉", "Mau?! So laut!"), 1.4f)
+            }
+        }
+    }
 
     // ------------------------------------------------------------------ input
 
@@ -309,7 +553,7 @@ class PetDirector(seed: Int = 7) {
                         startCare(Act.Eat(emoji))
                     }
                 }
-                ReactionKind.CLEAN -> startCare(if (cat) Act.Groom(brush = true) else Act.Bath())
+                ReactionKind.CLEAN -> startCare(if (real) Act.Groom(brush = true) else Act.Bath())
                 ReactionKind.PLAY -> startCare(if (hasBall) Act.Ball() else Act.Cheer())
                 ReactionKind.GAME, ReactionKind.BUY -> if (!act.care) start(Act.Cheer())
                 ReactionKind.HEAL, ReactionKind.DRINK -> startCare(Act.Heal(e.itemId?.let { Catalog[it]?.emoji } ?: "💊"))
@@ -356,6 +600,18 @@ class PetDirector(seed: Int = 7) {
                 ps.burst(PKind.STAR, headX, headY, 10, 0.45f, 1.4f, 0.028f, ParticleSystem.STAR_COLORS, gravity = 0.3f, upward = true)
             }
             is GameEvent.CoinsGained -> ps.burst(PKind.COIN, headX, headY, min(8, 2 + e.amount / 10), 0.3f, 1f, 0.03f, intArrayOf(0xFFFFC83D.toInt()), gravity = 0.7f, upward = true)
+            is GameEvent.TrickPracticed -> {
+                perform(e.trick, e.success)
+                if (e.learned) ps.burst(PKind.CONFETTI, headX, headY, 30, 0.55f, 1.8f, 0.022f, ParticleSystem.CONFETTI_COLORS, gravity = 0.5f, upward = true)
+            }
+            is GameEvent.TrickShown -> perform(e.trick, true)
+            is GameEvent.WishMade -> if (act !is Act.Sleeping) say(Wishes.text(e.wish, cat), 3.2f)
+            is GameEvent.WishFulfilled -> {
+                if (!act.care && act !is Act.Sleeping && !inRoomGame) start(Act.Cheer())
+                say(line("Juhu! Danke, danke! 💖", "Prrrr! Danke! 💖"), 2f)
+                ps.burst(PKind.HEART, headX, headY, 8, 0.35f, 1.4f, 0.03f, ParticleSystem.HEART_COLORS, upward = true)
+            }
+            is GameEvent.TournamentDone -> if (!act.care && act !is Act.Sleeping) start(if (e.place == 1) Act.Cheer() else Act.Wave())
             else -> Unit
         }
     }
@@ -407,7 +663,7 @@ class PetDirector(seed: Int = 7) {
                 say(line("Wiii!", "Mrrrp!"), 1.2f)
             }
             is Act.Wave -> {
-                say(if (cat) listOf("Miau!", "Mrrp?", "Miiiau!").random(rnd) else listOf("Hallo!", "Hey du!", "Hihi!").random(rnd), 1.6f)
+                say(if (cat) listOf("Miau!", "Mrrp?", "Miiiau!").random(rnd) else listOf(squeak ?: "Hallo!", "Hallo!", "Hey du!", "Hihi!").random(rnd), 1.6f)
                 onSound?.invoke(if (cat) de.knuffi.app.sound.Sfx.MEOW else de.knuffi.app.sound.Sfx.CHIRP)
             }
             is Act.Yawn -> say(line("Gääähn …", "Mrrraaau …"), 1.6f)
@@ -469,6 +725,8 @@ class PetDirector(seed: Int = 7) {
                 say(line("Oh, ein Schmetterling!", "Miau?! Ein Schmetterling!"), 1.6f)
             }
             is Act.Daydream -> Unit
+            is Act.FootHop -> jump(0.28f, 0.36f)
+            is Act.Fall -> if (fallV > 1f) say(line("Huiiii!", "Miauuu!"), 1f)
             else -> Unit
         }
     }
@@ -477,6 +735,8 @@ class PetDirector(seed: Int = 7) {
     private fun hobby(): Act {
         val pool = if (cat) {
             listOf<() -> Act>({ Act.Bubbles() }, { Act.Snack(listOf("🐟", "🍗", "🧀").random(rnd)) }, { Act.Flip() }, { Act.Butterfly() }, { Act.Butterfly() }, { Act.Daydream() })
+        } else if (squeak != null) {
+            listOf<() -> Act>({ Act.Snack(listOf("🥕", "🥒", "🌾", "🍎", "🌻").random(rnd)) }, { Act.Snack("🥕") }, { Act.Flip() }, { Act.Butterfly() }, { Act.Daydream() }, { Act.Hop() })
         } else {
             listOf<() -> Act>(
                 { Act.Bubbles() },
@@ -611,9 +871,16 @@ class PetDirector(seed: Int = 7) {
         toys.update(t, dt, toyConfig)
         paintMarks = (paintMarks - dt / 90f).coerceAtLeast(0f)
         pose.paint = paintMarks
-        if (act !is Act.Duo) hidden = false
+        if (act !is Act.Duo && act !is Act.Hiding) hidden = false
         if (look == null) return
         cat = look.isCat
+        real = look.form.isReal
+        squeak = when (look.form.line) {
+            EggLine.HASE -> "*mümmel*"
+            EggLine.HAMSTER -> "Piep!"
+            EggLine.MEERI -> "Quiek!"
+            else -> null
+        }
         emotion = look.emotion
         dirty = look.dirty
         pose.breath = sin(t * 2f * PI.toFloat() / 3.2f)
@@ -625,7 +892,12 @@ class PetDirector(seed: Int = 7) {
 
         // Sleep is driven by the game state.
         if (look.sleeping) {
+            if (carried) {
+                carried = false
+                carryH = 0f
+            }
             if (act !is Act.Sleeping && act !is Act.GoSleep && !(act is Act.Walk && queue.firstOrNull() is Act.GoSleep)) {
+                hidden = false
                 props.inTub = false
                 props.ball = false
                 props.tub = 0f
@@ -646,6 +918,7 @@ class PetDirector(seed: Int = 7) {
         val a = act
         val finished = when (a) {
             is Act.Walk -> abs(targetX - x) < 0.006f && abs(targetZ - z) < 0.02f
+            is Act.Fall -> (carryH <= 0f && fallV == 0f && elapsed > 0.35f) || elapsed >= a.dur
             else -> elapsed >= a.dur
         }
         if (finished) {
@@ -1127,6 +1400,319 @@ class PetDirector(seed: Int = 7) {
                 pose.mouth = if (p > 0.6f) MouthShape.YAWN else MouthShape.CAT
                 pose.tilt += facing * 6f * p
             }
+            is Act.Perform -> runPerform(a, el, dt, ps, headX, headY)
+            is Act.EarWiggle -> {
+                earV += sin(el * 26f) * 520f * dt
+                pose.eyes = EyeShape.HAPPY
+                pose.mouth = MouthShape.GRIN
+                pose.blush = 1f
+                pose.tilt += sin(el * 12f) * 5f
+            }
+            is Act.Bashful -> {
+                pose.eyes = EyeShape.HAPPY
+                pose.mouth = MouthShape.CAT
+                pose.blush = 1f
+                pose.turn = 0.45f * facing
+                pose.tilt += sin(el * 6f) * 6f
+                pose.armL = 0.35f
+                pose.armR = 0.35f
+            }
+            is Act.Tickle -> {
+                pose.eyes = EyeShape.HAPPY
+                pose.mouth = MouthShape.GRIN
+                pose.blush = 1f
+                pose.tilt += sin(el * 30f) * 9f
+                pose.lift += abs(sin(el * 15f)) * 0.05f
+                pose.armL = 0.3f + 0.2f * sin(el * 25f)
+                pose.armR = 0.3f - 0.2f * sin(el * 25f)
+                pose.footL = max(0f, sin(el * 20f)) * 0.5f
+                pose.footR = max(0f, -sin(el * 20f)) * 0.5f
+            }
+            is Act.FootHop -> {
+                pose.eyes = EyeShape.WIDE
+                pose.mouth = MouthShape.OPEN
+                pose.footL = max(0f, sin(el * 22f)) * 0.9f
+                pose.footR = max(0f, -sin(el * 22f)) * 0.9f
+                pose.armL = 0.7f
+                pose.armR = 0.7f
+            }
+            is Act.Carried -> {
+                yOffset = carryH
+                z = max(0f, z - dt * 3f)
+                targetZ = 0f
+                val k = sin(now * 9f)
+                pose.footL = max(0f, k) * 0.7f
+                pose.footR = max(0f, -k) * 0.7f
+                pose.armL = 0.85f
+                pose.armR = 0.85f
+                pose.armWaveL = k * 12f
+                pose.armWaveR = -k * 12f
+                pose.eyes = if (carryH > 1.6f) EyeShape.WIDE else EyeShape.HAPPY
+                pose.mouth = MouthShape.OPEN
+                pose.blush = 1f
+                pose.tilt += sin(now * 3f) * 6f
+            }
+            is Act.Fall -> {
+                carryH += fallV * dt
+                fallV -= 9f * dt
+                x = (x + fallVX * dt).coerceIn(minX, maxX)
+                targetX = x
+                if (abs(fallVX) > 0.02f) facing = sign(fallVX)
+                fallVX *= 1f - min(1f, dt * 1.5f)
+                if (carryH <= 0f) {
+                    carryH = 0f
+                    if (fallV < -3f) {
+                        fallV = -fallV * 0.35f
+                        sqV += 9f
+                        ps.burst(PKind.SMOKE, x, 0.95f, 4, 0.15f, 0.6f, 0.03f, intArrayOf(0x55FFFFFF), gravity = 0f)
+                    } else if (fallV <= 0f) {
+                        if (fallV < -0.5f) {
+                            sqV += 6f
+                            say(line(listOf("Gelandet!", "Nochmal! 😆", "Huii, das war lustig!").random(rnd), "Miau! Gelandet!"), 1.2f)
+                        }
+                        fallV = 0f
+                    }
+                }
+                yOffset = carryH
+                pose.eyes = if (carryH > 0.3f) EyeShape.WIDE else EyeShape.HAPPY
+                pose.mouth = MouthShape.OPEN
+                pose.armL = if (carryH > 0.1f) 1f else 0.5f
+                pose.armR = pose.armL
+            }
+            is Act.Hiding -> hidden = true
+            is Act.Flee -> runFlee(dt)
+            is Act.FetchBall -> runFetchBall(dt, ps)
+            is Act.Windy -> {
+                earV += 220f * dt * (if (facing > 0f) 1f else -1f)
+                pose.tilt -= facing * (8f + sin(el * 18f) * 4f)
+                pose.eyes = EyeShape.SQUINT
+                pose.mouth = MouthShape.O
+                pose.mouthOpen = 0.5f
+                pose.armL = 0.6f + 0.2f * sin(el * 20f)
+                pose.armR = 0.6f - 0.2f * sin(el * 20f)
+                if ((el % 0.22f) < dt) {
+                    val leaf = rnd.nextBoolean()
+                    ps.add(Particle(if (leaf) PKind.EMOJI else PKind.BUBBLE, x - facing * 0.3f, headY + (rnd.nextFloat() - 0.5f) * 0.2f, facing * (0.12f + rnd.nextFloat() * 0.08f), -0.01f, 1.4f, if (leaf) 0.03f else 0.016f, 0xFFFFFFFF.toInt(), text = if (leaf) listOf("🍃", "🌸", "🍂").random(rnd) else null, drag = 0.2f))
+                }
+            }
+            is Act.Sing -> {
+                val k = el * 5f
+                pose.tilt += sin(k) * 8f
+                pose.mouth = if ((el * 4f).toInt() % 2 == 0) MouthShape.OPEN else MouthShape.O
+                pose.mouthOpen = 0.7f
+                pose.eyes = EyeShape.CLOSED
+                pose.blush = 0.9f
+                pose.armL = 0.5f + 0.3f * sin(k)
+                pose.armR = 0.5f - 0.3f * sin(k)
+                if ((el % 0.35f) < dt) ps.add(Particle(PKind.NOTE, headX + (rnd.nextFloat() - 0.3f) * 0.18f, headY, (rnd.nextFloat() - 0.5f) * 0.05f, -0.08f, 1.5f, 0.035f, listOf(0xFF7C6CFF, 0xFFFF6B9A, 0xFF2EC4A0, 0xFFFFB84D).random(rnd).toInt()))
+            }
+        }
+    }
+
+    private fun runPerform(a: Act.Perform, el: Float, dt: Float, ps: ParticleSystem, headX: Float, headY: Float) {
+        val p = (el / a.dur).coerceIn(0f, 1f)
+        if (!a.success) {
+            // a clumsy try: it starts, wobbles and gets confused
+            if (el < 1.1f) {
+                pose.tilt += sin(el * 16f) * 10f
+                pose.armL = 0.5f
+                pose.armR = 0.7f
+                pose.eyes = EyeShape.SQUINT
+                pose.mouth = MouthShape.TONGUE
+            } else {
+                if (el - dt < 1.1f) {
+                    say(line(listOf("Hm? Wie ging das noch? 🤔", "Upps! Nochmal!", "Fast!").random(rnd), "Mau? 🤔"), 1.3f)
+                    sqV += 4f
+                }
+                pose.eyes = EyeShape.DIZZY
+                pose.mouth = MouthShape.WAVY
+                pose.tilt += 6f
+            }
+            return
+        }
+        when (a.trick) {
+            Trick.SITZ -> {
+                val k = easeOut((el / 0.4f).coerceIn(0f, 1f))
+                pose.scaleY *= 1f - 0.12f * k
+                pose.scaleX *= 1f + 0.06f * k
+                pose.eyes = EyeShape.HAPPY
+                pose.mouth = MouthShape.SMILE
+                pose.turn = 0f
+                pose.lookY = -0.3f
+            }
+            Trick.PFOTE -> {
+                pose.armR = 0.55f + 0.05f * sin(el * 8f)
+                pose.armWaveR = -20f + sin(el * 6f) * 6f
+                pose.turn = 0f
+                pose.eyes = EyeShape.HAPPY
+                pose.mouth = MouthShape.OPEN
+            }
+            Trick.WINKEN -> {
+                pose.armL = 0.95f
+                pose.armR = 0.95f
+                pose.armWaveL = sin(el * 14f) * 26f
+                pose.armWaveR = -sin(el * 14f) * 26f
+                pose.eyes = EyeShape.HAPPY
+                pose.mouth = MouthShape.OPEN
+            }
+            Trick.DREHEN -> {
+                pose.turn = sin(el * 9f)
+                pose.armL = 0.7f
+                pose.armR = 0.7f
+                pose.eyes = EyeShape.STAR
+                pose.mouth = MouthShape.OPEN
+                pose.lift += abs(sin(el * 4.5f)) * 0.05f
+            }
+            Trick.MAENNCHEN -> {
+                val k = sin((el / 0.5f).coerceIn(0f, 1f) * PI.toFloat() / 2f)
+                pose.lift += 0.18f * k
+                pose.scaleY *= 1f + 0.12f * k
+                pose.scaleX *= 1f - 0.06f * k
+                pose.armL = 0.45f
+                pose.armR = 0.45f
+                pose.eyes = EyeShape.HAPPY
+                pose.mouth = MouthShape.OPEN
+                pose.turn = 0f
+            }
+            Trick.SPRUNG -> {
+                if (el < dt * 1.5f) jump(0.75f, 0.65f)
+                pose.armL = 1f
+                pose.armR = 1f
+                pose.eyes = EyeShape.STAR
+                pose.mouth = MouthShape.OPEN
+            }
+            Trick.ROLLE -> {
+                val r = ((el - 0.2f) / 1.2f).coerceIn(0f, 1f)
+                pose.tilt += facing * 360f * (r * r * (3f - 2f * r))
+                pose.lying = sin(r * PI.toFloat()) * 0.3f
+                pose.eyes = if (r in 0.05f..0.95f) EyeShape.CLOSED else EyeShape.HAPPY
+                pose.mouth = MouthShape.GRIN
+            }
+            Trick.VERBEUGUNG -> {
+                val k = sin(p * PI.toFloat())
+                pose.tilt += facing * 28f * k
+                pose.lookY = k
+                pose.eyes = if (k > 0.5f) EyeShape.CLOSED else EyeShape.HAPPY
+                pose.armR = 0.4f * k
+                pose.mouth = MouthShape.SMILE
+            }
+            Trick.TANZ -> {
+                val k = el * 7f
+                pose.tilt += sin(k) * 12f
+                pose.lift += abs(sin(k)) * 0.1f
+                pose.armL = 0.75f + 0.25f * sin(k)
+                pose.armR = 0.75f - 0.25f * sin(k)
+                pose.turn = sin(k * 0.5f) * 0.7f
+                pose.eyes = EyeShape.HAPPY
+                pose.mouth = MouthShape.OPEN
+                pose.blush = 0.9f
+                if ((el % 0.45f) < dt) ps.add(Particle(PKind.NOTE, headX + (rnd.nextFloat() - 0.5f) * 0.2f, headY, (rnd.nextFloat() - 0.5f) * 0.05f, -0.09f, 1.4f, 0.04f, listOf(0xFF7C6CFF, 0xFFFF6B9A, 0xFF2EC4A0).random(rnd).toInt()))
+            }
+            Trick.SALTO -> {
+                if (el < dt * 1.5f) jump(0.7f, 0.9f)
+                val r = ((el - 0.14f) / 0.9f).coerceIn(0f, 1f)
+                pose.tilt -= facing * 360f * (r * r * (3f - 2f * r))
+                pose.armL = 1f
+                pose.armR = 1f
+                pose.eyes = if (r in 0.05f..0.95f) EyeShape.CLOSED else EyeShape.STAR
+                pose.mouth = MouthShape.OPEN
+            }
+        }
+        val end = a.dur - 0.55f
+        if (el >= end && el - dt < end) {
+            say(line(listOf("Tadaa! ⭐", "Gut, oder? 😎", "Applaus! 👏").random(rnd), "Miau! Tadaa! ⭐"), 1.2f)
+            ps.burst(PKind.STAR, headX, headY, 6, 0.3f, 1f, 0.022f, ParticleSystem.STAR_COLORS, upward = true)
+        }
+    }
+
+    private fun runFlee(dt: Float) {
+        z = max(0f, z - dt * 2f)
+        targetZ = 0f
+        if (now < fleeSafeUntil) {
+            pose.eyes = EyeShape.STAR
+            pose.mouth = MouthShape.GRIN
+            pose.blush = 1f
+            return
+        }
+        if (abs(targetX - x) < 0.02f || rnd.nextFloat() < dt * 0.5f) {
+            var tx = minX + rnd.nextFloat() * (maxX - minX)
+            if (abs(tx - x) < 0.15f) tx = if (x < (minX + maxX) / 2f) maxX else minX
+            targetX = tx
+        }
+        speed = 0.42f
+        walking = abs(targetX - x) > 0.01f
+        if (landed && rnd.nextFloat() < dt * 0.6f) jump(0.32f, 0.38f)
+        pose.eyes = EyeShape.HAPPY
+        pose.mouth = MouthShape.OPEN
+        pose.blush = 0.9f
+        pose.armL = 0.8f
+        pose.armR = 0.8f
+    }
+
+    private fun runFetchBall(dt: Float, ps: ParticleSystem) {
+        z = max(0f, z - dt * 3f)
+        targetZ = 0f
+        if (ballHeld) {
+            // shows the ball proudly, then drops it for the next throw
+            props.bx = x + facing * 0.06f
+            props.by = 0.62f
+            pose.eyes = EyeShape.HAPPY
+            pose.mouth = MouthShape.OPEN
+            pose.armL = 0.6f
+            pose.armR = 0.6f
+            pose.lookY = -0.2f
+            if (now - ballHeldAt > 0.9f) {
+                props.ball = false
+                ballHeld = false
+                if (rnd.nextFloat() < 0.4f) say(line("Nochmal! 🎾", "Miau! Nochmal!"), 1f)
+            }
+            return
+        }
+        if (!props.ball) {
+            pose.lookY = 0.5f
+            pose.eyes = EyeShape.WIDE
+            pose.mouth = MouthShape.OPEN
+            pose.armL = 0.3f + 0.2f * sin(now * 6f)
+            pose.armR = pose.armL
+            return
+        }
+        props.bvy -= 5.5f * dt
+        props.bx += props.bvx * dt
+        props.by += props.bvy * dt
+        props.brot += props.bvx * dt * 900f
+        if (props.by < 0f) {
+            props.by = 0f
+            if (abs(props.bvy) > 0.4f) props.bvy = -props.bvy * 0.55f else props.bvy = 0f
+            props.bvx *= 0.88f
+        }
+        val lo = minX - 0.1f
+        val hi = maxX + 0.1f
+        if (props.bx < lo) {
+            props.bx = lo
+            props.bvx = abs(props.bvx) * 0.6f
+        }
+        if (props.bx > hi) {
+            props.bx = hi
+            props.bvx = -abs(props.bvx) * 0.6f
+        }
+        targetX = props.bx.coerceIn(minX, maxX)
+        speed = 0.38f
+        walking = abs(targetX - x) > 0.02f
+        pose.eyes = EyeShape.HAPPY
+        pose.mouth = MouthShape.OPEN
+        pose.lookX = sign(props.bx - x)
+        pose.lookY = -0.6f
+        if (abs(props.bx - x) < 0.08f && props.by < 0.9f) {
+            val air = props.by > 0.15f
+            ballHeld = true
+            ballHeldAt = now
+            props.bvx = 0f
+            props.bvy = 0f
+            jump(if (air) 0.32f else 0.15f, 0.4f)
+            sqV += 4f
+            say(if (air) line(listOf("Gefangen! 🎾", "Super Wurf!").random(rnd), "Miau! Gefangen!") else line("Hab ihn!", "Miau! Meins!"), 1f)
+            ps.add(Particle(PKind.STAR, props.bx, 0.6f, 0f, -0.05f, 0.6f, 0.02f, 0xFFFFD166.toInt()))
+            onBallCatch?.invoke(air)
         }
     }
 
@@ -1247,6 +1833,40 @@ class PetDirector(seed: Int = 7) {
                 pose.tilt += face * 12f
                 pose.lift = 0f
                 if (el - dt < 1.5f && el >= 1.5f && a.lead) say(line("Hab dich lieb! 💕", "Prrrrrr … 💕"), 1.6f)
+            }
+            FriendMoment.SQUABBLE -> when {
+                // a little quarrel about a toy, then they make up again
+                el < 3.6f -> {
+                    pose.brows = 1f
+                    pose.mouth = if ((el * 8f).toInt() % 2 == 0) MouthShape.OPEN else MouthShape.FLAT
+                    pose.eyes = EyeShape.SQUINT
+                    pose.tilt += face * (6f + sin(el * 14f) * 5f)
+                    pose.armL = 0.5f + 0.3f * sin(el * 12f)
+                    pose.armR = 0.5f - 0.3f * sin(el * 12f)
+                    val turns = if (a.lead) floatArrayOf(1.4f, 2.9f) else floatArrayOf(2.15f)
+                    for (at in turns) if (el >= at && el - dt < at) {
+                        say(
+                            if (cat) listOf("Fauch! Meins!", "Mrrr! Nein, meins!").random(rnd)
+                            else listOf("Das ist meins!", "Nein, meins!", "Ich war zuerst da!", "Gar nicht wahr!").random(rnd),
+                            1.1f,
+                        )
+                        if (rnd.nextBoolean()) ps.add(Particle(PKind.EMOJI, headX + face * 0.05f, headY, 0f, -0.05f, 1f, 0.045f, 0xFF000000.toInt(), "💢"))
+                    }
+                }
+                el < 4.3f -> {
+                    pose.eyes = EyeShape.OPEN
+                    pose.mouth = MouthShape.FROWN
+                    pose.lookY = 0.6f
+                    if (el - dt < 3.7f && el >= 3.7f && a.lead) say(line("… Tut mir leid.", "Mrrp … 'tschuldigung."), 1.2f)
+                }
+                else -> {
+                    pose.eyes = EyeShape.HEART
+                    pose.blush = 1f
+                    pose.mouth = MouthShape.CAT
+                    pose.tilt += face * 12f
+                    if (el - dt < 4.6f && el >= 4.6f && !a.lead) say(line("Wieder Freunde! 💕", "Prrr! 💕"), 1.4f)
+                    if ((el % 0.5f) < dt) ps.add(Particle(PKind.HEART, headX, headY, 0f, -0.05f, 1.2f, 0.026f, 0xFFFF7FAF.toInt()))
+                }
             }
         }
     }
@@ -1528,6 +2148,12 @@ class PetDirector(seed: Int = 7) {
             }
             bubbleUntil = t + 3f
             nextNeedBubble = t + 7f + rnd.nextFloat() * 3f
+        }
+        val wish = wishText
+        if (bubbleText == null && wish != null && t > nextWishBubble && !act.care && !look.sleeping && !inRoomGame && !carried) {
+            bubbleText = wish
+            bubbleUntil = t + 3.2f
+            nextWishBubble = t + 18f + rnd.nextFloat() * 8f
         }
         val target = if (bubbleText != null) 1f else 0f
         if (bubbleText != null) bubble = bubbleText

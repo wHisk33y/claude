@@ -27,6 +27,12 @@ class SceneModel {
     /** A pet visiting from the Kuschelhaus. */
     var guest: PetLook? = null
 
+    /** A second visitor. */
+    var guest2: PetLook? = null
+
+    /** Hiding places to tap during hide and seek (normalised scene coordinates), with a highlight 0..1. */
+    var hideSpots: List<Pair<de.knuffi.core.HideSpot, Float>> = emptyList()
+
     /** Name tag under the pet (home screen wallpaper). */
     var nameTag: String? = null
 
@@ -43,6 +49,7 @@ class SceneRenderer {
     val room = RoomRenderer()
     val pet = PetRenderer()
     private val guestPet = PetRenderer()
+    private val guestPet2 = PetRenderer()
     val props = PropRenderer()
     val toyArt = ToyRenderer()
     private var cache: Bitmap? = null
@@ -113,7 +120,7 @@ class SceneRenderer {
         cacheKey = key
     }
 
-    fun draw(c: Canvas, w: Float, h: Float, kind: LayoutKind, m: SceneModel, d: PetDirector, ps: ParticleSystem?, t: Float, guest: PetDirector? = null, friends: FriendPlay? = null) {
+    fun draw(c: Canvas, w: Float, h: Float, kind: LayoutKind, m: SceneModel, d: PetDirector, ps: ParticleSystem?, t: Float, guest: PetDirector? = null, friends: FriendPlay? = null, guest2: PetDirector? = null) {
         configure(d, w, h, kind)
         val L = layout
         val f = m.furniture
@@ -207,6 +214,18 @@ class SceneRenderer {
             toyArt.ladder(c, toys.ladderX * w, L.groundY, toys.ladderHeight * L.petSize, L.petSize * 0.5f, toys.ladderExtend)
         }
 
+        // A second visiting friend
+        val gl2 = m.guest2
+        if (gl2 != null && guest2 != null && !guest2.hidden) {
+            guest2.minX = L.minX
+            guest2.maxX = L.maxX
+            val gz = guest2.z
+            val gs = L.petSize * 0.8f * (1f - 0.2f * gz)
+            val gFloor = L.groundY + (backY - L.groundY) * gz
+            if (guest2.showsShadow) guestPet2.drawShadow(c, guest2.x * w, gFloor, gs, guest2.pose, gl2)
+            guestPet2.draw(c, guest2.x * w, gFloor - guest2.yOffset * gs, gs, gl2, guest2.pose)
+        }
+
         // A visiting friend walks around behind the pet
         val gl = m.guest
         if (gl != null && guest != null && !guest.hidden) {
@@ -219,8 +238,13 @@ class SceneRenderer {
             guestPet.draw(c, guest.x * w, gFloor - guest.yOffset * gs, gs, gl, guest.pose)
         }
 
-        // The pet
-        if (look != null) {
+        // Hiding places during hide and seek
+        if (m.hideSpots.isNotEmpty()) {
+            for ((spot, glow) in m.hideSpots) props.hideSpot(c, spot.x * w, spot.y * h, L.petSize * 0.17f, glow, t)
+        }
+
+        // The pet (not while it hides)
+        if (look != null && !d.hidden) {
             if (d.showsShadow) pet.drawShadow(c, px, floorY, petSize, d.pose, look)
             pet.draw(c, px, ground, petSize, look, d.pose)
             petBounds.set(pet.bounds)
@@ -266,7 +290,7 @@ class SceneRenderer {
         d.companion?.let { props.flyer(c, it, d.companionX * w, d.companionY * h, L.petSize * 0.17f, t) }
 
         val tag = m.nameTag
-        if (tag != null && look != null && !look.isEgg) {
+        if (tag != null && look != null && !look.isEgg && !d.hidden) {
             props.nameTag(c, tag, px, floorY + L.petSize * 0.08f, max(L.w * 0.032f, petSize * 0.075f))
         }
 
@@ -275,9 +299,14 @@ class SceneRenderer {
             val gs = L.petSize * 0.85f
             props.speech(c, gb, guestPet.head.x, guestPet.head.y - gs * 0.04f, w, max(L.w * 0.04f, gs * 0.1f), guest.bubbleAlpha, m.safeTop)
         }
+        val gb2 = guest2?.bubble
+        if (m.showBubble && gl2 != null && guest2 != null && gb2 != null && !guest2.hidden) {
+            val gs = L.petSize * 0.8f
+            props.speech(c, gb2, guestPet2.head.x, guestPet2.head.y - gs * 0.04f, w, max(L.w * 0.04f, gs * 0.1f), guest2.bubbleAlpha, m.safeTop)
+        }
 
         val bubble = d.bubble
-        if (m.showBubble && bubble != null && look != null) {
+        if (m.showBubble && bubble != null && look != null && !d.hidden) {
             val size = max(L.w * 0.042f, petSize * 0.1f)
             props.speech(c, bubble, pet.head.x, pet.head.y - petSize * 0.04f, w, size, d.bubbleAlpha, m.safeTop)
         }

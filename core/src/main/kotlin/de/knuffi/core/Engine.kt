@@ -1351,6 +1351,7 @@ object Engine {
                     s = s.copy(pet = active.applyEffect(if (snowy) item.effect.copy(energy = item.effect.energy * 2) else item.effect))
                     emit(GameEvent.Reaction(ReactionKind.DRINK, item.id))
                     touch(now)
+                    if (item.effect.hygiene > 0) wishProgress(WishKind.BATH, now)
                     if (cooldownReady("xp_care", now, 30_000L)) addXp(3, now)
                 }
             }

@@ -39,6 +39,7 @@ class FriendPlay(seed: Int = 21) {
         FriendMoment.DANCE -> 5f
         FriendMoment.HIDE -> 9f
         FriendMoment.CUDDLE -> 6f
+        FriendMoment.SQUABBLE -> 6.4f
     }
 
     fun reset() {

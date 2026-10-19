@@ -108,6 +108,12 @@ sealed interface Route {
     data object Photos : Route
     data object Diary : Route
     data object Secrets : Route
+    data object Tricks : Route
+    data object Adventure : Route
+    data object Tournament : Route
+
+    /** Not a page of its own: switches to the goals tab. */
+    data object Goals : Route
 }
 
 /** Space that scrolling pages keep free at the bottom for the floating navigation bar. */
@@ -229,11 +235,11 @@ private fun MainNavigation(state: GameState, debug: DebugScenes.Launch?) {
                         )
                         Tab.WORLD -> WorldScreen(state) {
                             backToKuschelhaus = false
-                            route = it
+                            if (it == Route.Goals) tab = Tab.GOALS else route = it
                         }
-                        Tab.GAMES -> GamesScreen(state, onStart = { route = Route.Game(it) })
+                        Tab.GAMES -> GamesScreen(state, onStart = { route = Route.Game(it) }, onTournament = { route = Route.Tournament })
                         Tab.SHOP -> ShopScreen(state)
-                        Tab.GOALS -> GoalsScreen(state, onOpenPass = { route = Route.Pass })
+                        Tab.GOALS -> GoalsScreen(state, onOpenPass = { route = Route.Pass }, onOpenAdventure = { route = Route.Adventure })
                     }
                 }
                 FloatingNavBar(state, tab, Modifier.align(Alignment.BottomCenter)) { tab = it }
@@ -262,6 +268,10 @@ private fun MainNavigation(state: GameState, debug: DebugScenes.Launch?) {
             Route.Photos -> PhotoScreen(state, onBack = { route = Route.Main })
             Route.Diary -> DiaryScreen(state, onBack = { route = Route.Main })
             Route.Secrets -> SecretsScreen(state, onBack = { route = Route.Main })
+            Route.Tricks -> TricksScreen(state, onBack = { route = Route.Main })
+            Route.Adventure -> AdventureScreen(state, onBack = { route = Route.Main })
+            Route.Tournament -> de.knuffi.app.ui.games.TournamentScreen(state, onExit = { route = Route.Main })
+            Route.Goals -> Unit
         }
     }
 }
@@ -275,6 +285,9 @@ private fun FloatingNavBar(state: GameState, selected: Tab, modifier: Modifier =
     val goalsBadge = Engine.canClaimDaily(state, now, GameRepository.zone) ||
         state.daily.quests.any { it.done && !it.claimed } ||
         state.weekly.quests.any { it.done && !it.claimed } ||
+        state.monthly.goals.any { it.done && !it.claimed } ||
+        de.knuffi.core.Adventure.canStep(state) ||
+        de.knuffi.core.LongGoal.entries.any { it.done(state) && !it.claimed(state) } ||
         (!state.daily.bonusClaimed && state.daily.quests.isNotEmpty() && state.daily.quests.all { it.claimed }) ||
         (!state.weekly.bonusClaimed && state.weekly.quests.isNotEmpty() && state.weekly.quests.all { it.claimed })
     val index by animateFloatAsState(selected.ordinal.toFloat(), spring(dampingRatio = 0.68f, stiffness = 420f), label = "navIndex")

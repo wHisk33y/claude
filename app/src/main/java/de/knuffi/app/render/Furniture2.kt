@@ -410,6 +410,46 @@ class MoreFurniture : Painter() {
                 paw(c, x - s * 0.2f, g - s * 0.5f, s * 0.04f, -10f, Colors.alpha(Color.WHITE, 0.6f))
                 paw(c, x + s * 0.22f, g - s * 0.42f, s * 0.04f, 15f, Colors.alpha(Color.WHITE, 0.6f))
             }
+            "toy_wheel" -> {
+                val cy = g - s * 0.46f
+                val r = s * 0.38f
+                // stand
+                line.shader = null
+                line.color = 0xFF9A8AB8.toInt()
+                line.strokeWidth = s * 0.05f
+                c.drawLine(x - s * 0.32f, g, x, cy, line)
+                c.drawLine(x + s * 0.32f, g, x, cy, line)
+                box(c, x - s * 0.4f, g - s * 0.05f, x + s * 0.4f, g, s * 0.02f, 0xFFD8C8F0.toInt(), 0xFF9A8AB8.toInt())
+                // back of the wheel
+                fill.shader = null
+                fill.color = Colors.alpha(0xFFFFE0EC.toInt(), 0.55f)
+                c.drawCircle(x, cy, r, fill)
+                // rungs
+                line.color = Colors.alpha(Color.WHITE, 0.9f)
+                line.strokeWidth = s * 0.02f
+                for (k in 0 until 14) {
+                    val a = k * 2f * PI.toFloat() / 14f
+                    c.drawLine(x + cos(a) * r * 0.7f, cy + sin(a) * r * 0.7f, x + cos(a) * r, cy + sin(a) * r, line)
+                }
+                // rim
+                line.color = 0xFFFF7EB6.toInt()
+                line.strokeWidth = s * 0.06f
+                c.drawCircle(x, cy, r, line)
+                line.color = 0xFFFFB8D6.toInt()
+                line.strokeWidth = s * 0.03f
+                c.drawCircle(x, cy, r * 0.7f, line)
+                // spokes and hub
+                line.color = 0xFFFF7EB6.toInt()
+                line.strokeWidth = s * 0.025f
+                for (k in 0 until 4) {
+                    val a = k * PI.toFloat() / 2f + 0.4f
+                    c.drawLine(x, cy, x + cos(a) * r * 0.7f, cy + sin(a) * r * 0.7f, line)
+                }
+                fill.color = 0xFFFFE066.toInt()
+                c.drawCircle(x, cy, s * 0.06f, fill)
+                fill.color = Colors.alpha(Color.WHITE, 0.6f)
+                c.drawCircle(x - s * 0.015f, cy - s * 0.015f, s * 0.02f, fill)
+            }
             "toy_trophy" -> {
                 box(c, x - s * 0.4f, g - s * 0.9f, x + s * 0.4f, g, s * 0.03f, 0xFFB9824E.toInt(), 0xFF7A4E22.toInt())
                 path.reset()

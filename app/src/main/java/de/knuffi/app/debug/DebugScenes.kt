@@ -135,7 +135,9 @@ object DebugScenes {
                     .copy(overlayPinned = intent.getStringExtra("debug_pinned") != null, graphics3d = intent.getStringExtra("debug_2d") == null),
                 inventory = state.inventory + mapOf("carrot" to 2, "pumpkin" to 1, "flour" to 3, "milk" to 2, "strawberry" to 2, "tomato" to 2, "cheese" to 1),
                 finds = mapOf("f_shell" to 2, "f_snail" to 1, "f_pebble" to 1, "f_clover" to 1, "f_feather_blue" to 1),
-                visit = if (scene == "visit") de.knuffi.core.Visit(state.resting.first().id, System.currentTimeMillis() + 3_600_000L) else null,
+                visit = if (scene == "visit" || scene == "visit2") de.knuffi.core.Visit(state.resting.first().id, System.currentTimeMillis() + 3_600_000L) else null,
+                visit2 = if (scene == "visit2") de.knuffi.core.Visit(state.resting[2].id, System.currentTimeMillis() + 3_600_000L) else null,
+                adventure = de.knuffi.core.AdventureState(points = 14, station = 6),
                 friendship = if (scene == "visit") mapOf(de.knuffi.core.Friends.key(pet.id, state.resting.first().id) to 90) else emptyMap(),
             )
         }
@@ -158,8 +160,17 @@ object DebugScenes {
         "coloring" -> Route.Game(MiniGame.COLORING)
         "yarn" -> Route.Game(MiniGame.YARN)
         "pacman" -> Route.Game(MiniGame.PACMAN)
+        "spot" -> Route.Game(MiniGame.SPOT)
+        "words" -> Route.Game(MiniGame.WORDS)
+        "shadow" -> Route.Game(MiniGame.SHADOW)
+        "space" -> Route.Game(MiniGame.SPACE)
+        "jumper" -> Route.Game(MiniGame.JUMPER)
+        "race" -> Route.Game(MiniGame.RACE)
+        "tricks" -> Route.Tricks
+        "adventuremap" -> Route.Adventure
+        "tournament" -> Route.Tournament
         "settings" -> Route.Settings
-        "gallery", "gallery1", "gallery2", "gallery3", "gallery4", "gallery5", "gallery6", "gallery7" -> Route.Gallery
+        "gallery", "gallery1", "gallery2", "gallery3", "gallery4", "gallery5", "gallery6", "gallery7", "gallery8", "gallery9" -> Route.Gallery
         "widget" -> Route.WidgetPreview
         "wallpaper" -> Route.WallpaperPreview
         "walk" -> Route.Walk
@@ -250,6 +261,10 @@ object DebugScenes {
             "evolution" -> Form.STELLARIS
             "adventure", "halloween" -> Form.MAGMO
             "winter" -> Form.POLARFUCHS
+            "bunny" -> Form.KUSCHELHASE
+            "hamster" -> Form.BACKENHAMSTER
+            "guinea" -> Form.POPCORNSCHWEINCHEN
+            "jungle" -> Form.JAGUARO
             else -> Form.LUMI
         }
         var pet = Pet(
@@ -265,6 +280,8 @@ object DebugScenes {
             hygiene = 70.0,
             health = 92.0,
             line = chosenForm.line,
+            fur = de.knuffi.core.Skins.defaultFur(chosenForm.line),
+            tricks = mapOf(de.knuffi.core.Trick.SITZ to 4, de.knuffi.core.Trick.PFOTE to 5, de.knuffi.core.Trick.WINKEN to 3, de.knuffi.core.Trick.DREHEN to 1),
         )
         pet = when (scene) {
             "sick" -> pet.copy(sick = true, poops = 2, hygiene = 22.0, satiety = 24.0, joy = 30.0)
@@ -327,6 +344,10 @@ object DebugScenes {
             "adventure" -> {
                 equipped[Slot.HAT] = "hat_explorer"
                 equipped[Slot.NECK] = "neck_cape"
+            }
+            "hamster" -> {
+                equipped[Slot.TOY] = "toy_wheel"
+                equipped[Slot.DECO] = "deco_stage"
             }
         }
         val zone = ZoneId.systemDefault()
@@ -429,8 +450,12 @@ object DebugScenes {
     @Composable
     fun Gallery(state: GameState, scene: String? = null) {
         val page = scene?.removePrefix("gallery")?.toIntOrNull() ?: 0
-        if (page in 1..5) {
-            GalleryPage("Formen, Seite $page", Form.entries.chunked(24).getOrElse(page - 1) { emptyList() }.map { it.title to PetLook(it, Mood.HAPPY, line = it.line) })
+        if (page in 1..5 || page in 8..9) {
+            val chunk = if (page <= 5) page - 1 else page - 3
+            GalleryPage(
+                "Formen, Seite ${chunk + 1}",
+                Form.entries.chunked(24).getOrElse(chunk) { emptyList() }.map { it.title to PetLook(it, Mood.HAPPY, line = it.line, fur = de.knuffi.core.Skins.defaultFur(it.line)) },
+            )
             return
         }
         if (page == 6) {

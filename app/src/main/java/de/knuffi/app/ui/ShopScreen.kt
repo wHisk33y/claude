@@ -87,7 +87,7 @@ private data class ShopTab(val label: String, val kinds: List<ItemKind>, val top
 private val shopTabs = listOf(
     ShopTab("🍙 Essen", listOf(ItemKind.FOOD, ItemKind.INGREDIENT), Color(0xFFFFD6A8), Color(0xFFFFB7C9)),
     ShopTab("🧴 Pflege", listOf(ItemKind.CARE), Color(0xFFB8F0DC), Color(0xFFA8D8FF)),
-    ShopTab("🥚 Eier", listOf(ItemKind.EGG), Color(0xFFFFF1C4), Color(0xFFFFD0E4)),
+    ShopTab("🥚 Eier & Tiere", listOf(ItemKind.EGG), Color(0xFFFFF1C4), Color(0xFFFFD0E4)),
     ShopTab("🌱 Garten", listOf(ItemKind.SEED), Color(0xFFD0F5C8), Color(0xFFFFF0B0)),
     ShopTab("🎀 Mode", listOf(ItemKind.HAT, ItemKind.FACE, ItemKind.NECK, ItemKind.BACK), Color(0xFFE2D6FF), Color(0xFFFFC8E4)),
     ShopTab(
@@ -130,7 +130,7 @@ fun ShopScreen(state: GameState) {
     val current = shopTabs[tab]
     val shown = Catalog.items.filter {
         it.kind in current.kinds && !it.unlimited && (it.sold || it.id in state.owned) &&
-            (it.kind != ItemKind.EGG || if (state.catMode) it.line == EggLine.KATZE else it.line != EggLine.KATZE || state.catsUnlocked)
+            (it.kind != ItemKind.EGG || it.line?.small == true || if (state.catMode) it.line == EggLine.KATZE else it.line != EggLine.KATZE || state.catsUnlocked)
     }
     val navSpace = bottomBarSpace()
 
@@ -151,7 +151,7 @@ fun ShopScreen(state: GameState) {
                 if (current.kinds.first() == ItemKind.EGG) {
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        if (state.catMode) "Ein Körbchen mit einem neuen Kätzchen. Abholen kannst du es im Kuschelhaus unter 🌍 Welt." else "Jede Ei-Sorte hat ihre eigene Familie. Ausgebrütet wird im Kuschelhaus unter 🌍 Welt.",
+                        if (state.catMode) "Körbchen mit Kätzchen, Hasen, Hamstern und Meerschweinchen. Abholen kannst du sie im Kuschelhaus unter 🌍 Welt." else "Jede Ei-Sorte hat ihre eigene Familie. Dazu gibt es echte Hasen, Hamster und Meerschweinchen im Körbchen. Ausgebrütet und abgeholt wird im Kuschelhaus unter 🌍 Welt.",
                         style = MaterialTheme.typography.bodySmall,
                         color = LocalPalette.current.textMuted,
                     )
@@ -233,8 +233,11 @@ private fun ShopSpecials(state: GameState, onOpen: (Item) -> Unit) {
 }
 
 /** An egg, or a kitten for the cat basket. */
-fun eggPreview(line: EggLine): PetLook =
-    if (line == EggLine.KATZE) PetLook(Form.KAETZCHEN, Mood.HAPPY, line = EggLine.KATZE, fur = "fur_tabby_grey") else PetLook(Form.EGG, Mood.HAPPY, line = line)
+fun eggPreview(line: EggLine): PetLook = when {
+    line == EggLine.KATZE -> PetLook(Form.KAETZCHEN, Mood.HAPPY, line = EggLine.KATZE, fur = "fur_tabby_grey")
+    line.real -> PetLook(Form.find(line, de.knuffi.core.Role.BABY) ?: Form.KAETZCHEN, Mood.HAPPY, line = line, fur = de.knuffi.core.Skins.defaultFur(line))
+    else -> PetLook(Form.EGG, Mood.HAPPY, line = line)
+}
 
 private fun lookWith(state: GameState, item: Item): PetLook? {
     val base = PetLook.of(state)?.takeUnless { it.isEgg }?.copy(mood = Mood.HAPPY, sleeping = false, sick = false) ?: return null

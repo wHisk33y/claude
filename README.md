@@ -1,10 +1,11 @@
 # Knuffi – dein modernes Taschen-Haustier 🥚✨
 
 Knuffi ist ein Tamagotchi für Android im modernen Gewand: Ein kleines Wesen schlüpft aus einem Ei,
-wächst mit deiner Pflege heran und entwickelt sich je nach Pflege in eine von über 100 Formen.
-Du sammelst Haustiere aus 12 Ei-Sorten, legst einen Garten an, schickst deine Lieblinge auf Ausflüge
-und feierst die Feste des Jahres. Dazu gibt es ein Homescreen-Widget, einen Live-Hintergrund, ein Haustier,
-das über deinen Bildschirm läuft, Benachrichtigungen, 15 Minispiele, einen Shop, Erfolge und einen Schrittzähler.
+wächst mit deiner Pflege heran und entwickelt sich je nach Pflege in eine von über 160 Formen.
+Du sammelst Fabelwesen aus 15 Ei-Sorten, dazu echte Katzen, Hasen, Hamster und Meerschweinchen, legst einen Garten an,
+schickst deine Lieblinge auf Ausflüge, bringst ihnen Kunststücke bei und feierst die Feste des Jahres.
+Dazu gibt es ein Homescreen-Widget, einen Live-Hintergrund, ein Haustier, das über deinen Bildschirm läuft,
+Benachrichtigungen, 21 Minispiele, Turniere, eine Abenteuerkarte, einen Shop, Erfolge und einen Schrittzähler.
 
 ## APK herunterladen
 
@@ -116,6 +117,30 @@ Eine neue Version lässt sich einfach über die alte installieren, dein Spielsta
   Schmetterlinge jagen und Tagträumen; die Leiter reicht jetzt über den ganzen Bildschirm.
 - **Schwebendes Haustier**: zeigt seinen Namen und lässt sich per Doppeltipp, Einstellung oder Benachrichtigung
   oben links anheften, damit es beim Tippen nicht im Weg ist.
+- **Kleintiere**: Hasen, Hamster und Meerschweinchen mit je 9 Formen und eigenen Fellfarben. Sie kommen als
+  Körbchen (im Shop unter „Eier & Tiere“), quieken und piepsen, knabbern Möhren und Gurken, hoppeln herum und
+  werden gebürstet statt gebadet. Fürs Zimmer gibt es ein Laufrad.
+- **Drei neue Fabelwesen-Eier**: Dschungel, Wüste und Edelstein mit je 8 neuen Wesen, zu verdienen auf der
+  Abenteuerkarte, über Monatsziele und große Sammelziele.
+- **Kunststücke**: Bring jedem Haustier bis zu 10 Tricks bei (Sitz, Pfote, Winken, Pirouette … bis zum Salto).
+  Gute Laune und Energie helfen beim Üben, gelernte Tricks lassen sich vorführen.
+- **Mehr Berührungen**: Kopf kraulen, Ohren streicheln, Bäckchen stupsen, Bauch kitzeln und Füße kitzeln
+  lösen eigene Reaktionen aus. Lange drücken hebt das Haustier hoch, dann kannst du es durchs Zimmer tragen.
+- **Mehrere im Zimmer**: Bis zu zwei Freunde aus dem Kuschelhaus kommen gleichzeitig zu Besuch und spielen
+  auch miteinander (und zanken sich manchmal ein bisschen). Mit ↩️ schickst du sie wieder heim.
+- **Stimme & Mikrofon** (in den Einstellungen, standardmäßig aus): Dein Haustier reagiert auf Klatschen,
+  Pusten, Singen und Rufen. Es wird nur die Lautstärke gemessen, nichts aufgenommen oder gespeichert.
+- **Wünsche**: Ab und zu wünscht sich dein Haustier etwas (ein Essen, ein Spiel, Kuscheln, ein Bad, Besuch …).
+  Erfüllst du den Wunsch rechtzeitig, gibt es Münzen und Abenteuerpunkte.
+- **Spielen im Zimmer**: Verstecken (tippe auf das richtige Versteck), Fangen und Ball werfen, direkt im Zimmer.
+- **Abenteuerkarte**: 30 Stationen durch Blumenwiese, Zauberwald und Wolkenschloss. Abenteuerpunkte 🧭 aus
+  Aufgaben, Wünschen, Spielen und Turnieren bringen dein Haustier weiter, an jeder Station wartet eine Belohnung.
+- **Turniere**: Wettrennen, Hürdenlauf und Weitsprung gegen deine anderen Haustiere und Gäste um den Bronze-,
+  Silber-, Gold- und Diamant-Pokal. Gewonnene Pokale stehen im Regal.
+- **Mehr Aufgaben**: 42 Aufgabentypen, dazu drei große Monatsziele mit Bonus-Ei und 9 große Sammelziele
+  (z. B. „Kleiner Zoo“, „Zirkusstar“, „Champion“) mit besonderen Belohnungen wie Laufrad und Zirkusbühne.
+- **6 neue Minispiele** (jetzt 21, nach Action, Knobeln und Ruhig sortierbar): Unterschiede finden, Wortsuche,
+  Schattenrätsel, Sternenflug mit Ufo-Boss, Wolkenhüpfer und Kartrennen.
 - **Benachrichtigungen**: bei Hunger, Krankheit, Schmutz, Langeweile oder Müdigkeit, mit Direkt-Aktionen
   wie „Füttern“. Außerdem Hinweise auf tägliche Belohnungen, Schrittziele, reife Pflanzen, zurückgekehrte
   Ausflügler, neue Feste und Geburtstage. Es gibt eine Nachtruhe, die Hinweise haben Abklingzeiten, und die App

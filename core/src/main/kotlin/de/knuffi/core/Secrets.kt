@@ -162,4 +162,5 @@ enum class FriendMoment(val title: String, val minLevel: Int) {
     DANCE("tanzen", 2),
     HIDE("Verstecken spielen", 2),
     CUDDLE("kuscheln", 3),
+    SQUABBLE("sich streiten und vertragen", 1),
 }

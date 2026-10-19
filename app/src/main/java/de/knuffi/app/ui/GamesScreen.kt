@@ -20,7 +20,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,13 +49,17 @@ import de.knuffi.app.ui.components.CoinPill
 import de.knuffi.app.ui.components.GlossyBar
 import de.knuffi.app.ui.components.Pill
 import de.knuffi.app.ui.components.ScreenHeader
+import de.knuffi.app.ui.components.SegmentedControl
 import de.knuffi.app.ui.components.SurfaceCard
 import de.knuffi.app.ui.components.staggered
 import de.knuffi.app.ui.theme.LocalPalette
+import de.knuffi.core.Cup
 import de.knuffi.core.Engine
+import de.knuffi.core.GameGroup
 import de.knuffi.core.GameState
 import de.knuffi.core.MiniGame
 import de.knuffi.core.Mood
+import de.knuffi.core.Tournament
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -74,6 +82,12 @@ private fun themeFor(game: MiniGame) = when (game) {
     MiniGame.COLORING -> GameTheme(Color(0xFFFFF6E8), Color(0xFFF0E8FF), Color(0xFFFFA24D), Color(0xFFD1782A))
     MiniGame.YARN -> GameTheme(Color(0xFFFFF0F6), Color(0xFFE8F6FF), Color(0xFFFF6F91), Color(0xFFD14A6A))
     MiniGame.PACMAN -> GameTheme(Color(0xFF4A2E8A), Color(0xFF8A7CFF), Color(0xFF7C6CFF), Color(0xFF4A3BC4))
+    MiniGame.SPOT -> GameTheme(Color(0xFF9FDCFF), Color(0xFFFFF0C8), Color(0xFF4DB6AC), Color(0xFF2A8A80))
+    MiniGame.WORDS -> GameTheme(Color(0xFFFFE6A8), Color(0xFFFFF6E0), Color(0xFFFFA24D), Color(0xFFD1782A))
+    MiniGame.SHADOW -> GameTheme(Color(0xFF6A5A9E), Color(0xFFFFE0EE), Color(0xFF8C7BFF), Color(0xFF6150D6))
+    MiniGame.SPACE -> GameTheme(Color(0xFF0E0A2A), Color(0xFF51307A), Color(0xFFFF5A8A), Color(0xFFC83A66))
+    MiniGame.JUMPER -> GameTheme(Color(0xFF7EC8FF), Color(0xFFE6F6FF), Color(0xFF4DA8FF), Color(0xFF2A70C8))
+    MiniGame.RACE -> GameTheme(Color(0xFF7EC8FF), Color(0xFF8ED06A), Color(0xFFFF5A6E), Color(0xFFC83A4E))
 }
 
 /** Emojis that tell what the newer games are about. */
@@ -87,11 +101,17 @@ private fun previewEmojis(game: MiniGame): List<String> = when (game) {
     MiniGame.COLORING -> listOf("🖍️", "🎨", "🌸", "💜")
     MiniGame.YARN -> listOf("🧶", "🧶", "🧶")
     MiniGame.PACMAN -> listOf("🍬", "🍪", "👻", "👻")
+    MiniGame.SPOT -> listOf("🔎", "🌷", "🦋", "🎈")
+    MiniGame.WORDS -> listOf("🔤", "H", "A", "S", "E")
+    MiniGame.SHADOW -> listOf("👤", "❓", "🐾")
+    MiniGame.SPACE -> listOf("🚀", "☄️", "🪨", "🛸")
+    MiniGame.JUMPER -> listOf("☁️", "☁️", "🪙", "☁️")
+    MiniGame.RACE -> listOf("🏎️", "🚧", "🪙", "⚡")
     else -> emptyList()
 }
 
 @Composable
-fun GamesScreen(state: GameState, onStart: (MiniGame) -> Unit) {
+fun GamesScreen(state: GameState, onStart: (MiniGame) -> Unit, onTournament: () -> Unit = {}) {
     val p = LocalPalette.current
     val blocker = Engine.gameBlocker(state)
     val pet = state.pet
@@ -137,11 +157,56 @@ fun GamesScreen(state: GameState, onStart: (MiniGame) -> Unit) {
                 }
             }
         }
-        for ((i, game) in MiniGame.entries.withIndex()) {
+        Spacer(Modifier.height(14.dp))
+        TournamentCard(state, blocker, Modifier.staggered(1), onTournament)
+        Spacer(Modifier.height(14.dp))
+        var group by rememberSaveable { mutableIntStateOf(0) }
+        val groups = GameGroup.entries
+        SegmentedControl(listOf("Alle") + groups.map { "${it.emoji} ${it.title}" }, group, { group = it })
+        val shown = MiniGame.entries.filter { group == 0 || it.group == groups[group - 1] }
+        for ((i, game) in shown.withIndex()) {
             Spacer(Modifier.height(14.dp))
-            GameCard(state, game, look, blocker, Modifier.staggered(i + 1)) { onStart(game) }
+            GameCard(state, game, look, blocker, Modifier.staggered(i + 2)) { onStart(game) }
         }
         Spacer(Modifier.height(bottomBarSpace()))
+    }
+}
+
+@Composable
+private fun TournamentCard(state: GameState, blocker: String?, modifier: Modifier = Modifier, onOpen: () -> Unit) {
+    val p = LocalPalette.current
+    val open = Cup.entries.count { Tournament.unlocked(state, it) }
+    val wins = Cup.entries.sumOf { Tournament.wins(state, it) }
+    val start = { if (blocker == null) onOpen() else GameRepository.message(blocker) }
+    SurfaceCard(modifier.fillMaxWidth(), onClick = start, color = if (p.dark) Color(0xFF4A3A20) else Color(0xFFFFF0C8)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("🏆", fontSize = 40.sp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Turnier", style = MaterialTheme.typography.titleLarge, color = p.text)
+                Text(
+                    "Wettrennen, Hürdenlauf und Weitsprung gegen deine anderen Haustiere und Gäste. Wer holt den Pokal?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = p.textMuted,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    for (c in Cup.entries) {
+                        val unlocked = Tournament.unlocked(state, c)
+                        Pill(
+                            if (unlocked) "${c.emoji}${if (Tournament.wins(state, c) > 0) " ×${Tournament.wins(state, c)}" else ""}" else "🔒",
+                            color = if (unlocked) p.gold.copy(alpha = 0.3f) else p.track,
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            ClayTextButton(if (open > 0) "Los" else "Ab Lv ${Cup.BRONZE.minLevel}", start, color = p.gold, deep = p.goldDeep, small = true, enabled = blocker == null && open > 0)
+        }
+        if (wins > 0) {
+            Spacer(Modifier.height(4.dp))
+            Text("Schon $wins ${if (wins == 1) "Pokal" else "Pokale"} gewonnen!", style = MaterialTheme.typography.labelMedium, color = p.goldDeep)
+        }
     }
 }
 

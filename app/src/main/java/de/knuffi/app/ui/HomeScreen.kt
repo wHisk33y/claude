@@ -80,9 +80,16 @@ import de.knuffi.core.Effect
 import de.knuffi.core.Engine
 import de.knuffi.core.GameState
 import de.knuffi.core.Item
+import de.knuffi.core.MiniGame
 import de.knuffi.core.Pet
+import de.knuffi.core.RoomGame
+import de.knuffi.core.RoomGames
+import de.knuffi.core.Wish
+import de.knuffi.core.WishKind
+import de.knuffi.core.Wishes
+import androidx.compose.runtime.LaunchedEffect
 
-private enum class Sheet { FOOD, CARE }
+private enum class Sheet { FOOD, CARE, PLAY }
 
 @Composable
 fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () -> Unit, onOpenShop: () -> Unit, onOpen: (Route) -> Unit = {}) {
@@ -93,6 +100,41 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
     val navSpace = bottomBarSpace()
     var hudPx by remember { mutableStateOf(0) }
     val dockHeight = if (pet.isEgg) (if (state.count(Catalog.GLITTER) > 0 || pet.shiny) 160.dp else 112.dp) else 124.dp
+    val scene = remember { SceneHandle() }
+    var roomGame by remember { mutableStateOf<RoomGameSession?>(null) }
+    val running = roomGame
+    LaunchedEffect(running?.finished) {
+        val g = running ?: return@LaunchedEffect
+        if (!g.finished) return@LaunchedEffect
+        if (g.juggled) GameRepository.perform(Action.FindSecret(de.knuffi.core.Secret.JUGGLER))
+        GameRepository.perform(Action.RoomGameFinished(g.game, g.score))
+        GameRepository.message("${g.game.emoji} ${g.game.title}: ${g.score} ${if (g.score == 1) "Punkt" else "Punkte"}! +${RoomGames.coins(g.score)} 🪙")
+        roomGame = null
+    }
+    fun startRoomGame(game: RoomGame) {
+        val blocker = RoomGames.blocker(state)
+        if (blocker != null) {
+            GameRepository.message(blocker)
+            return
+        }
+        roomGame = RoomGameSession(game, pet.name)
+    }
+    fun fulfil(w: Wish) {
+        when (w.kind) {
+            WishKind.FOOD -> sheet = Sheet.FOOD
+            WishKind.GAME -> MiniGame.entries.firstOrNull { it.name == w.target }?.let { onOpen(Route.Game(it)) }
+            WishKind.PLAY -> act(Action.Play)
+            WishKind.CUDDLE -> GameRepository.message("Streichle ${pet.name} oder kitzle es am Bauch! 🥰")
+            WishKind.BATH -> if (pet.hygiene < 90 || pet.poops > 0) act(Action.Clean) else sheet = Sheet.CARE
+            WishKind.TRICK -> onOpen(Route.Tricks)
+            WishKind.VISIT -> onOpen(Route.Kuschelhaus)
+            WishKind.COOK -> onOpen(Route.Kitchen)
+            WishKind.HARVEST -> onOpen(Route.Garden)
+            WishKind.OUTFIT -> onOpen(Route.Wardrobe)
+            WishKind.PHOTO -> onOpen(Route.Photos)
+            WishKind.ROOM_GAME -> RoomGame.entries.firstOrNull { it.name == w.target }?.let { startRoomGame(it) }
+        }
+    }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -107,11 +149,14 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
                 topInsetPx = hudPx,
                 onPetTap = { act(if (pet.isEgg) Action.HatchTap else Action.Stroke) },
                 onStroke = { act(Action.Stroke) },
+                onTouch = { zone -> act(Action.Touch(zone)) },
+                roomGame = roomGame,
+                handle = scene,
             )
             Spacer(Modifier.height(navSpace + dockHeight - 34.dp))
         }
 
-        Hud(state, pet, onOpenSettings, Modifier.align(Alignment.TopCenter).onSizeChanged { hudPx = it.height }, onMood = { moodSheet = true }, onOpen = onOpen)
+        Hud(state, pet, onOpenSettings, Modifier.align(Alignment.TopCenter).onSizeChanged { hudPx = it.height }, onMood = { moodSheet = true }, onOpen = onOpen, onWish = { fulfil(it) })
 
         Column(
             Modifier
@@ -143,8 +188,10 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
             }
             if (pet.isEgg) {
                 EggDock(pet, Modifier.height(dockHeight), glitter = state.count(Catalog.GLITTER)) { act(Action.UseItem(Catalog.GLITTER)) }
+            } else if (running != null && !running.finished) {
+                RoomGameDock(running, Modifier.height(dockHeight)) { running.stop(scene.director) }
             } else {
-                ActionDock(pet, Modifier.height(dockHeight), onFeed = { sheet = Sheet.FOOD }, onCare = { sheet = Sheet.CARE }, act = act)
+                ActionDock(pet, Modifier.height(dockHeight), onFeed = { sheet = Sheet.FOOD }, onCare = { sheet = Sheet.CARE }, onPlay = { sheet = Sheet.PLAY }, act = act)
             }
         }
     }
@@ -181,12 +228,104 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
                 onOpenShop()
             },
         )
+        Sheet.PLAY -> PlaySheet(
+            pet = pet,
+            onDismiss = { sheet = null },
+            onBall = {
+                sheet = null
+                act(Action.Play)
+            },
+            onRoomGame = {
+                sheet = null
+                startRoomGame(it)
+            },
+            onTricks = {
+                sheet = null
+                onOpen(Route.Tricks)
+            },
+        )
         null -> Unit
     }
 }
 
+/** What to play: the quick ball, the room games and the tricks. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Hud(state: GameState, pet: Pet, onOpenSettings: () -> Unit, modifier: Modifier = Modifier, onMood: () -> Unit = {}, onOpen: (Route) -> Unit = {}) {
+private fun PlaySheet(pet: Pet, onDismiss: () -> Unit, onBall: () -> Unit, onRoomGame: (RoomGame) -> Unit, onTricks: () -> Unit) {
+    val p = LocalPalette.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = if (p.dark) p.surface else p.bgTop,
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+    ) {
+        Column(
+            Modifier
+                .padding(horizontal = 16.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                EmojiTile("🎾", size = 42.dp, color = p.pink)
+                Spacer(Modifier.width(12.dp))
+                Text("Was spielen wir?", style = MaterialTheme.typography.titleLarge, color = p.text)
+            }
+            PlayOption(if (pet.isCat) "🧶" else "🎾", if (pet.isCat) "Wollknäuel" else "Ballspielen", "Schnell zwischendurch: ${pet.name} jagt den Ball.", p.pink, onBall)
+            for (g in RoomGame.entries) {
+                PlayOption(g.emoji, g.title, g.description, if (g == RoomGame.HIDE) p.violet else if (g == RoomGame.TAG) p.orange else p.sky) { onRoomGame(g) }
+            }
+            PlayOption("🌟", "Kunststücke", "Bring ${pet.name} Tricks bei: Sitz, Pfote, Rolle, Salto …", p.gold, onTricks)
+        }
+    }
+}
+
+@Composable
+private fun PlayOption(emoji: String, title: String, text: String, color: Color, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    SurfaceCard(Modifier.fillMaxWidth(), onClick = onClick, contentPadding = PaddingValues(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            EmojiTile(emoji, size = 46.dp, color = color)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, color = p.text)
+                Text(text, style = MaterialTheme.typography.bodySmall, color = p.textMuted)
+            }
+            Text("›", style = MaterialTheme.typography.headlineMedium, color = p.textMuted)
+        }
+    }
+}
+
+/** Score, time and the stop button while a room game runs. */
+@Composable
+private fun RoomGameDock(game: RoomGameSession, modifier: Modifier = Modifier, onStop: () -> Unit) {
+    val p = LocalPalette.current
+    GlassPanel(modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)) {
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(game.game.emoji, fontSize = 30.sp)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(game.game.title, style = MaterialTheme.typography.titleMedium, color = p.text)
+                    Text(
+                        if (game.game == RoomGame.HIDE) "Runde ${game.round} von ${RoomGames.HIDE_ROUNDS} · ⭐ ${game.score}" else "⭐ ${game.score} · ⏱ ${game.secondsLeft} s",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = p.textMuted,
+                    )
+                }
+                ClayTextButton("Fertig", onStop, small = true, color = Color(0xFF9A8FB0), deep = Color(0xFF6E6484))
+            }
+            game.hint?.let {
+                Spacer(Modifier.height(6.dp))
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = p.text, maxLines = 2)
+            }
+        }
+    }
+}
+
+@Composable
+private fun Hud(state: GameState, pet: Pet, onOpenSettings: () -> Unit, modifier: Modifier = Modifier, onMood: () -> Unit = {}, onOpen: (Route) -> Unit = {}, onWish: (Wish) -> Unit = {}) {
     val p = LocalPalette.current
     Column(
         modifier
@@ -248,6 +387,8 @@ private fun Hud(state: GameState, pet: Pet, onOpenSettings: () -> Unit, modifier
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                 )
                 Spacer(Modifier.weight(1f))
+                HudButton("🎓", null) { onOpen(Route.Tricks) }
+                Spacer(Modifier.width(6.dp))
                 HudButton("📸", null) { onOpen(Route.Photos) }
                 Spacer(Modifier.width(6.dp))
                 HudButton("👗", null) { onOpen(Route.Wardrobe) }
@@ -257,7 +398,33 @@ private fun Hud(state: GameState, pet: Pet, onOpenSettings: () -> Unit, modifier
                 HudButton("💬", if (pet.level < de.knuffi.core.Chat.UNLOCK_LEVEL) "${de.knuffi.core.Chat.UNLOCK_LEVEL}" else null) { onOpen(Route.Chat) }
             }
         }
-        val guest = state.visit?.let { v -> state.resting.firstOrNull { it.id == v.petId } }
+        val wish = state.wish
+        if (wish != null && pet.alive && !pet.isEgg) {
+            val left = ((wish.until - System.currentTimeMillis()) / 60_000L).coerceAtLeast(0)
+            Row(
+                Modifier
+                    .padding(top = 8.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Brush.horizontalGradient(listOf(p.pink.copy(alpha = 0.9f), p.violet.copy(alpha = 0.9f))))
+                    .clickable { onWish(wish) }
+                    .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("💭", fontSize = 18.sp)
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "Wunsch: ${Wishes.label(wish, pet.isCat)}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(if (left >= 60) "${left / 60}:${(left % 60).toString().padStart(2, '0')} h" else "$left Min", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.85f))
+            }
+        }
+        val guests = state.visitors
+        val guest = guests.firstOrNull()
         if (guest != null) {
             Row(
                 Modifier
@@ -268,7 +435,13 @@ private fun Hud(state: GameState, pet: Pet, onOpenSettings: () -> Unit, modifier
                     .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("🏠 ${guest.name} ist zu Besuch", style = MaterialTheme.typography.labelLarge, color = p.text)
+                Text(
+                    if (guests.size > 1) "🏠 ${guests[0].name} und ${guests[1].name} sind da" else "🏠 ${guest.name} ist zu Besuch",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = p.text,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
                 Spacer(Modifier.width(8.dp))
                 ClayTextButton("Zusammen spielen", { GameRepository.perform(Action.PlayTogether) }, small = true, emoji = "🤝", color = p.mint, deep = p.mintDeep)
             }
@@ -401,17 +574,17 @@ private fun EggDock(pet: Pet, modifier: Modifier = Modifier, glitter: Int = 0, o
 }
 
 @Composable
-private fun ActionDock(pet: Pet, modifier: Modifier = Modifier, onFeed: () -> Unit, onCare: () -> Unit, act: (Action) -> Unit) {
+private fun ActionDock(pet: Pet, modifier: Modifier = Modifier, onFeed: () -> Unit, onCare: () -> Unit, onPlay: () -> Unit, act: (Action) -> Unit) {
     val p = LocalPalette.current
     GlassPanel(modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)) {
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            StatAction(if (pet.isCat) "🐟" else "🍙", "Füttern", pet.satiety, p.satiety, p.orangeDeep, onFeed, alert = pet.satiety < 30, modifier = Modifier.staggered(0))
+            StatAction(if (pet.isCat) "🐟" else if (pet.isSmall) "🥕" else "🍙", "Füttern", pet.satiety, p.satiety, p.orangeDeep, onFeed, alert = pet.satiety < 30, modifier = Modifier.staggered(0))
             StatAction(
-                "🎾", "Spielen", pet.joy, p.joy, p.pinkDeep, { act(Action.Play) },
+                "🎾", "Spielen", pet.joy, p.joy, p.pinkDeep, onPlay,
                 enabled = !pet.sleeping, alert = pet.joy < 30 && !pet.sleeping, modifier = Modifier.staggered(1),
             )
             StatAction(
-                if (pet.poops > 0) "💩" else if (pet.isCat) "✨" else "🫧", if (pet.isCat) "Bürsten" else "Putzen", pet.hygiene, p.hygiene, p.skyDeep, { act(Action.Clean) },
+                if (pet.poops > 0) "💩" else if (pet.isReal) "✨" else "🫧", if (pet.isReal) "Bürsten" else "Putzen", pet.hygiene, p.hygiene, p.skyDeep, { act(Action.Clean) },
                 alert = pet.poops > 0 || pet.hygiene < 30, modifier = Modifier.staggered(2),
             )
             StatAction(

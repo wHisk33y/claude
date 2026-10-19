@@ -26,7 +26,7 @@ class PetColors(
     val extra: Int = accent2,
 )
 
-enum class Ears { NONE, BUNNY, CAT, ROUND, FOX, FIN, LEAF, BAT, HORSE, WRAPPER }
+enum class Ears { NONE, BUNNY, CAT, ROUND, FOX, FIN, LEAF, BAT, HORSE, WRAPPER, LOP, PETAL }
 
 /** Things growing out of the top of the head. */
 enum class Antenna {
@@ -41,14 +41,14 @@ enum class Antenna {
 }
 
 enum class Wings { NONE, SMALL, DRAGON, ANGEL, FAIRY, BAT, JET, BEE, FEATHER }
-enum class Tail { NONE, DRAGON, FLUFFY, FISH, LEAF, BOLT, CAT, RAINBOW, FLAME, COMET, DINO, KITTY }
+enum class Tail { NONE, DRAGON, FLUFFY, FISH, LEAF, BOLT, CAT, RAINBOW, FLAME, COMET, DINO, KITTY, POM }
 enum class EyeStyle { BIG, GRUMPY, GLOW, CAT }
 enum class Pattern {
     NONE, SPOTS, STRIPES, STARS, PANELS, SWIRL, BANDAGE, SPRINKLES, GALAXY, CRACKS, BUTTONS, BANDS, RIBS,
     TABBY, CALICO, TUXEDO, POINTS, HEARTS, ZIGZAG, SEEDS, ICING,
 }
 enum class Back { NONE, PLATES, SHELL, MANE, FRILL, CAPE }
-enum class Muzzle { NONE, SNOUT, NOSE, WHISKERS, BEAK, FANGS, CARROT, CAT }
+enum class Muzzle { NONE, SNOUT, NOSE, WHISKERS, BEAK, FANGS, CARROT, CAT, BUNNY }
 enum class Shape { ROUND, SQUARE, DROP }
 enum class Aura { NONE, FLAMES, BUBBLES, SNOW, HEARTS, LEAVES, STARS, SMOKE, BOLTS }
 
@@ -111,6 +111,27 @@ private fun catLook(width: Float, height: Float, bigBelly: Boolean = false, spar
     width, height,
     ears = Ears.CAT, tail = Tail.KITTY, muzzle = Muzzle.CAT, eyes = EyeStyle.CAT,
     pattern = Pattern.TABBY, bigBelly = bigBelly, sparkles = sparkles,
+)
+
+/** Real rabbits: the colours come from the fur. */
+private fun bunnyLook(width: Float, height: Float, ears: Ears = Ears.BUNNY, bigBelly: Boolean = false, sparkles: Boolean = false, scruffy: Boolean = false) = FormLook(
+    pal(0xFFA8805E, 0xFFFFB3C6, 0xFF7A5A40, 0xFF2A1F2A, belly = 0xFFF2E2CC),
+    width, height,
+    ears = ears, tail = Tail.POM, muzzle = Muzzle.BUNNY, bigBelly = bigBelly, sparkles = sparkles, spikes = scruffy,
+)
+
+/** Real hamsters: round, with tiny ears and big cheeks. */
+private fun hamsterLook(width: Float, height: Float, bigBelly: Boolean = true, sparkles: Boolean = false, scruffy: Boolean = false) = FormLook(
+    pal(0xFFDDA266, 0xFFFFB3C6, 0xFFB4783E, 0xFF2A1F2A, belly = 0xFFFFF4E2),
+    width, height,
+    ears = Ears.PETAL, muzzle = Muzzle.BUNNY, bigBelly = bigBelly, sparkles = sparkles, spikes = scruffy,
+)
+
+/** Real guinea pigs: long and round, with petal ears and no tail. */
+private fun guineaLook(width: Float, height: Float, mane: Boolean = false, sparkles: Boolean = false, scruffy: Boolean = false) = FormLook(
+    pal(0xFFFAF6F0, 0xFFFFB3C6, 0xFFD88A3A, 0xFF2A1F2A, belly = 0xFFFFFFFF, extra = 0xFF3A3436),
+    width, height,
+    ears = Ears.PETAL, muzzle = Muzzle.BUNNY, back = if (mane) Back.MANE else Back.NONE, sparkles = sparkles, spikes = scruffy,
 )
 
 object Looks {
@@ -289,6 +310,69 @@ object Looks {
         Form.SCHMUSEKATZE to catLook(0.96f, 0.98f),
         Form.STREUNER to catLook(0.9f, 0.96f),
         Form.GLUECKSKATZE to catLook(0.94f, 1.0f, sparkles = true),
+
+        // Dschungel
+        Form.LIANI to FormLook(pal(0xFF8FD67A, 0xFF4FA84A, 0xFFFFD84D, 0xFF2E6B2A), 0.94f, 0.82f, antenna = Antenna.SPROUT, tail = Tail.LEAF, pattern = Pattern.SPOTS),
+        Form.KOKOSI to FormLook(pal(0xFFB8E08A, 0xFF8A5A3A, 0xFFFFF0D8, 0xFF3A6B2A), 0.92f, 0.9f, antenna = Antenna.SHELL_CAP, ears = Ears.LEAF),
+        Form.TUKANI to FormLook(pal(0xFF3A3A4A, 0xFFFF9A2E, 0xFFFFE04D, 0xFF2E8AD8, belly = 0xFFFFF4D8), 0.88f, 0.96f, muzzle = Muzzle.BEAK, wings = Wings.SMALL, antenna = Antenna.CREST),
+        Form.SCHLINGI to FormLook(pal(0xFF7AD8A0, 0xFFFF7AB0, 0xFFFFE066, 0xFF2E8A5A), 0.96f, 0.86f, eyes = EyeStyle.GRUMPY, tail = Tail.CAT, pattern = Pattern.ZIGZAG, antenna = Antenna.CREST),
+        Form.JAGUARO to FormLook(pal(0xFFF2B85A, 0xFFFFB3A0, 0xFF5A3A1E, 0xFF6A8A2A, belly = 0xFFFFF4E0), 0.88f, 1f, ears = Ears.CAT, tail = Tail.CAT, pattern = Pattern.SPOTS, muzzle = Muzzle.WHISKERS),
+        Form.BANANO to FormLook(pal(0xFF5A5060, 0xFFFFE04D, 0xFFB8A8B8, 0xFF3A2A1A, belly = 0xFFD8C8D0), 1.12f, 0.9f, ears = Ears.ROUND, bigBelly = true, muzzle = Muzzle.SNOUT),
+        Form.ORCHIDEA to FormLook(pal(0xFFFF8AC8, 0xFFB98AFF, 0xFF7AE8C8, 0xFF8A2A6A), 0.88f, 1f, wings = Wings.FEATHER, antenna = Antenna.FLOWER, tail = Tail.RAINBOW, muzzle = Muzzle.BEAK),
+        Form.SMARAGDLOEWE to FormLook(pal(0xFFF2C46A, 0xFF3AC88A, 0xFFFFE680, 0xFF2E6B3A), 0.96f, 1.02f, back = Back.MANE, ears = Ears.ROUND, tail = Tail.CAT, crown = true, aura = Aura.LEAVES, muzzle = Muzzle.NOSE, sparkles = true),
+
+        // Wüste
+        Form.SANDI to FormLook(pal(0xFFF4D8A0, 0xFFE8A85A, 0xFFFFF4D8, 0xFF8A5A2A), 0.9f, 0.9f, shape = Shape.DROP, pattern = Pattern.SPOTS),
+        Form.FENNI to FormLook(pal(0xFFF2C890, 0xFFFFB3A0, 0xFFFFF4E4, 0xFF6A3A1A), 0.88f, 0.94f, ears = Ears.FOX, tail = Tail.FLUFFY, muzzle = Muzzle.NOSE),
+        Form.SKARABI to FormLook(pal(0xFF3A8A9A, 0xFFFFD24D, 0xFF2A5A7A, 0xFFFFE680), 0.98f, 0.88f, back = Back.SHELL, antenna = Antenna.ANTENNAE),
+        Form.KAKTUSI to FormLook(pal(0xFF7AC07A, 0xFFFF8AC8, 0xFF4E8A4E, 0xFF2E5A2E), 0.9f, 1f, spikes = true, antenna = Antenna.FLOWER, eyes = EyeStyle.GRUMPY, pattern = Pattern.STRIPES),
+        Form.WIRBELI to FormLook(pal(0xFFE8C88A, 0xFFFFE8B8, 0xFFC89A5A, 0xFF8A5A2A), 0.86f, 1f, aura = Aura.SMOKE, tail = Tail.COMET, antenna = Antenna.SWIRL),
+        Form.KAMELIO to FormLook(pal(0xFFD8A870, 0xFFFFE0B0, 0xFFB8885A, 0xFF5A3A1A), 1.14f, 0.9f, ears = Ears.HORSE, bigBelly = true, muzzle = Muzzle.SNOUT),
+        Form.SPHINXI to FormLook(pal(0xFFE8C080, 0xFF3A6AD8, 0xFFFFD24D, 0xFF3A6AD8), 0.9f, 1f, ears = Ears.CAT, tail = Tail.CAT, headband = true, muzzle = Muzzle.NOSE),
+        Form.PHARAONI to FormLook(pal(0xFFFFD86A, 0xFF3A6AD8, 0xFF3A6AD8, 0xFF8A5A00), 0.94f, 1.02f, crown = true, back = Back.CAPE, ears = Ears.CAT, aura = Aura.STARS, sparkles = true),
+
+        // Edelstein
+        Form.KRISTALLI to FormLook(pal(0xFFC8E8FF, 0xFF8AD8FF, 0xFFFFFFFF, 0xFF3A7AB8), 0.88f, 0.9f, shape = Shape.DROP, antenna = Antenna.CRYSTAL, sparkles = true, jelly = true),
+        Form.RUBINI to FormLook(pal(0xFFFF6A8A, 0xFFFFD0DC, 0xFFC21F4A, 0xFF8A1E3A), 0.92f, 0.92f, antenna = Antenna.CRYSTAL, jelly = true, pattern = Pattern.STARS),
+        Form.SAPHIRO to FormLook(pal(0xFF5A8AE8, 0xFFB8D8FF, 0xFF2E5AB8, 0xFF1A3A8A), 0.88f, 0.98f, ears = Ears.FIN, wings = Wings.SMALL, jelly = true),
+        Form.GEODI to FormLook(pal(0xFF9A98A8, 0xFFB98AFF, 0xFF6E6C7A, 0xFFB98AFF), 0.98f, 0.9f, spikes = true, eyes = EyeStyle.GRUMPY, pattern = Pattern.CRACKS),
+        Form.DIAMANTO to FormLook(pal(0xFFE0F4FF, 0xFF8AE0FF, 0xFFB8D0F0, 0xFF2E7AB8), 0.92f, 1.02f, wings = Wings.DRAGON, horns = true, tail = Tail.DRAGON, sparkles = true, jelly = true),
+        Form.BERNSTEINI to FormLook(pal(0xFFF2A84A, 0xFFFFE0A0, 0xFFC87A2A, 0xFF6A3A0A), 1.12f, 0.9f, ears = Ears.ROUND, bigBelly = true, jelly = true, muzzle = Muzzle.SNOUT),
+        Form.OPALIA to FormLook(pal(0xFFF0E8FF, 0xFF8AE8D8, 0xFFFFB8E0, 0xFF6A4AC8), 0.9f, 1f, wings = Wings.FAIRY, antenna = Antenna.CRYSTAL, pattern = Pattern.STARS, sparkles = true),
+        Form.PRISMARA to FormLook(pal(0xFFF8F4FF, 0xFFB98AFF, 0xFF8AE8FF, 0xFF5A3DC8), 0.92f, 1.02f, ears = Ears.HORSE, antenna = Antenna.UNICORN, back = Back.MANE, tail = Tail.RAINBOW, aura = Aura.STARS, sparkles = true, jelly = true),
+
+        // Echte Hasen
+        Form.HAESCHEN to bunnyLook(0.94f, 0.8f),
+        Form.JUNGHASE to bunnyLook(0.9f, 0.88f),
+        Form.HOPPELHASE to bunnyLook(0.88f, 0.96f),
+        Form.TROTZHASE to bunnyLook(0.92f, 0.92f, ears = Ears.LOP),
+        Form.SPRINTHASE to bunnyLook(0.84f, 1.02f),
+        Form.PUMMELHASE to bunnyLook(1.12f, 0.9f, ears = Ears.LOP, bigBelly = true),
+        Form.KUSCHELHASE to bunnyLook(0.98f, 0.96f, ears = Ears.LOP),
+        Form.ZAUSELHASE to bunnyLook(0.92f, 0.94f, scruffy = true),
+        Form.MONDHASE to bunnyLook(0.92f, 1f, sparkles = true),
+
+        // Echte Hamster
+        Form.HAMSTERBABY to hamsterLook(0.96f, 0.78f),
+        Form.JUNGHAMSTER to hamsterLook(0.98f, 0.84f),
+        Form.FLITZHAMSTER to hamsterLook(0.92f, 0.9f, bigBelly = false),
+        Form.GRUMMELHAMSTER to hamsterLook(1f, 0.86f).copy(eyes = EyeStyle.GRUMPY),
+        Form.LAUFRADPROFI to hamsterLook(0.9f, 0.96f, bigBelly = false),
+        Form.BACKENHAMSTER to hamsterLook(1.18f, 0.88f),
+        Form.KUSCHELHAMSTER to hamsterLook(1.04f, 0.9f),
+        Form.ZAUSELHAMSTER to hamsterLook(1f, 0.88f, scruffy = true),
+        Form.STERNENHAMSTER to hamsterLook(1.02f, 0.92f, sparkles = true).copy(aura = Aura.STARS),
+
+        // Echte Meerschweinchen
+        Form.QUIEKCHEN to guineaLook(1.04f, 0.76f),
+        Form.JUNGSCHWEINCHEN to guineaLook(1.08f, 0.8f),
+        Form.WIRBELSCHWEINCHEN to guineaLook(1.08f, 0.86f, mane = true),
+        Form.BRUMMSCHWEINCHEN to guineaLook(1.1f, 0.84f).copy(eyes = EyeStyle.GRUMPY),
+        Form.POPCORNSCHWEINCHEN to guineaLook(1.02f, 0.9f),
+        Form.GURKENSCHWEINCHEN to guineaLook(1.2f, 0.86f).copy(bigBelly = true),
+        Form.KUSCHELSCHWEINCHEN to guineaLook(1.12f, 0.88f),
+        Form.STRUPPELSCHWEINCHEN to guineaLook(1.1f, 0.86f, scruffy = true),
+        Form.SEIDENSCHWEINCHEN to guineaLook(1.1f, 0.9f, mane = true, sparkles = true),
     )
 
     private val shinyCache = HashMap<Form, FormLook>()
@@ -354,8 +438,8 @@ object Looks {
             var fl = of(form)
             Skins[fur]?.let { fl = withSkin(fl, it) }
             Skins[skin]?.let { fl = withSkin(fl, it) }
-            // Real cats don't change colour when they are rare, they just sparkle.
-            if (shiny) fl = if (form.isCat || skin != null) fl.copy(sparkles = true) else shift(fl)
+            // Real animals don't change colour when they are rare, they just sparkle.
+            if (shiny) fl = if (form.isReal || skin != null) fl.copy(sparkles = true) else shift(fl)
             fl
         }
     }
@@ -394,9 +478,15 @@ object Looks {
         EggLine.BLUETE -> pal(0xFFFFE6F0, 0xFFFF7FAF, 0xFF7FC46A, 0xFF000000)
         EggLine.STERN -> pal(0xFF4A4A9A, 0xFFFFE680, 0xFFB8A8FF, 0xFF000000)
         EggLine.ZUCKER -> pal(0xFFFFE8F4, 0xFFFF6AA8, 0xFF8FD8FF, 0xFF000000)
+        EggLine.DSCHUNGEL -> pal(0xFFCDEFB8, 0xFF3FA05A, 0xFFFFD84D, 0xFF000000)
+        EggLine.WUESTE -> pal(0xFFF6DDA8, 0xFFE0904A, 0xFFFFF4D8, 0xFF000000)
+        EggLine.EDELSTEIN -> pal(0xFFE6ECFF, 0xFFB98AFF, 0xFF8AE0FF, 0xFF000000)
         EggLine.FROST -> pal(0xFFE8F6FF, 0xFF8FD0FF, 0xFFFFFFFF, 0xFF000000)
         EggLine.GRUSEL -> pal(0xFFFFA24D, 0xFF3A2E4A, 0xFF7A4AD6, 0xFF000000)
         EggLine.KATZE -> pal(0xFFE8C08A, 0xFFFF8FB8, 0xFFB07A4A, 0xFF000000)
+        EggLine.HASE -> pal(0xFFF0DCC0, 0xFFFFB3C6, 0xFFB8905A, 0xFF000000)
+        EggLine.HAMSTER -> pal(0xFFF4D8A8, 0xFFE8A060, 0xFF3A3436, 0xFF000000)
+        EggLine.MEERI -> pal(0xFFE8F0C8, 0xFF9AC85A, 0xFFD8B060, 0xFF000000)
     }
 }
 
@@ -426,6 +516,9 @@ data class PetLook(
     val formLook: FormLook get() = Looks.compose(form, fur, skin, shiny)
     val isEgg: Boolean get() = form == Form.EGG
     val isCat: Boolean get() = form.isCat
+
+    /** Rabbit, hamster or guinea pig. */
+    val isSmall: Boolean get() = form.line.small
 
     companion object {
         fun of(state: GameState): PetLook? {
