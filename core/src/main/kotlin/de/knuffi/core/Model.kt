@@ -91,6 +91,10 @@ data class Pet(
     val talents: Map<Talent, Int> = emptyMap(),
     /** Practice points per trick (see [Tricks]). */
     val tricks: Map<Trick, Int> = emptyMap(),
+    /** Mum and dad, if the pet hatched from a family egg. */
+    val parents: List<Long> = emptyList(),
+    /** Form of the other parent; its colours shine through a little. */
+    val blend: String? = null,
 ) {
     /** Pets are identified by their birth time. */
     val id: Long get() = bornAt
@@ -208,6 +212,13 @@ data class Counters(
     val adventureSteps: Int = 0,
     val monthlies: Int = 0,
     val monthGoals: Int = 0,
+    val familyEggs: Int = 0,
+    val roomsBuilt: Int = 0,
+    val duels: Int = 0,
+    val duelWins: Int = 0,
+    val notesPlayed: Int = 0,
+    val songs: Int = 0,
+    val cardsCrafted: Int = 0,
 )
 
 @Serializable
@@ -291,6 +302,10 @@ data class Settings(
     val graphics3d: Boolean = true,
     /** The pet reacts to blowing, clapping and singing (microphone, nothing is recorded). */
     val micReactions: Boolean = false,
+    /** The house with several rooms (false: the single classic room). */
+    val houseMode: Boolean = true,
+    /** Saves a backup into Downloads/Knuffi once a week. */
+    val autoBackup: Boolean = true,
 )
 
 /** Player-adjustable pace of the needs and of sleep. Level 2 is the original balance. */
@@ -417,6 +432,19 @@ data class GameState(
     val milestones: Set<String> = emptySet(),
     val cooldowns: Map<String, Long> = emptyMap(),
     val notifyLog: Map<String, Long> = emptyMap(),
+    /** The rooms of the house (see [House]). */
+    val house: HouseState = HouseState(),
+    /** How far the furniture of the current room was moved, in screen widths. */
+    val furnitureOffsets: Map<Slot, Float> = emptyMap(),
+    /** Eggs from best friends, waiting to be hatched. */
+    val familyEggs: List<FamilyEgg> = emptyList(),
+    /** Trading cards per form name. */
+    val cards: Map<String, Int> = emptyMap(),
+    val cardDust: Int = 0,
+    /** Songs recorded in the music room. */
+    val songs: List<Song> = emptyList(),
+    /** Time of the last automatic backup. */
+    val lastAutoBackup: Long = 0,
     val lastSimulated: Long = 0,
 ) {
     fun count(itemId: String): Int = inventory[itemId] ?: 0
@@ -520,6 +548,9 @@ sealed interface GameEvent {
     data class AdventureStep(val station: Int, val title: String, val reward: String, val emoji: String, val mapDone: Boolean) : GameEvent
     data class TournamentDone(val cup: Cup, val place: Int, val coins: Int, val firstWin: Boolean) : GameEvent
     data class GoalDone(val goal: LongGoal) : GameEvent
+    data class CardsOpened(val forms: List<Form>) : GameEvent
+    data class RoomBuilt(val room: RoomKind) : GameEvent
+    data class RoomEntered(val room: RoomKind) : GameEvent
 }
 
 data class Outcome(val state: GameState, val events: List<GameEvent> = emptyList())

@@ -99,6 +99,20 @@ sealed interface Action {
     data object AdventureStep : Action
     data class ClaimGoal(val goal: LongGoal) : Action
     data class TournamentFinished(val cup: Cup, val place: Int, val rivals: List<Long> = emptyList()) : Action
+
+    // House, family, cards, music and backups
+    data class GoToRoom(val room: RoomKind) : Action
+    data class BuildRoom(val room: RoomKind) : Action
+    data class MoveFurniture(val slot: Slot, val dx: Float) : Action
+    data object ResetFurniture : Action
+    data class HatchFamilyEgg(val id: Long, val name: String) : Action
+    data object DustDuplicates : Action
+    data class CraftCard(val form: Form) : Action
+    data class CardDuelFinished(val won: Int, val lost: Int) : Action
+    data class MusicPlayed(val notes: Int) : Action
+    data class SaveSong(val song: Song) : Action
+    data class DeleteSong(val index: Int) : Action
+    data class BackupMade(val at: Long) : Action
 }
 
 data class GameReward(val coins: Int, val xp: Int)
@@ -125,6 +139,7 @@ object Engine {
         val feeling = tx.emotionNow(now)
         tx.simulate(now, zone)
         tx.refreshDay(now, zone, userPresent)
+        tx.normalizeHouse(now)
         tx.checkAchievements(now)
         tx.trackEmotion(feeling, now)
         return tx.outcome()
@@ -138,6 +153,7 @@ object Engine {
         tx.simulate(now, zone)
         tx.refreshDay(now, zone, userPresent)
         tx.apply(action, now, zone)
+        tx.normalizeHouse(now)
         tx.checkAchievements(now)
         tx.trackEmotion(feeling, now)
         return tx.outcome()
@@ -324,6 +340,11 @@ object Engine {
             if (pet != null && (pet.lastCare <= 0L || (pet.isReal && pet.fur == null))) s = s.copy(pet = fix(pet))
             if (s.resting.any { it.isReal && it.fur == null }) s = s.copy(resting = s.resting.map { fix(it) })
             if (s.visit2 != null && s.visit == null) s = s.copy(visit = s.visit2, visit2 = null)
+            val missingCards = s.album.filter { Cards.isCard(it) && (s.cards[it] ?: 0) == 0 }
+            if (missingCards.isNotEmpty()) s = s.copy(cards = s.cards + missingCards.associateWith { 1 })
+            if ("cards:welcome" !in s.milestones) {
+                s = s.copy(milestones = s.milestones + "cards:welcome", inventory = s.inventory + (Cards.PACK to s.count(Cards.PACK) + 2))
+            }
         }
 
         // ---------------------------------------------------------------- feelings
@@ -601,6 +622,7 @@ object Engine {
                 rainWatering(now, today)
                 endVisit(now)
                 wishTick(now, userPresent)
+                if (userPresent) familyTick(now)
             }
             if (userPresent && s.onboarded && s.pet?.alive == true && s.pet?.isEgg == false) {
                 if (Secrets.midnight(now, zone)) findSecret(Secret.MIDNIGHT, now)
@@ -657,7 +679,12 @@ object Engine {
         }
 
         private fun friendMoment(m: FriendMoment, petId: Long, now: Long) {
-            val guest = (if (petId != 0L) s.visitors.firstOrNull { it.id == petId } else null) ?: visitor() ?: return
+            val byId = if (petId != 0L) {
+                s.visitors.firstOrNull { it.id == petId } ?: House.residentsIn(s, s.house.current).firstOrNull { it.id == petId }
+            } else {
+                null
+            }
+            val guest = byId ?: visitor() ?: return
             val host = s.pet ?: return
             if (!cooldownReady("moment", now, 90_000L)) return
             s = s.copy(
@@ -859,6 +886,7 @@ object Engine {
             val newShiny = shiny && "${form.name}*" !in album
             if (shiny) album = album + "${form.name}*"
             s = s.copy(album = album)
+            if (newForm && (s.cards[form.name] ?: 0) == 0) s = s.copy(cards = s.cards + (form.name to 1))
             if (newShiny) counters { it.copy(shinies = it.shinies + 1) }
             if (newForm || newShiny) emit(GameEvent.NewForm(form, shiny))
         }
@@ -905,6 +933,8 @@ object Engine {
         // ---------------------------------------------------------------- actions
 
         fun apply(action: Action, now: Long, zone: ZoneId) {
+            // Eating happens in the kitchen, bathing in the bath and sleeping in the bedroom.
+            House.roomFor(action, s)?.let { s = House.goTo(s, it) }
             when (action) {
                 is Action.Start -> start(action, now, zone)
                 Action.HatchTap -> hatchTap(now)
@@ -977,6 +1007,18 @@ object Engine {
                 Action.AdventureStep -> adventureStep(now)
                 is Action.ClaimGoal -> claimGoal(action.goal)
                 is Action.TournamentFinished -> tournamentFinished(action.cup, action.place, action.rivals, now)
+                is Action.GoToRoom -> goToRoom(action.room)
+                is Action.BuildRoom -> buildRoom(action.room, now)
+                is Action.MoveFurniture -> moveFurniture(action.slot, action.dx)
+                Action.ResetFurniture -> s = s.copy(furnitureOffsets = emptyMap())
+                is Action.HatchFamilyEgg -> hatchFamilyEgg(action.id, action.name, now)
+                Action.DustDuplicates -> dustDuplicates()
+                is Action.CraftCard -> craftCard(action.form)
+                is Action.CardDuelFinished -> cardDuel(action.won, action.lost, now)
+                is Action.MusicPlayed -> musicPlayed(action.notes, now)
+                is Action.SaveSong -> saveSong(action.song, now)
+                is Action.DeleteSong -> if (action.index in s.songs.indices) s = s.copy(songs = s.songs.filterIndexed { i, _ -> i != action.index })
+                is Action.BackupMade -> s = s.copy(lastAutoBackup = action.at)
             }
             checkPerfect()
         }
@@ -1277,6 +1319,13 @@ object Engine {
                     if (!consume(item)) return
                     val rnd = Random(now xor s.counters.coinsEarned)
                     addStickers(List(3) { Stickers.roll(rnd).id })
+                    return
+                }
+                Cards.PACK -> {
+                    if (!consume(item)) return
+                    val got = Cards.openPack(Random(now xor (s.counters.coinsEarned.toLong() shl 7)))
+                    addCards(got)
+                    emit(GameEvent.CardsOpened(got))
                     return
                 }
                 Catalog.SEED_PACK -> {
@@ -2379,6 +2428,176 @@ object Engine {
                 }
             }
             emit(GameEvent.GoalDone(g))
+        }
+
+        // ---------------------------------------------------------------- house
+
+        fun normalizeHouse(now: Long) {
+            val before = s.house.current
+            s = House.normalize(s, now)
+            if (House.enabled(s) && s.house.current != before) emit(GameEvent.RoomEntered(s.house.current))
+        }
+
+        private fun goToRoom(k: RoomKind) {
+            if (!House.enabled(s) || k == s.house.current || k !in House.unlocked(s)) return
+            val p = s.pet
+            if (p != null && p.alive && p.sleeping && k != RoomKind.BEDROOM) {
+                message("${p.name} schläft gerade im Schlafzimmer. Psst!")
+                return
+            }
+            s = House.goTo(s, k)
+            emit(GameEvent.RoomEntered(k))
+        }
+
+        private fun buildRoom(k: RoomKind, now: Long) {
+            val blocker = House.buildBlocker(s, k)
+            if (blocker != null) {
+                message(blocker)
+                return
+            }
+            s = House.build(s.copy(coins = s.coins - k.price), k)
+            counters { it.copy(roomsBuilt = it.roomsBuilt + 1) }
+            emit(GameEvent.RoomBuilt(k))
+            addXp(20, now)
+            feel(Emotion.AUFGEREGT, now)
+        }
+
+        private fun moveFurniture(slot: Slot, dx: Float) {
+            if (slot !in House.MOVABLE) return
+            val v = dx.coerceIn(-House.MAX_OFFSET, House.MAX_OFFSET)
+            s = s.copy(furnitureOffsets = if (kotlin.math.abs(v) < 0.004f) s.furnitureOffsets - slot else s.furnitureOffsets + (slot to v))
+        }
+
+        // ---------------------------------------------------------------- family
+
+        private fun familyTick(now: Long) {
+            if (s.familyEggs.size >= Family.MAX_WAITING) return
+            val last = s.cooldowns["family_check"] ?: 0L
+            if ((now - last) in 0L until Family.CHECK_MS) return
+            s = s.copy(cooldowns = s.cooldowns + ("family_check" to now))
+            val lastEgg = s.cooldowns["family_egg"] ?: 0L
+            if ((now - lastEgg) in 0L until Family.COOLDOWN_MS) return
+            val couples = Family.couples(s)
+            if (couples.isEmpty()) return
+            val rnd = Random(now xor 0x5EEDL)
+            if (rnd.nextFloat() >= Family.CHANCE) return
+            val (a, b) = couples[rnd.nextInt(couples.size)]
+            val egg = Family.make(a, b, now, rnd)
+            s = s.copy(familyEggs = s.familyEggs + egg, cooldowns = s.cooldowns + ("family_egg" to now))
+            counters { it.copy(familyEggs = it.familyEggs + 1) }
+            emit(GameEvent.EggFound(egg.line, egg.title + " 💕"))
+        }
+
+        private fun hatchFamilyEgg(id: Long, name: String, now: Long) {
+            val egg = s.familyEggs.firstOrNull { it.id == id } ?: return
+            val active = s.pet
+            val keepActive = active != null && active.alive
+            if (keepActive && s.resting.size >= s.restSlots) {
+                message("Das Kuschelhaus ist voll. Bau einen neuen Platz an!")
+                return
+            }
+            val base = if (egg.line.real) {
+                animalBaby(egg.line, cleanName(name, babyName(egg.line)), now, egg.fur)
+            } else {
+                Pet(name = cleanName(name, egg.line.title.substringBefore("-")), bornAt = now, line = egg.line)
+            }
+            s = s.copy(
+                pet = base.copy(parents = egg.parents, blend = egg.blend),
+                resting = if (keepActive) s.resting + active!! else s.resting,
+                familyEggs = s.familyEggs.filter { it.id != id },
+                lastSimulated = now,
+            )
+            if (keepActive) message("${active!!.name} kuschelt sich ins Kuschelhaus. 🏡")
+            if (egg.line.real) welcomeKitten(now)
+        }
+
+        // ---------------------------------------------------------------- cards
+
+        private fun addCards(forms: List<Form>) {
+            var c = s.cards
+            for (f in forms) c = c + (f.name to (c[f.name] ?: 0) + 1)
+            s = s.copy(cards = c)
+        }
+
+        private fun dustDuplicates() {
+            var dust = 0
+            val cards = s.cards.mapValues { (name, n) ->
+                val f = Form.entries.firstOrNull { it.name == name }
+                if (n > 1 && f != null) {
+                    dust += (n - 1) * Cards.rarity(f).dust
+                    1
+                } else {
+                    n
+                }
+            }
+            if (dust == 0) {
+                message("Du hast keine doppelten Karten.")
+                return
+            }
+            s = s.copy(cards = cards, cardDust = s.cardDust + dust)
+            message("Doppelte Karten getauscht: +$dust Glitzerstaub ✨")
+        }
+
+        private fun craftCard(form: Form) {
+            if (form == Form.EGG) return
+            val cost = Cards.rarity(form).craft
+            if (s.cardDust < cost) {
+                message("Dafür brauchst du $cost Glitzerstaub.")
+                return
+            }
+            s = s.copy(cardDust = s.cardDust - cost)
+            addCards(listOf(form))
+            counters { it.copy(cardsCrafted = it.cardsCrafted + 1) }
+            message("${form.title} ist jetzt in deiner Sammlung! 🎴")
+        }
+
+        private fun cardDuel(won: Int, lost: Int, now: Long) {
+            val w = won.coerceIn(0, Cards.DUEL_ROUNDS)
+            val l = lost.coerceIn(0, Cards.DUEL_ROUNDS)
+            val win = w > l
+            counters { it.copy(duels = it.duels + 1, duelWins = it.duelWins + if (win) 1 else 0) }
+            addCoins(Cards.duelCoins(w))
+            s = s.copy(cardDust = s.cardDust + w * 3)
+            addXp(6 + w * 2, now)
+            addTalent(Talent.BASTELN, 2 + w, now)
+            if (win && cooldownReady("duel_pack", now, 20 * 3_600_000L)) {
+                addItem(Cards.PACK)
+                message("Erster Sieg heute: eine Kartentüte! 🃏")
+            }
+            updatePet { if (it.alive && !it.isEgg) it.applyEffect(Effect(joy = if (win) 10 else 5)) else it }
+            feel(if (win) Emotion.STOLZ else Emotion.VERSPIELT, now)
+            dayLog("game")
+            touch(now)
+        }
+
+        // ---------------------------------------------------------------- music
+
+        private fun musicPlayed(notes: Int, now: Long) {
+            val n = notes.coerceIn(0, Music.MAX_NOTES)
+            if (n <= 0) return
+            counters { it.copy(notesPlayed = it.notesPlayed + n) }
+            if (n < Music.MIN_NOTES) return
+            updatePet { if (it.alive && !it.isEgg && !it.sleeping) it.applyEffect(Effect(joy = (n / 4).coerceAtMost(15))) else it }
+            addTalent(Talent.MUSIK, (n / 6).coerceIn(1, 8), now)
+            if (cooldownReady("music", now, Music.REWARD_COOLDOWN_MS)) {
+                addCoins(5 + (n / 10).coerceAtMost(10))
+                addXp(5, now)
+            }
+            feel(Emotion.FROEHLICH, now)
+            dayLog("music")
+            touch(now)
+        }
+
+        private fun saveSong(song: Song, now: Long) {
+            val notes = song.notes.filter { it.at in 0..Music.MAX_LENGTH_MS }.take(Music.MAX_NOTES)
+            if (notes.size < 3) {
+                message("Spiel erst ein paar Töne, dann kannst du das Lied speichern.")
+                return
+            }
+            val name = song.name.trim().take(20).ifEmpty { "Lied ${s.counters.songs + 1}" }
+            s = s.copy(songs = (s.songs + Song(name, notes, now)).takeLast(Music.MAX_SONGS))
+            counters { it.copy(songs = it.songs + 1) }
+            message("Dein Lied „$name“ ist gespeichert. 🎶")
         }
 
         // ---------------------------------------------------------------- adventure map

@@ -160,6 +160,7 @@ object Catalog {
         Item("vitamins", "Vitamin-Gummis", "🍬", ItemKind.CARE, 18, "Kleine Gummibärchen mit großer Wirkung.", minLevel = 5, effect = Effect(health = 25, joy = 4)),
         Item(STICKER_PACK, "Stickertüte", "🎴", ItemKind.CARE, 40, "Drei zufällige Sticker für dein Album."),
         Item(SEED_PACK, "Samentüte", "🌱", ItemKind.CARE, 20, "Drei zufällige Samen für deinen Garten."),
+        Item(Cards.PACK, "Kartentüte", "🃏", ItemKind.CARE, 60, "Fünf zufällige Sammelkarten, mindestens eine davon selten."),
         Item(GLITTER, "Glitzerstaub", "✨", ItemKind.CARE, 0, "Streu ihn auf ein Ei: Es schlüpft garantiert schillernd!", sold = false),
         // Samen
         seed("seed_carrot", "Karottensamen", "🥕", 5, 2, "carrot", 2, Season.SPRING),
