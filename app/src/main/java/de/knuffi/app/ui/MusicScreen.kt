@@ -103,7 +103,7 @@ fun MusicScreen(state: GameState, onBack: () -> Unit) {
 
     fun hit(inst: Instrument, key: Int, fromSong: Boolean = false) {
         synth.play(inst, key)
-        played++
+        if (!fromSong) played++
         noteAt = time.floatValue
         lastKey = key
         if (recording && !fromSong) {

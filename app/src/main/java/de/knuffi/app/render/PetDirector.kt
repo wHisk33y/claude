@@ -391,7 +391,7 @@ class PetDirector(seed: Int = 7) {
 
     /** Picks the pet up. Returns false if that is not possible right now. */
     fun grab(): Boolean {
-        if (act is Act.Sleeping || act is Act.GoSleep || act is Act.Wake || act.care || inRoomGame) return false
+        if (act is Act.Sleeping || act is Act.GoSleep || act is Act.Wake || act is Act.Door || act.care || inRoomGame) return false
         start(Act.Carried())
         carried = true
         carryH = 0.3f

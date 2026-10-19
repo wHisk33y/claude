@@ -133,6 +133,8 @@ class SceneHandle {
 
     /** A piece of furniture being dragged and its offset, before it is saved. */
     var editPreview: Pair<de.knuffi.core.Slot, Float>? = null
+    /** After letting go the preview stays until the saved offset arrives (0 while dragging). */
+    var editPreviewUntil = 0L
     private var pendingHop: (() -> Unit)? = null
     private var pendingThen: (() -> Unit)? = null
 
@@ -149,7 +151,8 @@ class SceneHandle {
             return
         }
         if (travelling) {
-            then?.invoke()
+            // Already on the way: wait for the arrival instead of acting in the wrong room.
+            s.pet?.let { GameRepository.message("${it.name} ist gerade unterwegs. 🚪") }
             return
         }
         val pet = s.pet
@@ -490,7 +493,7 @@ fun PetScene(
                     onDragStart = { pos ->
                         carrying = false
                         val game = session
-                        if (!editState && (game == null || game.finished) && hitPet(pos.x, pos.y) && lookState?.isEgg != true && d.grab()) {
+                        if (!editState && (game == null || game.finished) && !handle.travelling && hitPet(pos.x, pos.y) && lookState?.isEgg != true && d.grab()) {
                             carrying = true
                             tracker.resetTracking()
                             GameRepository.perform(Action.Carry)
@@ -531,11 +534,12 @@ fun PetScene(
                     startOff = slot?.let { GameRepository.current.furnitureOffsets[it] } ?: 0f
                     moved = 0f
                     m.editActive = slot
+                    handle.editPreviewUntil = 0L
                 },
                 onDragEnd = {
                     val sl = slot
                     if (sl != null) GameRepository.perform(Action.MoveFurniture(sl, (startOff + moved).coerceIn(-de.knuffi.core.House.MAX_OFFSET, de.knuffi.core.House.MAX_OFFSET)))
-                    handle.editPreview = null
+                    handle.editPreviewUntil = System.currentTimeMillis() + 600
                     m.editActive = null
                     slot = null
                 },
@@ -559,6 +563,10 @@ fun PetScene(
         val w = size.width
         val h = size.height
         m.room = Furnishing.roomId(state)
+        handle.editPreview?.let { (slot, off) ->
+            val until = handle.editPreviewUntil
+            if (until != 0L && (System.currentTimeMillis() > until || kotlin.math.abs((furniture.offsets[slot] ?: 0f) - off) < 0.002f)) handle.editPreview = null
+        }
         val preview = handle.editPreview
         m.furniture = if (preview != null && editMode) furniture.copy(offsets = furniture.offsets + preview) else furniture
         m.editMode = editMode
@@ -598,6 +606,7 @@ fun PetScene(
                 }
                 handle.guestIds[0] = ids[0]
                 handle.guestIds[1] = ids[1]
+                handle.cameIn = null
             } else {
                 for (i in 0..1) {
                     val id = ids[i]

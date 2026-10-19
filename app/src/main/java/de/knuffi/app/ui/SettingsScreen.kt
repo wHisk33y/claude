@@ -588,11 +588,15 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
                 pendingImport = null
                 scope.launch {
                     backupBusy = true
-                    withContext(Dispatchers.IO) {
-                        Backup.saveBeforeImport(context, GameRepository.current)
-                        Backup.restore(context, c)
+                    val error = withContext(Dispatchers.IO) {
+                        if (!Backup.saveBeforeImport(context, GameRepository.current)) {
+                            "Dein jetziger Spielstand konnte nicht gesichert werden. Ist der Speicher voll? Nichts wurde geändert."
+                        } else {
+                            runCatching { Backup.restore(context, c) }.exceptionOrNull()?.let { "Die Sicherung konnte nicht geladen werden. Ist der Speicher voll?" }
+                        }
                     }
                     backupBusy = false
+                    if (error != null) GameRepository.message(error)
                 }
             },
             onDismiss = { pendingImport = null },

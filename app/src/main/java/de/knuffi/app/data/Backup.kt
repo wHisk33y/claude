@@ -181,9 +181,12 @@ object Backup {
         true
     }.getOrDefault(false)
 
-    /** Saves the current game before a backup replaces it. */
+    /** Saves the current game before a backup replaces it (in the app's own files if Downloads fails). */
     fun saveBeforeImport(context: Context, state: GameState): Boolean =
-        saveToDownloads(context, state, prefix = "Knuffi-vor-dem-Import-")
+        saveToDownloads(context, state, prefix = "Knuffi-vor-dem-Import-") || runCatching {
+            File(context.filesDir, "Knuffi-vor-dem-Import.zip").outputStream().use { write(context, state, it) }
+            true
+        }.getOrDefault(false)
 
     private fun pruneMediaStore(context: Context) {
         if (Build.VERSION.SDK_INT < 29) return

@@ -12,8 +12,19 @@ import kotlin.random.Random
 
 /** Piano, xylophone and drums for the music room, made in code (no sound files). */
 class ToneSynth {
-    private val tracks: Map<Instrument, List<AudioTrack?>> = Instrument.entries.associateWith { inst ->
-        (0 until inst.keys).map { k -> runCatching { build(samples(inst, k)) }.getOrNull() }
+    @Volatile private var tracks: Map<Instrument, List<AudioTrack?>> = emptyMap()
+    @Volatile private var released = false
+
+    init {
+        // The sounds are computed in the background so the screen opens without a stutter.
+        Thread {
+            val made = Instrument.entries.associateWith { inst ->
+                (0 until inst.keys).map { k -> runCatching { build(samples(inst, k)) }.getOrNull() }
+            }
+            synchronized(this) {
+                if (released) made.values.forEach { list -> list.forEach { runCatching { it?.release() } } } else tracks = made
+            }
+        }.apply { isDaemon = true }.start()
     }
 
     fun play(instrument: Instrument, key: Int) {
@@ -26,7 +37,11 @@ class ToneSynth {
     }
 
     fun release() {
-        for (list in tracks.values) for (t in list) runCatching { t?.release() }
+        synchronized(this) {
+            released = true
+            for (list in tracks.values) for (t in list) runCatching { t?.release() }
+            tracks = emptyMap()
+        }
     }
 
     companion object {

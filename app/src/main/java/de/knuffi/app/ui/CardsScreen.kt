@@ -285,6 +285,7 @@ private fun CardDuel(state: GameState, onDone: () -> Unit) {
     var won by remember { mutableIntStateOf(0) }
     var lost by remember { mutableIntStateOf(0) }
     var chosen by remember { mutableStateOf<CardStat?>(null) }
+    var revealed by remember { mutableStateOf(false) }
     var finished by remember { mutableStateOf(false) }
     val flip = remember { Animatable(0f) }
     val r = rounds.getOrNull(round)
@@ -306,6 +307,7 @@ private fun CardDuel(state: GameState, onDone: () -> Unit) {
         val a = Cards.stats(rr.mine)[c]
         val b = Cards.stats(rr.theirs)[c]
         if (a > b) won++ else if (b > a) lost++
+        revealed = true
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -352,8 +354,9 @@ private fun CardDuel(state: GameState, onDone: () -> Unit) {
                 Text("VS", style = MaterialTheme.typography.titleLarge, color = p.pinkDeep)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(opponent, style = MaterialTheme.typography.labelLarge, color = p.text, maxLines = 1)
-                    Box(Modifier.graphicsLayer { rotationY = (1f - flip.value) * 180f; cameraDistance = 12f * density }) {
-                        CreatureCard(r.theirs, width = 140.dp, hidden = flip.value < 0.5f, highlight = chosen)
+                    val turn = if (chosen == null) 0f else flip.value
+                    Box(Modifier.graphicsLayer { rotationY = (1f - turn) * 180f; cameraDistance = 12f * density }) {
+                        CreatureCard(r.theirs, width = 140.dp, hidden = turn < 0.5f, highlight = chosen)
                     }
                 }
             }
@@ -371,7 +374,7 @@ private fun CardDuel(state: GameState, onDone: () -> Unit) {
                 } else {
                     Text("🤔", fontSize = 40.sp)
                 }
-            } else if (flip.value >= 0.99f) {
+            } else if (revealed) {
                 val a = Cards.stats(r.mine)[c]
                 val b = Cards.stats(r.theirs)[c]
                 Text(
@@ -387,6 +390,7 @@ private fun CardDuel(state: GameState, onDone: () -> Unit) {
                 ClayTextButton(
                     if (round + 1 >= rounds.size) "Ergebnis" else "Nächste Runde",
                     {
+                        revealed = false
                         chosen = null
                         if (round + 1 >= rounds.size) finished = true else round++
                     },
