@@ -4,8 +4,9 @@ Knuffi ist ein Tamagotchi für Android im modernen Gewand: Ein kleines Wesen sch
 wächst mit deiner Pflege heran und entwickelt sich je nach Pflege in eine von über 160 Formen.
 Du sammelst Fabelwesen aus 15 Ei-Sorten, dazu echte Katzen, Hasen, Hamster und Meerschweinchen, legst einen Garten an,
 schickst deine Lieblinge auf Ausflüge, bringst ihnen Kunststücke bei und feierst die Feste des Jahres.
-Dazu gibt es ein Homescreen-Widget, einen Live-Hintergrund, ein Haustier, das über deinen Bildschirm läuft,
-Benachrichtigungen, 21 Minispiele, Turniere, eine Abenteuerkarte, einen Shop, Erfolge und einen Schrittzähler.
+Dein Haustier wohnt in einem Haus mit bis zu acht Zimmern, die du selbst einrichtest. Dazu gibt es ein Homescreen-Widget,
+einen Live-Hintergrund, ein Haustier, das über deinen Bildschirm läuft, Benachrichtigungen, 21 Minispiele, Turniere,
+eine Abenteuerkarte, Sammelkarten, ein Musikzimmer, einen Shop, Erfolge und einen Schrittzähler.
 
 ## APK herunterladen
 
@@ -117,6 +118,27 @@ Eine neue Version lässt sich einfach über die alte installieren, dein Spielsta
   Schmetterlinge jagen und Tagträumen; die Leiter reicht jetzt über den ganzen Bildschirm.
 - **Schwebendes Haustier**: zeigt seinen Namen und lässt sich per Doppeltipp, Einstellung oder Benachrichtigung
   oben links anheften, damit es beim Tippen nicht im Weg ist.
+- **Ein ganzes Haus**: Wohnzimmer, Küche und Schlafzimmer gibt es von Anfang an; Bad, Spielzimmer, Musikzimmer,
+  Garten und Bastelzimmer baust du mit Münzen dazu (bis zu 8 Zimmer). Jedes Zimmer hat seine Aufgabe: Gegessen wird
+  in der Küche, gebadet im Bad, geschlafen im Schlafzimmer. Dein Haustier läuft dafür durch die Türen, und du kannst
+  jederzeit auf eine Tür tippen, um ins nächste Zimmer zu gehen. Die **Draufsicht** zeigt das ganze Haus mit allen
+  Haustieren; tippst du ein Zimmer an, läuft dein Haustier dorthin. Jedes Zimmer richtest du selbst ein. In den
+  Einstellungen kannst du zwischen *Ganzes Haus* und dem klassischen *Ein Zimmer* umschalten, beides bleibt erhalten.
+- **Garten zum Hineingehen**: Durch die Hintertür geht es nach draußen, mit Schaukel, Planschbecken, Baum und
+  Beeten, in denen deine Pflanzen aus dem Garten wachsen. Himmel und Wetter ändern sich mit der Tageszeit.
+- **Mitbewohner**: Die Haustiere aus dem Kuschelhaus wohnen in den Zimmern und wandern ab und zu durch die Türen.
+- **Möbel frei verschieben**: Mit ✏️ ziehst du Pflanze, Lampe, Bild, Teppich, Spielecke, Sitzecke und Bett zur Seite.
+- **Nachwuchs**: Haustiere, die beste Freunde sind, bekommen manchmal zusammen ein Ei. Das Kleine hat Farben von
+  beiden (Kleintiere erben das Fell).
+- **Musikzimmer**: Klavier, Xylophon und Trommeln spielen, Lieder aufnehmen und wieder anhören. Dein Haustier tanzt mit.
+- **Sammelkarten**: Jedes Wesen ist eine Karte mit Stärke, Tempo, Magie und Niedlichkeit. Karten gibt es beim Entdecken,
+  in Kartentüten und im Quartett-Duell; doppelte werden zu Glitzerstaub, daraus bastelst du fehlende Karten.
+- **Sprachkommandos**: Tippe auf 🎙️ und sag „Sitz!“, „Gib Pfötchen!“ oder „Rolle!“. Gelernte Tricks führt dein
+  Haustier sofort vor, ungelernte übt es. Dafür wird die Spracherkennung des Handys genutzt (wenn möglich offline,
+  manche Handys brauchen dafür Internet); gespeichert wird nichts.
+- **Sicherung**: In den Einstellungen exportierst du den Spielstand mit allen Fotos als ZIP-Datei und importierst ihn
+  wieder, zum Beispiel auf einem neuen Handy. Zusätzlich legt die App einmal pro Woche eine Sicherung in
+  Downloads/Knuffi ab (die letzten drei bleiben). Alles bleibt auf dem Handy, nichts geht ins Internet.
 - **Kleintiere**: Hasen, Hamster und Meerschweinchen mit je 9 Formen und eigenen Fellfarben. Sie kommen als
   Körbchen (im Shop unter „Eier & Tiere“), quieken und piepsen, knabbern Möhren und Gurken, hoppeln herum und
   werden gebürstet statt gebadet. Fürs Zimmer gibt es ein Laufrad.
