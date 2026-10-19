@@ -21,7 +21,10 @@ adb install -r -g dist/Knuffi-debug.apk
 adb logcat -c
 
 # Every adb call has a time limit: a stuck emulator must not block the job until it times out.
+# After BUDGET seconds everything else is skipped, so the job ends in time and uploads the screenshots.
+BUDGET=${BUDGET:-3900}
 shot() {
+  [ "$SECONDS" -gt "$BUDGET" ] && return 0
   sleep "$2"
   timeout 40 adb exec-out screencap -p > "$OUT/$1.png" || echo "::warning::screenshot $1 failed"
 }
@@ -29,12 +32,44 @@ shot() {
 run_scene() {
   local theme=$1 scene=$2
   shift 2
+  if [ "$SECONDS" -gt "$BUDGET" ]; then
+    echo "::warning::time budget used up, skipping $scene"
+    return 0
+  fi
   timeout 30 adb shell am force-stop $DEBUG_PKG || true
   if ! timeout 60 adb shell am start -W -n "$DEBUG_PKG/$ACT" --es debug_scene "$scene" --es debug_theme "$theme" "$@" > /dev/null; then
     echo "::warning::scene $scene did not start in time"
     timeout 120 adb wait-for-device || true
   fi
 }
+
+# The house in 3D: overview, every room, the classic room, furnishing, music and cards
+for scene in house kitchenroom bathroom bedroom playroom musicroom gardenroom craftroom classic furnish music cards; do
+  run_scene light "$scene"
+  shot "light_${scene}" 12
+done
+run_scene dark gardenroom
+shot dark_gardenroom 12
+run_scene dark house
+shot dark_house 12
+# Furnishing with real finger drags, then back to the home screen: the room must stay in 3D
+run_scene light furnish
+sleep 12
+for sw in "540 1150 330 1000" "760 1350 520 1250" "380 900 640 1080" "540 1300 700 1150"; do
+  timeout 20 adb shell input swipe $sw 700 || true
+  sleep 3
+done
+shot light_furnish_moved 2
+timeout 20 adb shell input keyevent KEYCODE_BACK || true
+shot light_furnish_home 10
+timeout 20 adb logcat -d -s Room3d:W > "$OUT/room3d_log.txt" || true
+
+# ... and drawn, as before
+for scene in house kitchenroom bedroom classic; do
+  run_scene light "$scene" --es debug_flat 1
+  shot "flat_${scene}" 9
+done
+
 
 # The CI emulator renders in software and is slow: give every screen time for its first frames.
 for theme in light dark; do
@@ -64,33 +99,6 @@ for scene in bunny hamster guinea jungle visit2 tricks adventuremap tournament s
 done
 run_scene dark tricks
 shot dark_tricks 8
-
-# The house in 3D: overview, every room, the classic room, furnishing, music and cards
-for scene in house kitchenroom bathroom bedroom playroom musicroom gardenroom craftroom classic furnish music cards; do
-  run_scene light "$scene"
-  shot "light_${scene}" 12
-done
-run_scene dark gardenroom
-shot dark_gardenroom 12
-run_scene dark house
-shot dark_house 12
-# Furnishing with real finger drags, then back to the home screen: the room must stay in 3D
-run_scene light furnish
-sleep 12
-for sw in "540 1150 330 1000" "760 1350 520 1250" "380 900 640 1080" "540 1300 700 1150"; do
-  timeout 20 adb shell input swipe $sw 700 || true
-  sleep 3
-done
-shot light_furnish_moved 2
-timeout 20 adb shell input keyevent KEYCODE_BACK || true
-shot light_furnish_home 10
-timeout 20 adb logcat -d -s Room3d:W > "$OUT/room3d_log.txt" || true
-
-# ... and drawn, as before
-for scene in house kitchenroom bedroom classic; do
-  run_scene light "$scene" --es debug_flat 1
-  shot "flat_${scene}" 9
-done
 
 # Furniture, festivals and the new celebrations
 for scene in furniture furniture2 furniture3 halloween winter eventshop eggfound birthday tripback; do
