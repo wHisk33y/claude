@@ -270,6 +270,7 @@ fun PetScene(
     }
     val taps = remember { HashMap<String, MutableList<Long>>() }
     val combo = remember { ArrayDeque<Pair<String, Long>>() }
+    var residentHintShown by remember { androidx.compose.runtime.mutableStateOf(false) }
     fun tapped(key: String, n: Int, withinMs: Long): Boolean {
         val now = System.currentTimeMillis()
         val list = taps.getOrPut(key) { mutableListOf() }
@@ -366,6 +367,25 @@ fun PetScene(
                     if (game != null && !game.finished && game.tap(nx, ny, hitPet(pos.x, pos.y), d, ps, r.headNX, r.headNY)) return@detectTapGestures
                     if (d.tapToys(pos.x, pos.y, ps, size.width.toFloat(), size.height.toFloat())) return@detectTapGestures
                     if (editState) return@detectTapGestures
+                    // visitors and residents from the Kuschelhaus say who they are
+                    val gi = if (interactive) r.hitGuest(pos.x, pos.y) else 0
+                    val who = if (gi > 0) roomGuests.getOrNull(gi - 1) else null
+                    if (who != null && !hitPet(pos.x, pos.y)) {
+                        val gd = if (gi == 1) handle.guest else handle.guest2
+                        val cat = who.isCat
+                        val text = when {
+                            who.id in visitorIds -> if (cat) "Miau! Ich bin ${who.name} und bin zu Besuch! 😺" else "Hallo! Ich bin ${who.name} und bin zu Besuch! 👋"
+                            else -> if (cat) "Miau! Ich bin ${who.name} und wohne hier im Haus. 🏠" else "Hallo! Ich bin ${who.name} und wohne hier im Haus. 🏠"
+                        }
+                        gd.greet(text)
+                        if (who.id !in visitorIds && !residentHintShown) {
+                            residentHintShown = true
+                            GameRepository.message("${who.name} wohnt bei euch im Haus. Wer hier wohnt, legst du unter 🌍 Welt → „Dein Haus“ → „Wer wohnt im Haus?“ fest.")
+                        }
+                        val b = if (gi == 1) r.guestBounds else r.guest2Bounds
+                        ps.burst(de.knuffi.app.render.PKind.HEART, b.centerX() / size.width, b.top / size.height, 3, 0.15f, 1.1f, 0.025f, de.knuffi.app.render.ParticleSystem.HEART_COLORS, upward = true)
+                        return@detectTapGestures
+                    }
                     if (interactive && r.hitHidden(pos.x, pos.y)) {
                         val h = de.knuffi.core.Hidden.today(GameRepository.current.daily.day)
                         ps.burst(de.knuffi.app.render.PKind.SPARKLE, nx, ny, 12, 0.3f, 1f, 0.025f, de.knuffi.app.render.ParticleSystem.SPARKLE_COLORS)
@@ -587,6 +607,8 @@ fun PetScene(
         m.safeTop = topInsetPx.toFloat()
         m.guest = guestLook
         m.guest2 = if (guestLook != null) guestLook2 else null
+        m.guestName = if (guestLook != null) roomGuests.getOrNull(0)?.name else null
+        m.guest2Name = if (guestLook != null && guestLook2 != null) roomGuests.getOrNull(1)?.name else null
         m.hidden = if (interactive) hiddenItem else null
         m.nameTag = if (kind == LayoutKind.WALLPAPER && state.settings.showNameTag) state.pet?.name else null
         d.toyConfig.from(state.settings)

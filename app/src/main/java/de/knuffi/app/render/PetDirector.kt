@@ -284,6 +284,16 @@ class PetDirector(seed: Int = 7) {
     val onLadderTop: Boolean get() = act is Act.Ladder && (now - actStart) in 3.2f..5.6f
 
     /** A happy reaction with a speech bubble (secrets, found things). */
+    /** Says hello when tapped (visitors and residents). */
+    fun greet(text: String) {
+        if (act is Act.Sleeping || act.care || act is Act.Ladder || act is Act.Duo) {
+            say(text, 2.4f)
+            return
+        }
+        start(Act.Wave())
+        say(text, 2.6f)
+    }
+
     fun celebrate(text: String) {
         if (act !is Act.Sleeping && !act.care) start(Act.Cheer())
         say(text, 2.2f)

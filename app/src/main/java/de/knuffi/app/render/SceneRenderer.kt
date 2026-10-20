@@ -30,6 +30,10 @@ class SceneModel {
     /** A second visitor. */
     var guest2: PetLook? = null
 
+    /** Names shown under the visitors and residents, so you always know who is there. */
+    var guestName: String? = null
+    var guest2Name: String? = null
+
     /** Hiding places to tap during hide and seek (normalised scene coordinates), with a highlight 0..1. */
     var hideSpots: List<Pair<de.knuffi.core.HideSpot, Float>> = emptyList()
 
@@ -70,6 +74,17 @@ class SceneRenderer {
 
     /** True if (x, y) hits today's hidden object. */
     fun hitHidden(x: Float, y: Float): Boolean = !hiddenRect.isEmpty && hiddenRect.contains(x, y)
+
+    /** Where the visitors / residents were drawn (empty when not in the room). */
+    val guestBounds = RectF()
+    val guest2Bounds = RectF()
+
+    /** 1 or 2 if (x, y) hits a visitor or resident, otherwise 0. */
+    fun hitGuest(x: Float, y: Float): Int = when {
+        !guestBounds.isEmpty && guestBounds.contains(x, y) -> 1
+        !guest2Bounds.isEmpty && guest2Bounds.contains(x, y) -> 2
+        else -> 0
+    }
 
     /** The furniture of the room (set before [configure], so the pet knows where the bed is). */
     var furnishing = Furnishing()
@@ -316,6 +331,11 @@ class SceneRenderer {
             toyArt.ladder(c, toys.ladderX * w, L.groundY, toys.ladderHeight * L.petSize, L.petSize * 0.5f, toys.ladderExtend)
         }
 
+        guestBounds.setEmpty()
+        guest2Bounds.setEmpty()
+        val tagSize = max(L.w * 0.028f, L.petSize * 0.06f)
+        val tags = kind == LayoutKind.HOME || m.nameTag != null
+
         // A second visiting friend
         val gl2 = m.guest2
         if (gl2 != null && guest2 != null && !guest2.hidden && guest2.fade > 0.01f) {
@@ -327,6 +347,8 @@ class SceneRenderer {
             val layer = fadeLayer(c, guest2.fade)
             if (guest2.showsShadow) guestPet2.drawShadow(c, guest2.x * w, gFloor, gs, guest2.pose, gl2)
             guestPet2.draw(c, guest2.x * w, gFloor - guest2.yOffset * gs, gs, gl2, guest2.pose)
+            guest2Bounds.set(guestPet2.bounds)
+            m.guest2Name?.let { if (tags && !gl2.isEgg) props.nameTag(c, it, guest2.x * w, gFloor + gs * 0.08f, tagSize) }
             if (layer >= 0) c.restoreToCount(layer)
         }
 
@@ -341,6 +363,8 @@ class SceneRenderer {
             val layer = fadeLayer(c, guest.fade)
             if (guest.showsShadow) guestPet.drawShadow(c, guest.x * w, gFloor, gs, guest.pose, gl)
             guestPet.draw(c, guest.x * w, gFloor - guest.yOffset * gs, gs, gl, guest.pose)
+            guestBounds.set(guestPet.bounds)
+            m.guestName?.let { if (tags && !gl.isEgg) props.nameTag(c, it, guest.x * w, gFloor + gs * 0.08f, tagSize) }
             if (layer >= 0) c.restoreToCount(layer)
         }
 
