@@ -23,7 +23,15 @@ class MainActivity : ComponentActivity() {
         GameRepository.init(this)
         de.knuffi.app.sound.Sounds.init(applicationContext)
         val debug = if (BuildConfig.DEBUG) DebugScenes.fromIntent(intent) else null
-        if (debug != null) {
+        if (BuildConfig.DEBUG && intent.getStringExtra("debug_crash") != null) {
+            // debug builds only: checks the crash report in the settings
+            Thread({ throw IllegalStateException("Testabsturz für den Fehlerbericht") }, "knuffi-test").start()
+        }
+        if (debug != null && intent.getStringExtra("debug_persist") != null) {
+            // debug builds only: keep the seeded game for real (to test the background services with it)
+            GameRepository.restore(debug.state)
+            if (debug.state.settings.overlayPet) PetOverlayService.start(this)
+        } else if (debug != null) {
             GameRepository.enterPreview(debug.state)
             if (debug.scene == "notify") DebugScenes.postSampleNotifications(this, debug.state)
         } else {

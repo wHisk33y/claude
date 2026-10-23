@@ -545,6 +545,50 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
                 }
             }
 
+            var crashReport by remember { mutableStateOf(de.knuffi.app.data.CrashLog.report(context)) }
+            if (crashReport != null) {
+                SectionHeader("Fehlerbericht", "🩹")
+                SurfaceCard(Modifier.fillMaxWidth()) {
+                    Text(
+                        "Knuffi hat zuletzt einen Fehler gehabt. Wenn du den Bericht kopierst und weitergibst, lässt sich der Fehler genau finden. Er enthält nur technische Angaben (Version, Handy-Modell, Fehlerstelle), keine persönlichen Daten.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = p.textMuted,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        crashReport!!.lineSequence().drop(1).take(3).joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = p.text,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ClayTextButton(
+                            "Kopieren",
+                            {
+                                val cm = context.getSystemService(android.content.ClipboardManager::class.java)
+                                cm?.setPrimaryClip(android.content.ClipData.newPlainText("Knuffi-Fehlerbericht", crashReport))
+                                GameRepository.message("Fehlerbericht kopiert. 📋")
+                            },
+                            small = true,
+                            emoji = "📋",
+                            color = p.violet,
+                            deep = p.violetDeep,
+                        )
+                        ClayTextButton(
+                            "Löschen",
+                            {
+                                de.knuffi.app.data.CrashLog.clear(context)
+                                crashReport = null
+                            },
+                            small = true,
+                            emoji = "🧹",
+                            color = p.mint,
+                            deep = p.mintDeep,
+                        )
+                    }
+                }
+            }
+
             SectionHeader("Daten", "🗑️")
             SurfaceCard(Modifier.fillMaxWidth()) {
                 Text(

@@ -66,6 +66,10 @@ class PetOverlayService : Service(), OverlayPetView.Host {
             return START_NOT_STICKY
         }
         startInForeground()
+        if (!foreground) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         if (!ScreenPet.canDrawOverlays(this) || !GameRepository.current.settings.overlayPet) {
             stopSelf()
             return START_NOT_STICKY
@@ -102,8 +106,18 @@ class PetOverlayService : Service(), OverlayPetView.Host {
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .build()
         val type = if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
-        ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type)
+        try {
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type)
+            foreground = true
+        } catch (e: Exception) {
+            // Android may refuse it when the system restarts the pet in the background; it comes back
+            // the next time the app is opened. Never crash because of it.
+            android.util.Log.w("PetOverlay", "startForeground refused", e)
+            foreground = false
+        }
     }
+
+    private var foreground = false
 
     private fun attach() {
         val wm = getSystemService(WindowManager::class.java) ?: return
@@ -151,7 +165,13 @@ class PetOverlayService : Service(), OverlayPetView.Host {
         scope = s
         s.launch {
             GameRepository.state.combine(ScreenPet.appVisible) { state, appVisible -> state to appVisible }
-                .collect { (state, appVisible) -> applyState(state, appVisible) }
+                .collect { (state, appVisible) ->
+                    try {
+                        applyState(state, appVisible)
+                    } catch (e: Exception) {
+                        de.knuffi.app.data.CrashLog.note(this@PetOverlayService, "Schwebendes Haustier", e)
+                    }
+                }
         }
     }
 

@@ -196,7 +196,7 @@ class SceneRenderer {
     }
 
     fun release() {
-        cache?.recycle()
+        // not recycled: the render thread may still draw the last frame with it
         cache = null
         cacheKey = ""
         home3.release()
@@ -211,7 +211,6 @@ class SceneRenderer {
             old.eraseColor(android.graphics.Color.TRANSPARENT)
             old
         } else {
-            old?.recycle()
             Bitmap.createBitmap(max(1, w.toInt()), max(1, h.toInt()), Bitmap.Config.ARGB_8888)
         }
         room.drawStatic(Canvas(bmp), layout, roomId, f)

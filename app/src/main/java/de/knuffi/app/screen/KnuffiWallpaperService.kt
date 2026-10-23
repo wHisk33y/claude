@@ -215,6 +215,10 @@ class KnuffiWallpaperService : WallpaperService() {
                 }
             } catch (_: Exception) {
                 // Surface went away mid frame; the next visibility change restarts drawing.
+            } catch (e: OutOfMemoryError) {
+                // too little memory for this frame: free the cached pictures and try again later
+                scene.release()
+                de.knuffi.app.data.CrashLog.note(this@KnuffiWallpaperService, "Live-Hintergrund (Speicher)", e)
             } finally {
                 if (canvas != null) runCatching { holder.unlockCanvasAndPost(canvas) }
             }

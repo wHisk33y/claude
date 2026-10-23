@@ -99,9 +99,23 @@ object GameRepository {
 
     private fun mutate(updateWidget: Boolean, sync: Boolean, f: (GameState) -> Outcome): Outcome {
         val outcome = synchronized(lock) {
-            val o = f(_state.value)
+            val before = _state.value
+            val o = try {
+                f(before)
+            } catch (e: Exception) {
+                // A game rule that fails for one special game state must never close the app
+                // (this also runs in the background); the game simply stays as it was.
+                if (initialized) CrashLog.note(appContext, "Spielregel", e)
+                Outcome(before)
+            }
             _state.value = o.state
-            if (!previewMode && initialized) save(o.state, sync)
+            if (!previewMode && initialized && o.state !== before) {
+                try {
+                    save(o.state, sync)
+                } catch (e: Exception) {
+                    CrashLog.note(appContext, "Speichern", e)
+                }
+            }
             o
         }
         for (e in outcome.events) _events.tryEmit(e)

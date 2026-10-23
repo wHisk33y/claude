@@ -10,6 +10,8 @@ import kotlinx.coroutines.launch
 class KnuffiApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        de.knuffi.app.data.CrashLog.install(this)
+        Thread { de.knuffi.app.data.CrashLog.checkExitReasons(this) }.start()
         GameRepository.init(this)
         Notifier.createChannels(this)
         PetWorker.schedule(this)

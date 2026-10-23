@@ -48,7 +48,9 @@ class Layer3 {
     internal fun obtain(w: Int, h: Int): Bitmap = synchronized(lock) {
         val i = free.indexOfFirst { it.width == w && it.height == h && !it.isRecycled }
         if (i >= 0) return free.removeAt(i)
-        while (free.size > 1) free.removeAt(0).recycle()
+        // Older pictures are only dropped, never recycled: the screen's render thread may still be
+        // drawing them (recycling them there crashed the app). The garbage collector frees them.
+        while (free.size > 1) free.removeAt(0)
         Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
     }
 
