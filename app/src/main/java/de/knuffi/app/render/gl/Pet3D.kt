@@ -67,6 +67,9 @@ object Pet3D {
         var width = 1
         var height = 1
         var yaw = 0f
+
+        /** Leaning forward in radians (a bow). */
+        var pitch = 0f
         var depth = 1f
         var bodyBottom = 0f
         var bodyH = 1f
@@ -326,6 +329,7 @@ object Pet3D {
 
         GLES30.glUniform4f(u("uRegion"), f.left, f.top, f.right, f.bottom)
         GLES30.glUniform2f(u("uYaw"), kotlin.math.cos(f.yaw), kotlin.math.sin(f.yaw))
+        GLES30.glUniform2f(u("uPitch"), kotlin.math.cos(f.pitch), kotlin.math.sin(f.pitch))
         GLES30.glUniform1f(u("uZRange"), maxOf(f.right - f.left, f.bottom - f.top))
         GLES30.glUniform2f(u("uFloor"), f.bodyBottom, f.bodyH)
         GLES30.glUniform4fv(u("uTint"), 1, f.tint, 0)

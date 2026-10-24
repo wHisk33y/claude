@@ -343,6 +343,22 @@ class HouseTest {
         assertEquals(Trick.MAENNCHEN, Tricks.match("Mach Männchen"))
         assertEquals(Trick.TANZ, Tricks.match("Tanz für mich"))
         assertNull(Tricks.match("Guten Morgen"))
+        // what speech recognition often hears instead
+        assertEquals(Trick.PFOTE, Tricks.match("Gib Pforte"))
+        assertEquals(Trick.SALTO, Tricks.match("Saldo!"))
+        assertEquals(Trick.PFOTE, Tricks.match("gib mir die Hand"))
+        assertEquals(Trick.SITZ, Tricks.match("Mochi, mach Platz."))
+        assertEquals(Trick.TANZ, Tricks.match("Mochi tanzen"))
+        assertEquals(Trick.MAENNCHEN, Tricks.match("Mach Mänchen"))
+        // the first trick said wins
+        assertEquals(Trick.SITZ, Tricks.match("Sitz und dann dreh dich"))
+        assertEquals(Trick.DREHEN, Tricks.match("Dreh dich und dann Sitz"))
+        // everyday words are no commands
+        assertNull(Tricks.match("den ganzen Tag"))
+        assertNull(Tricks.match("die volle Punktzahl"))
+        assertNull(Tricks.match("Wie geht es dir"))
+        assertTrue(Tricks.calledByName("Mochi?", "Mochi"))
+        assertFalse(Tricks.calledByName("Hallo du", "Mochi"))
         // every trick can be called with its own command
         for (t in Trick.entries) assertEquals(t, Tricks.match(t.command))
     }

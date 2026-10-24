@@ -38,7 +38,13 @@ fun rememberTrickVoice(): TrickVoice {
     }
     voice.requestPermission = { launcher.launch(android.Manifest.permission.RECORD_AUDIO) }
     DisposableEffect(Unit) {
-        onDispose { voice.destroy() }
+        // talking to the pet (heard by the microphone reactions) starts listening for a command
+        val wake = { voice.wake() }
+        VoiceState.wake = wake
+        onDispose {
+            if (VoiceState.wake === wake) VoiceState.wake = null
+            voice.destroy()
+        }
     }
     return voice
 }

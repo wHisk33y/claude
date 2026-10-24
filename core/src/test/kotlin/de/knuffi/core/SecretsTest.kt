@@ -104,4 +104,10 @@ class SecretsTest {
         val r = Engine.gameReward(MiniGame.PACMAN, 300)
         assertTrue(r.coins in 2..60)
     }
+
+    @Test
+    fun heartNamesAreFound() {
+        for (t in listOf("Toni", "hallo toni!", "Ich mag Susi.", "ARIK", "Tony und Susie", "arik?")) assertTrue(t, HeartNames.mentioned(t))
+        for (t in listOf("Antonia", "Sitz!", "Tonne", "Susanne", "Erik", "")) assertFalse(t, HeartNames.mentioned(t))
+    }
 }

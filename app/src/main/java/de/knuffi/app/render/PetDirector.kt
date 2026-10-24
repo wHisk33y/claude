@@ -247,7 +247,9 @@ class PetDirector(seed: Int = 7) {
         class Duo(val kind: FriendMoment, val lead: Boolean, val spot: Float, val partnerSpot: Float, d: Float) : Act(d)
 
         // Tricks, touching, carrying, room games and voice
-        class Perform(val trick: Trick, val success: Boolean) : Act(if (trick == Trick.TANZ) 3.4f else if (success) 2.4f else 2.1f)
+        class Perform(val trick: Trick, val success: Boolean) : Act(TrickMoves.duration(trick, success)) {
+            var startX = -1f
+        }
         class EarWiggle : Act(1.4f)
         class Bashful : Act(1.4f)
         class Tickle : Act(1.6f)
@@ -555,6 +557,16 @@ class PetDirector(seed: Int = 7) {
                 say(line("Huch, so laut! 🙉", "Mau?! So laut!"), 1.4f)
             }
         }
+    }
+
+    /** The pet pricks up its ears and looks at you: it is listening for a command. */
+    fun listenUp(text: String) {
+        if (act is Act.Sleeping || act is Act.GoSleep || carried || inRoomGame || act.care) return
+        if (act !is Act.Perform) start(Act.EarWiggle())
+        lookTX = 0f
+        lookTY = -0.4f
+        focusUntil = now + 2.5f
+        say(text, 2.6f)
     }
 
     // ------------------------------------------------------------------ input
@@ -1785,116 +1797,60 @@ class PetDirector(seed: Int = 7) {
     }
 
     private fun runPerform(a: Act.Perform, el: Float, dt: Float, ps: ParticleSystem, headX: Float, headY: Float) {
-        val p = (el / a.dur).coerceIn(0f, 1f)
+        val tr = a.trick
+        fun at(s: Float) = el >= s && el - dt < s
+        TrickMoves.apply(pose, tr, el, a.success, facing)
         if (!a.success) {
-            // a clumsy try: it starts, wobbles and gets confused
-            if (el < 1.1f) {
-                pose.tilt += sin(el * 16f) * 10f
-                pose.armL = 0.5f
-                pose.armR = 0.7f
-                pose.eyes = EyeShape.SQUINT
-                pose.mouth = MouthShape.TONGUE
-            } else {
-                if (el - dt < 1.1f) {
-                    say(line(listOf("Hm? Wie ging das noch? 🤔", "Upps! Nochmal!", "Fast!").random(rnd), "Mau? 🤔"), 1.3f)
-                    sqV += 4f
-                }
-                pose.eyes = EyeShape.DIZZY
-                pose.mouth = MouthShape.WAVY
-                pose.tilt += 6f
+            if (at(1.1f)) {
+                say(line(listOf("Hm? Wie ging das noch? 🤔", "Upps! Nochmal!", "Fast!").random(rnd), "Mau? 🤔"), 1.3f)
+                sqV += 4f
             }
             return
         }
-        when (a.trick) {
-            Trick.SITZ -> {
-                val k = easeOut((el / 0.4f).coerceIn(0f, 1f))
-                pose.scaleY *= 1f - 0.12f * k
-                pose.scaleX *= 1f + 0.06f * k
-                pose.eyes = EyeShape.HAPPY
-                pose.mouth = MouthShape.SMILE
-                pose.turn = 0f
-                pose.lookY = -0.3f
-            }
-            Trick.PFOTE -> {
-                pose.armR = 0.55f + 0.05f * sin(el * 8f)
-                pose.armWaveR = -20f + sin(el * 6f) * 6f
-                pose.turn = 0f
-                pose.eyes = EyeShape.HAPPY
-                pose.mouth = MouthShape.OPEN
-            }
-            Trick.WINKEN -> {
-                pose.armL = 0.95f
-                pose.armR = 0.95f
-                pose.armWaveL = sin(el * 14f) * 26f
-                pose.armWaveR = -sin(el * 14f) * 26f
-                pose.eyes = EyeShape.HAPPY
-                pose.mouth = MouthShape.OPEN
-            }
-            Trick.DREHEN -> {
-                pose.turn = sin(el * 9f)
-                pose.armL = 0.7f
-                pose.armR = 0.7f
-                pose.eyes = EyeShape.STAR
-                pose.mouth = MouthShape.OPEN
-                pose.lift += abs(sin(el * 4.5f)) * 0.05f
-            }
-            Trick.MAENNCHEN -> {
-                val k = sin((el / 0.5f).coerceIn(0f, 1f) * PI.toFloat() / 2f)
-                pose.lift += 0.18f * k
-                pose.scaleY *= 1f + 0.12f * k
-                pose.scaleX *= 1f - 0.06f * k
-                pose.armL = 0.45f
-                pose.armR = 0.45f
-                pose.eyes = EyeShape.HAPPY
-                pose.mouth = MouthShape.OPEN
-                pose.turn = 0f
-            }
-            Trick.SPRUNG -> {
-                if (el < dt * 1.5f) jump(0.75f, 0.65f)
-                pose.armL = 1f
-                pose.armR = 1f
-                pose.eyes = EyeShape.STAR
-                pose.mouth = MouthShape.OPEN
-            }
-            Trick.ROLLE -> {
-                val r = ((el - 0.2f) / 1.2f).coerceIn(0f, 1f)
-                pose.tilt += facing * 360f * (r * r * (3f - 2f * r))
-                pose.lying = sin(r * PI.toFloat()) * 0.3f
-                pose.eyes = if (r in 0.05f..0.95f) EyeShape.CLOSED else EyeShape.HAPPY
-                pose.mouth = MouthShape.GRIN
-            }
-            Trick.VERBEUGUNG -> {
-                val k = sin(p * PI.toFloat())
-                pose.tilt += facing * 28f * k
-                pose.lookY = k
-                pose.eyes = if (k > 0.5f) EyeShape.CLOSED else EyeShape.HAPPY
-                pose.armR = 0.4f * k
-                pose.mouth = MouthShape.SMILE
-            }
-            Trick.TANZ -> {
-                val k = el * 7f
-                pose.tilt += sin(k) * 12f
-                pose.lift += abs(sin(k)) * 0.1f
-                pose.armL = 0.75f + 0.25f * sin(k)
-                pose.armR = 0.75f - 0.25f * sin(k)
-                pose.turn = sin(k * 0.5f) * 0.7f
-                pose.eyes = EyeShape.HAPPY
-                pose.mouth = MouthShape.OPEN
-                pose.blush = 0.9f
-                if ((el % 0.45f) < dt) ps.add(Particle(PKind.NOTE, headX + (rnd.nextFloat() - 0.5f) * 0.2f, headY, (rnd.nextFloat() - 0.5f) * 0.05f, -0.09f, 1.4f, 0.04f, listOf(0xFF7C6CFF, 0xFFFF6B9A, 0xFF2EC4A0).random(rnd).toInt()))
-            }
-            Trick.SALTO -> {
-                if (el < dt * 1.5f) jump(0.7f, 0.9f)
-                val r = ((el - 0.14f) / 0.9f).coerceIn(0f, 1f)
-                pose.tilt -= facing * 360f * (r * r * (3f - 2f * r))
-                pose.armL = 1f
-                pose.armR = 1f
-                pose.eyes = if (r in 0.05f..0.95f) EyeShape.CLOSED else EyeShape.STAR
-                pose.mouth = MouthShape.OPEN
+        val feetY = headY + 0.13f
+        // the trick's sign above the head, so it is clear which one it is
+        if (a.startX < 0f) {
+            say("${tr.emoji} ${tr.title}!", 0.9f)
+            a.startX = x
+        }
+        // the roll travels over the floor
+        val shift = TrickMoves.shift(tr, el)
+        if (shift != 0f && a.startX >= 0f) {
+            x = (a.startX + facing * shift).coerceIn(minX, maxX)
+            targetX = x
+        }
+        TrickMoves.landing(tr)?.let { land ->
+            if (at(land)) {
+                sqV += if (tr == Trick.SITZ) 3f else 8f
+                ps.burst(PKind.SMOKE, x, feetY, 6, 0.2f, 0.7f, 0.03f, intArrayOf(0x66FFFFFF), gravity = -0.05f)
             }
         }
+        when (tr) {
+            Trick.PFOTE -> if (at(0.6f)) ps.add(Particle(PKind.EMOJI, headX + 0.08f, headY + 0.04f, 0.01f, -0.03f, 1.2f, 0.04f, 0, text = "🐾"))
+            Trick.WINKEN -> if (at(0.3f)) ps.add(Particle(PKind.EMOJI, headX + 0.09f, headY - 0.02f, 0.01f, -0.035f, 1.3f, 0.045f, 0, text = "👋"))
+            Trick.DREHEN -> if (el in 0.25f..1.45f && (el % 0.07f) < dt) {
+                ps.add(Particle(PKind.SPARKLE, headX + (rnd.nextFloat() - 0.5f) * 0.16f, headY + rnd.nextFloat() * 0.12f, 0f, -0.02f, 0.8f, 0.02f, ParticleSystem.SPARKLE_COLORS.random(rnd)))
+            }
+            Trick.MAENNCHEN -> if (at(1.0f)) ps.add(Particle(PKind.HEART, headX, headY - 0.03f, 0f, -0.04f, 1.2f, 0.03f, 0xFFFF7FAF.toInt()))
+            Trick.SPRUNG -> if (at(0.67f)) ps.burst(PKind.STAR, headX, headY, 8, 0.35f, 1f, 0.025f, ParticleSystem.STAR_COLORS, upward = true)
+            Trick.ROLLE -> if (el in 0.4f..1.6f && (el % 0.16f) < dt) {
+                ps.add(Particle(PKind.SMOKE, x, feetY, -facing * 0.02f, -0.01f, 0.7f, 0.025f, 0x55FFFFFF))
+            }
+            Trick.VERBEUGUNG -> if (at(1.2f)) {
+                ps.add(Particle(PKind.EMOJI, headX - 0.1f, headY - 0.04f, -0.01f, -0.03f, 1.3f, 0.04f, 0, text = "👏"))
+                ps.add(Particle(PKind.EMOJI, headX + 0.1f, headY - 0.06f, 0.01f, -0.03f, 1.3f, 0.04f, 0, text = "👏"))
+            }
+            Trick.TANZ -> {
+                if (el < 3.6f && (el % 0.4f) < dt) ps.add(Particle(PKind.NOTE, headX + (rnd.nextFloat() - 0.5f) * 0.2f, headY, (rnd.nextFloat() - 0.5f) * 0.05f, -0.09f, 1.4f, 0.04f, listOf(0xFF7C6CFF, 0xFFFF6B9A, 0xFF2EC4A0).random(rnd).toInt()))
+                if (at(3.6f)) ps.burst(PKind.CONFETTI, headX, headY, 26, 0.5f, 1.6f, 0.02f, ParticleSystem.CONFETTI_COLORS, gravity = 0.5f, upward = true)
+            }
+            Trick.SALTO -> if (el in 0.35f..1.15f && (el % 0.06f) < dt) {
+                ps.add(Particle(PKind.STAR, headX + (rnd.nextFloat() - 0.5f) * 0.1f, headY + 0.05f, 0f, 0f, 0.6f, 0.018f, ParticleSystem.STAR_COLORS.random(rnd)))
+            }
+            else -> Unit
+        }
         val end = a.dur - 0.55f
-        if (el >= end && el - dt < end) {
+        if (at(end)) {
             say(line(listOf("Tadaa! ⭐", "Gut, oder? 😎", "Applaus! 👏").random(rnd), "Miau! Tadaa! ⭐"), 1.2f)
             ps.burst(PKind.STAR, headX, headY, 6, 0.3f, 1f, 0.022f, ParticleSystem.STAR_COLORS, upward = true)
         }

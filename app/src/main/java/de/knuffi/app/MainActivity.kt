@@ -51,6 +51,13 @@ class MainActivity : ComponentActivity() {
             }
         }
         openFrom(intent)
+        intent.getStringExtra("debug_hearts")?.takeIf { debug != null }?.let { ms ->
+            android.os.Handler(mainLooper).postDelayed({ de.knuffi.app.ui.HeartRain.start() }, ms.toLongOrNull() ?: 3_000L)
+        }
+        // debug builds only: shows tricks one after another, e.g. debug_trick=DREHEN,SALTO
+        intent.getStringExtra("debug_trick")?.takeIf { debug != null }?.split(',')?.mapNotNull { n -> de.knuffi.core.Trick.entries.firstOrNull { it.name == n.trim() } }?.forEachIndexed { i, t ->
+            android.os.Handler(mainLooper).postDelayed({ GameRepository.emit(de.knuffi.core.GameEvent.TrickShown(t)) }, 4_000L + i * 5_000L)
+        }
         setContent { AppRoot(debug) }
     }
 

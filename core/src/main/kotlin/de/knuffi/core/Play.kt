@@ -45,25 +45,80 @@ object Tricks {
     /** Coins for learning a trick. */
     fun learnCoins(t: Trick): Int = 10 + t.practice * 3
 
-    /** Words that call a trick, checked in this order (the longer tricks first). */
+    /**
+     * Words that call a trick. Speech recognition often hears a little wrong ("Pforte", "Saldo"),
+     * so the usual mistakes are listed too. Short words count at the start of a word ("tanz" in "tanzen").
+     */
     private val words: List<Pair<Trick, List<String>>> = listOf(
-        Trick.SALTO to listOf("salto", "überschlag", "ueberschlag"),
-        Trick.ROLLE to listOf("rolle", "roll dich", "rollen", "kuller"),
-        Trick.VERBEUGUNG to listOf("verbeug", "verneig", "diener", "bück dich"),
-        Trick.TANZ to listOf("tanz"),
-        Trick.MAENNCHEN to listOf("männchen", "maennchen", "mach dich groß", "steh auf"),
-        Trick.PFOTE to listOf("pfote", "pfötchen", "pfoetchen", "gib fünf", "high five"),
-        Trick.WINKEN to listOf("wink", "tschüss", "tschüs", "hallo"),
-        Trick.SPRUNG to listOf("hopp", "spring", "sprung", "hüpf"),
-        Trick.DREHEN to listOf("dreh", "pirouette", "im kreis"),
-        Trick.SITZ to listOf("sitz", "setz dich", "hinsetzen", "platz"),
+        Trick.SALTO to listOf("salto", "saldo", "überschlag", "ueberschlag", "flickflack", "flick flack", "rückwärtssalto"),
+        Trick.ROLLE to listOf("rolle", "roll dich", "rollen", "roll", "kuller", "purzelbaum"),
+        Trick.VERBEUGUNG to listOf("verbeug", "verneig", "diener", "bück dich", "bueck dich", "verbeugen"),
+        Trick.TANZ to listOf("tanz", "tanzen", "tanze", "dance", "disco"),
+        Trick.MAENNCHEN to listOf("männchen", "maennchen", "mänchen", "mach dich groß", "mach dich gross", "steh auf", "stell dich hin", "hinterbeine"),
+        Trick.PFOTE to listOf("pfote", "pfötchen", "pfoetchen", "pfoten", "pforte", "gib fünf", "gib mir fünf", "high five", "give me five", "hand geben", "gib hand", "gib mir die hand"),
+        Trick.WINKEN to listOf("wink", "winke", "tschüss", "tschüs", "tschau", "hallo", "servus"),
+        Trick.SPRUNG to listOf("hopp", "hop", "spring", "sprung", "hüpf", "huepf", "jump"),
+        Trick.DREHEN to listOf("dreh", "drehen", "dreht", "pirouette", "im kreis", "rundherum", "einmal rum"),
+        Trick.SITZ to listOf("sitz", "sitzt", "sitze", "setz dich", "setzen", "hinsetzen", "platz"),
     )
 
-    /** The trick a spoken sentence asks for ("Sitz!", "Gib Pfötchen!" …), or null. */
+    /** Words that also count with one wrong letter (only ones that sound like no everyday word). */
+    private val fuzzy = setOf("salto", "pfote", "pfötchen", "männchen", "pirouette", "purzelbaum", "verbeugen", "überschlag", "hinsetzen")
+
+    /** Lower case, without punctuation, single spaces. */
+    private fun normalize(text: String): String =
+        text.lowercase().map { if (it.isLetterOrDigit() || it == ' ') it else ' ' }.joinToString("").split(' ').filter { it.isNotEmpty() }.joinToString(" ")
+
+    private fun distance(a: String, b: String): Int {
+        if (kotlin.math.abs(a.length - b.length) > 1) return 2
+        val prev = IntArray(b.length + 1) { it }
+        val cur = IntArray(b.length + 1)
+        for (i in 1..a.length) {
+            cur[0] = i
+            for (j in 1..b.length) cur[j] = minOf(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + if (a[i - 1] == b[j - 1]) 0 else 1)
+            System.arraycopy(cur, 0, prev, 0, cur.size)
+        }
+        return prev[b.length]
+    }
+
+    /**
+     * The trick a spoken sentence asks for ("Sitz!", "Gib Pfötchen!", "Mochi, mach Männchen" …), or null.
+     * If several tricks are mentioned, the one said first wins.
+     */
     fun match(text: String): Trick? {
-        val t = text.lowercase().trim()
+        val t = normalize(text)
         if (t.isEmpty()) return null
-        return words.firstOrNull { (_, ws) -> ws.any { it in t } }?.first
+        val padded = " $t "
+        val tokens = t.split(' ')
+        var best: Trick? = null
+        var bestAt = Int.MAX_VALUE
+        for ((trick, ws) in words) {
+            for (w in ws) {
+                val at = padded.indexOf(if (w.length <= 4) " $w" else w)
+                if (at in 0 until bestAt) {
+                    best = trick
+                    bestAt = at
+                }
+                // some words are often heard with one wrong letter ("Pforte", "Saldo")
+                if (w in fuzzy) {
+                    var pos = 0
+                    for (tok in tokens) {
+                        if (pos < bestAt && distance(tok, w) <= 1) {
+                            best = trick
+                            bestAt = pos
+                        }
+                        pos += tok.length + 1
+                    }
+                }
+            }
+        }
+        return best
+    }
+
+    /** True if [text] is only the pet's name being called ("Mochi?"). */
+    fun calledByName(text: String, name: String): Boolean {
+        val n = normalize(name)
+        return n.isNotEmpty() && normalize(text).split(' ').any { it == n || (n.length >= 5 && distance(it, n) <= 1) }
     }
 
     /** Reason why the pet cannot practise right now, or null. */

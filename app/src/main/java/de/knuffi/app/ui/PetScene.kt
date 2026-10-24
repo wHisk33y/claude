@@ -324,12 +324,21 @@ fun PetScene(
     val micOn = interactive && state.settings.micReactions && !GameRepository.previewMode && !de.knuffi.app.sound.VoiceState.listening
     LifecycleResumeEffect(micOn) {
         val mic = if (micOn) {
-            de.knuffi.app.sound.MicListener { kind ->
+            de.knuffi.app.sound.MicListener(onSpeech = { de.knuffi.app.sound.VoiceState.wake?.invoke() }) { kind ->
                 d.onVoice(kind, ps, r.headNX, r.headNY)
                 GameRepository.perform(Action.Voice(kind))
             }.also { it.start(context) }
         } else null
         onPauseOrDispose { mic?.stop() }
+    }
+    LaunchedEffect(interactive) {
+        if (!interactive) return@LaunchedEffect
+        de.knuffi.app.sound.VoiceState.cues.collect { cue ->
+            when (cue) {
+                is de.knuffi.app.sound.VoiceCue.Listening -> d.listenUp(cue.text)
+                is de.knuffi.app.sound.VoiceCue.Say -> d.say(cue.text, 2.2f)
+            }
+        }
     }
     DisposableEffect(Unit) {
         onDispose { r.release() }

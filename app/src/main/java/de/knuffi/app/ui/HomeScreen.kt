@@ -380,7 +380,7 @@ private fun RoomBar(state: GameState, pet: Pet, voice: de.knuffi.app.sound.Trick
             Text("🗺️", fontSize = 14.sp)
         }
         Spacer(Modifier.weight(1f))
-        if (!pet.isEgg && pet.alive && de.knuffi.core.Tricks.learnedCount(pet) > 0) {
+        if (!pet.isEgg && pet.alive) {
             VoiceButton(voice)
             Spacer(Modifier.width(6.dp))
         }

@@ -18,6 +18,12 @@ class PetPose {
     var breath = 0f
     var lying = 0f
 
+    /** Extra turn around the vertical axis in radians (a full pirouette is 2π). */
+    var spin = 0f
+
+    /** Leaning forward towards the viewer in radians, turning around the feet (a bow). */
+    var pitch = 0f
+
     // Limbs (0 = rest)
     var footL = 0f
     var footR = 0f
@@ -54,7 +60,7 @@ class PetPose {
     var paint = 0f
 
     fun reset(): PetPose {
-        t = 0f; lift = 0f; scaleX = 1f; scaleY = 1f; tilt = 0f; turn = 0f; breath = 0f; lying = 0f
+        t = 0f; lift = 0f; scaleX = 1f; scaleY = 1f; tilt = 0f; turn = 0f; breath = 0f; lying = 0f; spin = 0f; pitch = 0f
         footL = 0f; footR = 0f; strideL = 0f; strideR = 0f; armL = 0f; armR = 0f; armWaveL = 0f; armWaveR = 0f
         hold = 0f; earLag = 0f
         eyes = EyeShape.OPEN; eyeOpen = 1f; lookX = 0f; lookY = 0f; mouth = MouthShape.CAT; mouthOpen = 0f
@@ -65,6 +71,7 @@ class PetPose {
 
     fun copyFrom(o: PetPose): PetPose {
         t = o.t; lift = o.lift; scaleX = o.scaleX; scaleY = o.scaleY; tilt = o.tilt; turn = o.turn; breath = o.breath; lying = o.lying
+        spin = o.spin; pitch = o.pitch
         footL = o.footL; footR = o.footR; strideL = o.strideL; strideR = o.strideR; armL = o.armL; armR = o.armR
         armWaveL = o.armWaveL; armWaveR = o.armWaveR; hold = o.hold; earLag = o.earLag
         eyes = o.eyes; eyeOpen = o.eyeOpen; lookX = o.lookX; lookY = o.lookY; mouth = o.mouth; mouthOpen = o.mouthOpen

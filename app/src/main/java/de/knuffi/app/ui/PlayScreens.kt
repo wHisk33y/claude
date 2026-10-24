@@ -57,6 +57,7 @@ import de.knuffi.app.ui.theme.LocalPalette
 import de.knuffi.core.Action
 import de.knuffi.core.Adventure
 import de.knuffi.core.AdventureRegion
+import de.knuffi.app.render.TrickMoves
 import de.knuffi.core.GameEvent
 import de.knuffi.core.GameState
 import de.knuffi.core.Mood
@@ -69,84 +70,7 @@ import kotlin.math.sin
 // ------------------------------------------------------------------ tricks
 
 /** A pose for a trick shown on its own (portraits and cards). [el] is the time since the trick started. */
-fun trickPose(pose: PetPose, trick: Trick, el: Float, success: Boolean) {
-    if (!success) {
-        pose.tilt += sin(el * 16f) * 10f
-        pose.eyes = if (el > 1.1f) EyeShape.DIZZY else EyeShape.SQUINT
-        pose.mouth = if (el > 1.1f) MouthShape.WAVY else MouthShape.TONGUE
-        return
-    }
-    val p = (el / 2.2f).coerceIn(0f, 1f)
-    pose.eyes = EyeShape.HAPPY
-    pose.mouth = MouthShape.OPEN
-    when (trick) {
-        Trick.SITZ -> {
-            pose.scaleY *= 0.88f
-            pose.scaleX *= 1.06f
-            pose.mouth = MouthShape.SMILE
-        }
-        Trick.PFOTE -> {
-            pose.armR = 0.55f
-            pose.armWaveR = -20f + sin(el * 6f) * 6f
-        }
-        Trick.WINKEN -> {
-            pose.armL = 0.95f
-            pose.armR = 0.95f
-            pose.armWaveL = sin(el * 14f) * 26f
-            pose.armWaveR = -sin(el * 14f) * 26f
-        }
-        Trick.DREHEN -> {
-            pose.turn = sin(el * 9f)
-            pose.armL = 0.7f
-            pose.armR = 0.7f
-            pose.eyes = EyeShape.STAR
-        }
-        Trick.MAENNCHEN -> {
-            pose.lift += 0.18f
-            pose.scaleY *= 1.12f
-            pose.scaleX *= 0.94f
-            pose.armL = 0.45f
-            pose.armR = 0.45f
-        }
-        Trick.SPRUNG -> {
-            val ph = el % 1.2f
-            if (ph < 0.6f) pose.lift += sin(ph / 0.6f * PI.toFloat()) * 0.7f
-            pose.armL = 1f
-            pose.armR = 1f
-            pose.eyes = EyeShape.STAR
-        }
-        Trick.ROLLE -> {
-            val r = ((el % 2f) / 1.4f).coerceIn(0f, 1f)
-            pose.tilt += 360f * (r * r * (3f - 2f * r))
-            pose.eyes = if (r in 0.05f..0.95f) EyeShape.CLOSED else EyeShape.HAPPY
-            pose.mouth = MouthShape.GRIN
-        }
-        Trick.VERBEUGUNG -> {
-            val k = sin(p * PI.toFloat())
-            pose.tilt += 28f * k
-            pose.lookY = k
-            pose.eyes = if (k > 0.5f) EyeShape.CLOSED else EyeShape.HAPPY
-            pose.mouth = MouthShape.SMILE
-        }
-        Trick.TANZ -> {
-            val k = el * 7f
-            pose.tilt += sin(k) * 12f
-            pose.lift += abs(sin(k)) * 0.1f
-            pose.armL = 0.75f + 0.25f * sin(k)
-            pose.armR = 0.75f - 0.25f * sin(k)
-            pose.turn = sin(k * 0.5f) * 0.7f
-        }
-        Trick.SALTO -> {
-            val ph = el % 1.6f
-            val r = (ph / 0.9f).coerceIn(0f, 1f)
-            if (ph < 0.9f) pose.lift += sin(r * PI.toFloat()) * 0.7f
-            pose.tilt -= 360f * (r * r * (3f - 2f * r))
-            pose.armL = 1f
-            pose.armR = 1f
-            pose.eyes = if (r in 0.05f..0.95f) EyeShape.CLOSED else EyeShape.STAR
-        }
-    }
-}
+fun trickPose(pose: PetPose, trick: Trick, el: Float, success: Boolean) = TrickMoves.apply(pose, trick, el, success)
 
 @Composable
 fun TricksScreen(state: GameState, onBack: () -> Unit) {
@@ -205,14 +129,14 @@ fun TricksScreen(state: GameState, onBack: () -> Unit) {
                         PetPortrait(look, Modifier.size(120.dp), sizeFactor = 0.78f) { pose, _ ->
                             val tr = showing
                             val el = time.floatValue - shownAt
-                            if (tr != null && el in 0f..2.6f) trickPose(pose, tr, el, success)
+                            if (tr != null && el in 0f..TrickMoves.duration(tr, success)) trickPose(pose, tr, el, success)
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text("${pet.name} kann $learned von ${Trick.entries.size} Tricks", style = MaterialTheme.typography.titleMedium, color = p.text)
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                blocker ?: "Übe jeden Trick ein paar Mal. Mit guter Laune und viel Energie klappt es öfter! Tippe auf 🎙️ und sag das Kommando (z. B. „Sitz!“), dann macht ${pet.name} den Trick.",
+                                blocker ?: "Übe jeden Trick ein paar Mal. Mit guter Laune und viel Energie klappt es öfter! Tippe auf 🎙️ und sag Kommandos wie „Sitz!“ oder „Dreh dich!“. ${pet.name} hört dann eine Weile zu, du kannst also mehrere nacheinander sagen.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (blocker != null) p.red else p.textMuted,
                             )

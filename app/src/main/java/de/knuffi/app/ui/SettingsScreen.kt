@@ -465,7 +465,7 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit, onLearnStats: () -> Uni
                 SwitchRow("Haptisches Feedback", "Kleine Vibrationen beim Tippen", s.haptics) { update(s.copy(haptics = it)) }
                 SwitchRow(
                     "Stimme & Mikrofon",
-                    "Dein Haustier reagiert, wenn du klatschst, pustest, singst oder rufst. Es wird nichts aufgenommen oder gespeichert.",
+                    "Dein Haustier reagiert, wenn du klatschst, pustest oder singst. Sprichst du mit ihm, spitzt es die Ohren und hört auf Kommandos wie „Sitz!“. Es wird nichts aufgenommen oder gespeichert.",
                     s.micReactions,
                 ) { on ->
                     if (!on) {

@@ -117,6 +117,7 @@ fun ChatScreen(state: GameState, onBack: () -> Unit) {
 
     fun send(msg: String) {
         if (msg.isBlank()) return
+        if (de.knuffi.core.HeartNames.mentioned(msg)) HeartRain.start()
         GameRepository.perform(Action.Chat(msg))
         text = ""
     }

@@ -15,6 +15,7 @@ uniform vec4 uRegion;
 uniform float uZRange;
 uniform vec2 uFloor;        // bottom of the body and body half height
 uniform vec3 uWobble;       // amplitude, wave number, time
+uniform vec2 uPitch;        // cos, sin of leaning forward (a bow)
 out vec3 vRest;
 out vec3 vRestN;
 out vec3 vN;
@@ -27,6 +28,14 @@ void main() {
     float up = clamp((uFloor.x - p.y) / max(uFloor.y * 2.0, 1.0), 0.0, 1.2);
     p.x += sin(p.y * uWobble.y + uWobble.z * 3.1) * uWobble.x * up;
     p.z += cos(p.y * uWobble.y * 0.7 + uWobble.z * 2.3) * uWobble.x * 0.5 * up;
+    // leaning forward around the feet: the head comes towards the viewer and down
+    float dy = p.y - uFloor.x;
+    float pz = p.z * uPitch.x - dy * uPitch.y;
+    p.y = uFloor.x + dy * uPitch.x + p.z * uPitch.y;
+    p.z = pz;
+    float nny = n.y * uPitch.x + n.z * uPitch.y;
+    n.z = n.z * uPitch.x - n.y * uPitch.y;
+    n.y = nny;
     float c = uYaw.x;
     float s = uYaw.y;
     vec3 w = vec3(p.x * c + p.z * s, p.y, -p.x * s + p.z * c);

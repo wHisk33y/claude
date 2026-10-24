@@ -204,9 +204,11 @@ class PetRenderer {
         val baseY = groundY - pose.lift * u
 
         // bounds in canvas space (approximate, ignores rotation)
-        val sx = pose.scaleX
-        val sy = pose.scaleY
-        bounds.set(cx - bw * 1.15f * sx, baseY + top * sy - u * 0.1f, cx + bw * 1.15f * sx, baseY + u * 0.02f)
+        // without 3D a pirouette turns like a card and a bow becomes a deep nod
+        val sx = pose.scaleX * (if (pose.spin != 0f) kotlin.math.cos(pose.spin).let { if (kotlin.math.abs(it) < 0.12f) 0.12f * kotlin.math.sign(it + 1e-4f) else it } else 1f)
+        val sy = pose.scaleY * (1f - 0.22f * sin(pose.pitch))
+        val bx = bw * 1.15f * kotlin.math.abs(sx)
+        bounds.set(cx - bx, baseY + top * sy - u * 0.1f, cx + bx, baseY + u * 0.02f)
         head.set(cx + fx * sx, baseY + (top - earHeight(fl)) * sy)
 
         val useLayer = silhouette != null || pose.sickTint > 0.01f || pose.glow > 0.01f

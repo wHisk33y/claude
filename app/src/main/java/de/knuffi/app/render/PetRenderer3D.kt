@@ -76,7 +76,8 @@ internal fun PetRenderer.draw3D(c: Canvas, cx: Float, groundY: Float, size: Floa
         f.left = left; f.top = rTop; f.right = right; f.bottom = rBottom
         f.width = ow; f.height = oh
         // turning for real, plus a gentle idle sway
-        f.yaw = turn * 0.55f + sin(pose.t * 0.6f) * 0.05f
+        f.yaw = turn * 0.55f + pose.spin + sin(pose.t * 0.6f) * 0.05f
+        f.pitch = pose.pitch
         f.time = pose.t
         surfaceOf(look, fl, f.surface)
         f.surface[3] = 1f / max(1f, u * 0.035f)
@@ -276,6 +277,7 @@ internal fun PetRenderer.draw3DEgg(c: Canvas, cx: Float, groundY: Float, look: P
         f.left = left; f.top = rTop; f.right = right; f.bottom = rBottom
         f.width = ow; f.height = oh
         f.yaw = 0f
+        f.pitch = 0f
         f.bodyBottom = 0f
         f.bodyH = eh
         f.time = pose.t

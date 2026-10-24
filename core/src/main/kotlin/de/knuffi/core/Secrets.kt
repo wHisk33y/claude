@@ -64,6 +64,20 @@ object Secrets {
     }
 }
 
+// ---------------------------------------------------------------------------------- heart names
+
+/** Easter egg: writing or saying one of these names fills the whole screen with hearts. */
+object HeartNames {
+    /** The names, also the way speech recognition likes to write them. */
+    private val names = setOf(
+        "toni", "tony", "tonie", "tonis",
+        "susi", "susie", "suzi", "susy", "suzie", "susis",
+        "arik", "ariks", "arick", "aric", "arrik", "arek",
+    )
+
+    fun mentioned(text: String): Boolean = text.lowercase().split(Regex("[^\\p{L}]+")).any { it in names }
+}
+
 // ---------------------------------------------------------------------------------- daily hidden object
 
 /** Where something can be hidden in the room. Coordinates are normalised to the scene. */

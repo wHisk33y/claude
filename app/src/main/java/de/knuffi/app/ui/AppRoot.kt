@@ -181,6 +181,7 @@ fun AppRoot(debug: DebugScenes.Launch? = null) {
                     }
                 }
                 OverlayHost(state, debug?.scene)
+                HeartRainOverlay()
                 if (debug != null) DebugScenes.Driver(debug)
             }
         }

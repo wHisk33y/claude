@@ -16,10 +16,12 @@ import kotlin.math.max
 import kotlin.math.sqrt
 
 /**
- * Listens to the microphone and recognises blowing, clapping, singing and shouting from the
- * loudness alone. Nothing is recorded or stored: every 50 ms block is measured and thrown away.
+ * Listens to the microphone and recognises blowing, clapping, singing, shouting and talking from
+ * the loudness alone. Nothing is recorded or stored: every 50 ms block is measured and thrown away.
+ * Talking (a short sound with a tone, then a pause) is passed to [onSpeech], so the pet can
+ * prick up its ears and listen for a command.
  */
-class MicListener(private val onVoice: (VoiceKind) -> Unit) {
+class MicListener(private val onSpeech: () -> Unit = {}, private val onVoice: (VoiceKind) -> Unit) {
     @Volatile
     private var running = false
     private var thread: Thread? = null
@@ -44,6 +46,10 @@ class MicListener(private val onVoice: (VoiceKind) -> Unit) {
 
     private fun emit(kind: VoiceKind) {
         main.post { onVoice(kind) }
+    }
+
+    private fun speech() {
+        main.post { onSpeech() }
     }
 
     // The permission is checked in start().
@@ -73,8 +79,10 @@ class MicListener(private val onVoice: (VoiceKind) -> Unit) {
         var onsetAt = -1L
         var onsetPeak = 0.0
         var loudFrames = 0
+        var quietFrames = 0
         var zcrSum = 0.0
-        var ratioSum = 0.0
+        var rmsMax = 0.0
+        var handled = false
         var lastEvent = 0L
         try {
             rec.startRecording()
@@ -115,32 +123,39 @@ class MicListener(private val onVoice: (VoiceKind) -> Unit) {
                 }
                 if (onsetAt > 0 && now - onsetAt > 220L) onsetAt = -1L
 
-                // Something long: blowing (noisy), singing (tone) or shouting (very loud).
+                // A sound that lasts: blowing is noisy, singing a long tone, talking short bits of tone
+                // with pauses. Only a really loud voice counts as shouting.
                 if (ratio > 4.0) {
                     loudFrames++
+                    quietFrames = 0
                     zcrSum += zcr
-                    ratioSum += ratio
-                    if (loudFrames >= 8) {
-                        val avgZcr = zcrSum / loudFrames
-                        val avgRatio = ratioSum / loudFrames
-                        if (ready && onsetAt < 0) {
+                    rmsMax = max(rmsMax, rms)
+                    val avgZcr = zcrSum / loudFrames
+                    if (!handled && ready && onsetAt < 0) {
+                        if (loudFrames == 8 && avgZcr > 0.13) {
+                            handled = true
                             lastEvent = now
-                            emit(
-                                when {
-                                    avgZcr > 0.13 -> VoiceKind.BLOW
-                                    avgRatio > 30.0 -> VoiceKind.LOUD
-                                    else -> VoiceKind.SING
-                                },
-                            )
+                            emit(VoiceKind.BLOW)
+                        } else if (loudFrames == 24) {
+                            handled = true
+                            lastEvent = now
+                            emit(if (rmsMax > SHOUT_RMS) VoiceKind.LOUD else VoiceKind.SING)
+                        }
+                    }
+                } else if (loudFrames > 0) {
+                    quietFrames++
+                    if (quietFrames >= 3) {
+                        // the sound is over: a few words?
+                        if (!handled && ready && onsetAt < 0 && loudFrames >= 3) {
+                            lastEvent = now
+                            if (rmsMax > SHOUT_RMS) emit(VoiceKind.LOUD) else speech()
                         }
                         loudFrames = 0
+                        quietFrames = 0
                         zcrSum = 0.0
-                        ratioSum = 0.0
+                        rmsMax = 0.0
+                        handled = false
                     }
-                } else {
-                    loudFrames = 0
-                    zcrSum = 0.0
-                    ratioSum = 0.0
                 }
                 prevRatio = ratio
             }
@@ -158,6 +173,9 @@ class MicListener(private val onVoice: (VoiceKind) -> Unit) {
     }
 
     companion object {
+        /** A voice this loud (16 bit samples) is shouting, talking is far below. */
+        private const val SHOUT_RMS = 14_000.0
+
         fun allowed(context: Context): Boolean =
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
     }
