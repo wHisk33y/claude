@@ -101,6 +101,8 @@ object DebugScenes {
             "winter" -> SeasonEvent.WINTERZAUBER
             "easter" -> SeasonEvent.OSTERN
             "summerfest" -> SeasonEvent.SOMMERFEST
+            "fasching" -> SeasonEvent.FASCHING
+            "laternen" -> SeasonEvent.LATERNEN
             else -> null
         }
         val look = if (intent.getStringExtra("debug_look") == "abenteuer" || scene.startsWith("adventure")) LookStyle.ABENTEUER else LookStyle.ZAUBER
@@ -211,6 +213,8 @@ object DebugScenes {
         "space" -> Route.Game(MiniGame.SPACE)
         "jumper" -> Route.Game(MiniGame.JUMPER)
         "race" -> Route.Game(MiniGame.RACE)
+        "dance" -> Route.Game(MiniGame.TANZ)
+        "snowball" -> Route.Game(MiniGame.SCHNEEBALL)
         "tricks" -> Route.Tricks
         "house" -> Route.House
         "furnish" -> Route.Furnish(de.knuffi.core.RoomKind.LIVING, fromHouse = false)

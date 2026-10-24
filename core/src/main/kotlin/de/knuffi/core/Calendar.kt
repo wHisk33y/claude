@@ -30,6 +30,8 @@ enum class SeasonEvent(
     SOMMERFEST("Sommerfest", "🏖️", "Muscheln", "🐚", "Sonne, Strand und Eis am Stiel!", EggLine.MEER),
     HALLOWEEN("Halloween", "🎃", "Kürbisse", "🎃", "Süßes oder Saures? Gruselig schöne Tage!", EggLine.GRUSEL),
     WINTERZAUBER("Winterzauber", "🎄", "Schneeflocken", "❄️", "Lichterglanz, Plätzchen und Schnee.", EggLine.FROST),
+    FASCHING("Faschingsfest", "🎭", "Konfetti", "🎊", "Verkleiden, tanzen und Konfetti-Regen!", EggLine.EINHORN),
+    LATERNEN("Laternenfest", "🏮", "Lichter", "🕯️", "Bunte Laternen leuchten durch die Herbstnacht.", EggLine.WALD),
 }
 
 object EventCalendar {
@@ -69,6 +71,8 @@ object EventCalendar {
         SeasonEvent.SOMMERFEST -> LocalDate.of(year, 7, 15) to LocalDate.of(year, 8, 10)
         SeasonEvent.HALLOWEEN -> LocalDate.of(year, 10, 17) to LocalDate.of(year, 11, 2)
         SeasonEvent.WINTERZAUBER -> LocalDate.of(year, 12, 1) to LocalDate.of(year, 12, 31)
+        SeasonEvent.FASCHING -> LocalDate.of(year, 2, 19) to LocalDate.of(year, 2, 27)
+        SeasonEvent.LATERNEN -> LocalDate.of(year, 11, 5) to LocalDate.of(year, 11, 15)
     }
 
     fun active(d: LocalDate): SeasonEvent? = SeasonEvent.entries.firstOrNull { e ->

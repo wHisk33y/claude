@@ -841,6 +841,46 @@ class FurnitureRenderer : Painter() {
                     c.drawCircle(x + (k - 1) * s * 0.2f, y - s * (0.35f + (k % 2) * 0.35f), s * 0.05f, fill)
                 }
             }
+            SeasonEvent.FASCHING -> {
+                // a carnival mask on a little stand with confetti around it
+                box(c, x - s * 0.04f, y - s * 0.5f, x + s * 0.04f, y, s * 0.02f, 0xFFE8B880.toInt(), 0xFF9A6A3A.toInt())
+                path.reset()
+                path.moveTo(x - s * 0.55f, y - s * 0.78f)
+                path.quadTo(x - s * 0.5f, y - s * 1.05f, x, y - s * 0.86f)
+                path.quadTo(x + s * 0.5f, y - s * 1.05f, x + s * 0.55f, y - s * 0.78f)
+                path.quadTo(x + s * 0.45f, y - s * 0.5f, x + s * 0.12f, y - s * 0.56f)
+                path.quadTo(x, y - s * 0.66f, x - s * 0.12f, y - s * 0.56f)
+                path.quadTo(x - s * 0.45f, y - s * 0.5f, x - s * 0.55f, y - s * 0.78f)
+                path.close()
+                shaded(c, path, 0xFFE8C8FF.toInt(), 0xFF9A5AF0.toInt(), 0xFF5A2AA8.toInt(), outlineW = 1f)
+                fill.shader = null
+                fill.color = 0xFF2A1A40.toInt()
+                c.drawOval(x - s * 0.36f, y - s * 0.84f, x - s * 0.12f, y - s * 0.68f, fill)
+                c.drawOval(x + s * 0.12f, y - s * 0.84f, x + s * 0.36f, y - s * 0.68f, fill)
+                val conf = intArrayOf(0xFFFF5A8A.toInt(), 0xFFFFD84D.toInt(), 0xFF4CC8FF.toInt(), 0xFF5AD88A.toInt())
+                for (k in 0 until 7) {
+                    fill.color = conf[k % conf.size]
+                    val cx = x + (k - 3) * s * 0.17f
+                    c.drawRect(cx - s * 0.04f, y - s * 0.08f - (k % 3) * s * 0.05f, cx + s * 0.04f, y - s * 0.02f - (k % 3) * s * 0.05f, fill)
+                }
+            }
+            SeasonEvent.LATERNEN -> {
+                // a glowing paper lantern on a stick
+                line.shader = null
+                line.color = 0xFF8A5A2E.toInt()
+                line.strokeWidth = s * 0.06f
+                c.drawLine(x - s * 0.4f, y, x + s * 0.1f, y - s * 1.2f, line)
+                c.drawLine(x + s * 0.1f, y - s * 1.2f, x + s * 0.1f, y - s * 1.05f, line)
+                shader(radial(x + s * 0.1f, y - s * 0.75f, s * 0.9f, intArrayOf(Colors.alpha(0xFFFFC85A.toInt(), 0.55f), Colors.alpha(0xFFFFC85A.toInt(), 0f))))
+                c.drawCircle(x + s * 0.1f, y - s * 0.75f, s * 0.9f, fill)
+                fill.shader = null
+                path.reset()
+                path.addOval(x - s * 0.22f, y - s * 1.05f, x + s * 0.42f, y - s * 0.45f, Path.Direction.CW)
+                shaded(c, path, 0xFFFFF0B0.toInt(), 0xFFFF9A3D.toInt(), 0xFFC85A10.toInt(), outlineW = 1f)
+                line.color = Colors.alpha(0xFFC85A10.toInt(), 0.6f)
+                line.strokeWidth = s * 0.025f
+                for (k in -1..1) c.drawArc(x - s * 0.22f + s * 0.11f * (k + 1), y - s * 1.05f, x + s * 0.42f - s * 0.11f * (1 - k), y - s * 0.45f, 270f, 180f, false, line)
+            }
         }
     }
 
@@ -854,6 +894,7 @@ class FurnitureRenderer : Painter() {
         line.color = when (event) {
             SeasonEvent.HALLOWEEN -> 0xFF3A2E4A.toInt()
             SeasonEvent.WINTERZAUBER -> 0xFF2E6A3A.toInt()
+            SeasonEvent.LATERNEN -> 0xFF5A4A3A.toInt()
             else -> 0xFFE8D0A0.toInt()
         }
         line.strokeWidth = maxOf(1.5f, w * 0.004f)
@@ -948,6 +989,39 @@ class FurnitureRenderer : Painter() {
                 shaded(c, path, Color.WHITE, Colors.lerp(Colors.darken(col, 0.3f), Colors.lighten(col, 0.3f), on), Colors.darken(col, 0.4f), outlineW = 1f)
                 fill.color = 0xFF4A5470.toInt()
                 c.drawRect(x - s * 0.22f, y, x + s * 0.22f, y + s * 0.25f, fill)
+            }
+            SeasonEvent.FASCHING -> {
+                val cols = intArrayOf(0xFFFF5A8A.toInt(), 0xFFFFD84D.toInt(), 0xFF4CC8FF.toInt(), 0xFF5AD88A.toInt(), 0xFFB27CFF.toInt())
+                val col = cols[i % cols.size]
+                if (i % 2 == 0) {
+                    // pompom
+                    path.reset()
+                    path.addCircle(x, y + s * 0.8f, s * 0.6f, Path.Direction.CW)
+                    shaded(c, path, Colors.lighten(col, 0.5f), col, Colors.darken(col, 0.3f), outlineW = 1f)
+                } else {
+                    // curly streamer
+                    line.shader = null
+                    line.color = col
+                    line.strokeWidth = s * 0.22f
+                    path.reset()
+                    path.moveTo(x, y)
+                    for (k in 1..4) path.quadTo(x + (if (k % 2 == 0) -1 else 1) * s * 0.5f, y + s * (k * 0.5f - 0.25f), x, y + s * k * 0.5f)
+                    c.drawPath(path, line)
+                }
+            }
+            SeasonEvent.LATERNEN -> {
+                val cols = intArrayOf(0xFFFF9A3D.toInt(), 0xFFFFD84D.toInt(), 0xFFFF6A7A.toInt(), 0xFF8FD3FF.toInt())
+                val col = cols[i % cols.size]
+                val on = 0.7f + 0.3f * sin(t * 1.8f + i * 0.9f)
+                shader(radial(x, y + s * 0.9f, s * 2.4f, intArrayOf(Colors.alpha(col, 0.45f * on), Colors.alpha(col, 0f))))
+                c.drawCircle(x, y + s * 0.9f, s * 2.4f, fill)
+                fill.shader = null
+                path.reset()
+                path.addOval(x - s * 0.6f, y + s * 0.35f, x + s * 0.6f, y + s * 1.45f, Path.Direction.CW)
+                shaded(c, path, Colors.lighten(col, 0.6f), col, Colors.darken(col, 0.3f), outlineW = 1f)
+                fill.color = 0xFF4A3A2A.toInt()
+                c.drawRect(x - s * 0.3f, y + s * 0.2f, x + s * 0.3f, y + s * 0.38f, fill)
+                c.drawRect(x - s * 0.3f, y + s * 1.42f, x + s * 0.3f, y + s * 1.55f, fill)
             }
         }
         c.restore()

@@ -170,6 +170,12 @@ class SceneRenderer {
         d.doorPoints = DoorGeo
         d.hasBed = furnishing.hasBed
         d.hasBowl = furnishing.hasBowl
+        // favourite places in the drawn room: toy corner front left, cosy corner front right
+        d.spots.clear()
+        if (kind == LayoutKind.HOME && furnishing.house != de.knuffi.core.RoomKind.GARDEN) {
+            furnishing.toy?.let { d.spots[it] = floatArrayOf(0.1f + furnishing.offset(de.knuffi.core.Slot.TOY), 0f) }
+            furnishing.deco?.let { d.spots[it] = floatArrayOf(0.81f + furnishing.offset(de.knuffi.core.Slot.DECO), 0f) }
+        }
         val spec = spec3
         in3d = false
         if (spec != null && kind == LayoutKind.HOME && de.knuffi.app.render.house3d.Room3d.available) {
@@ -181,6 +187,13 @@ class SceneRenderer {
                 d.doorPoints = home3.doorPoints
                 val bed = m.placed[de.knuffi.core.Slot.BED]
                 d.hasBed = bed != null
+                d.spots.clear()
+                for (slot in arrayOf(de.knuffi.core.Slot.TOY, de.knuffi.core.Slot.DECO)) {
+                    val p = m.placed[slot] ?: continue
+                    val (px, pz) = v.toPet(p.x, p.z)
+                    val id = if (slot == de.knuffi.core.Slot.TOY) furnishing.toy else furnishing.deco
+                    if (id != null) d.spots[id] = floatArrayOf(px, pz)
+                }
                 if (bed != null) {
                     val (bx, bz) = v.toPet(bed.x, bed.z)
                     d.bedX = bx

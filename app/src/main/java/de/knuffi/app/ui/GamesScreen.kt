@@ -88,6 +88,8 @@ private fun themeFor(game: MiniGame) = when (game) {
     MiniGame.SPACE -> GameTheme(Color(0xFF0E0A2A), Color(0xFF51307A), Color(0xFFFF5A8A), Color(0xFFC83A66))
     MiniGame.JUMPER -> GameTheme(Color(0xFF7EC8FF), Color(0xFFE6F6FF), Color(0xFF4DA8FF), Color(0xFF2A70C8))
     MiniGame.RACE -> GameTheme(Color(0xFF7EC8FF), Color(0xFF8ED06A), Color(0xFFFF5A6E), Color(0xFFC83A4E))
+    MiniGame.TANZ -> GameTheme(Color(0xFF7C5CFF), Color(0xFFFF7EB6), Color(0xFFFF5AA8), Color(0xFFC8307A))
+    MiniGame.SCHNEEBALL -> GameTheme(Color(0xFFA8D8FF), Color(0xFFF4FAFF), Color(0xFF4C8DFF), Color(0xFF2A5AC8))
 }
 
 /** Emojis that tell what the newer games are about. */
@@ -107,6 +109,8 @@ private fun previewEmojis(game: MiniGame): List<String> = when (game) {
     MiniGame.SPACE -> listOf("🚀", "☄️", "🪨", "🛸")
     MiniGame.JUMPER -> listOf("☁️", "☁️", "🪙", "☁️")
     MiniGame.RACE -> listOf("🏎️", "🚧", "🪙", "⚡")
+    MiniGame.TANZ -> listOf("💃", "🎵", "🪩", "⭐")
+    MiniGame.SCHNEEBALL -> listOf("⛄", "❄️", "🐧", "🎯")
     else -> emptyList()
 }
 

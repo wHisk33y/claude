@@ -67,6 +67,10 @@ object Stickers {
         Sticker("s_heart", "Herz", "💝", StickerSet.FESTE),
         Sticker("s_chick", "Küken", "🐣", StickerSet.FESTE),
         Sticker("s_beach", "Strandtag", "🏖️", StickerSet.FESTE),
+        Sticker("s_mask", "Faschingsmaske", "🎭", StickerSet.FESTE),
+        Sticker("s_confetti", "Konfetti", "🎊", StickerSet.FESTE),
+        Sticker("s_lantern", "Laterne", "🏮", StickerSet.FESTE),
+        Sticker("s_candle", "Kerzenlicht", "🕯️", StickerSet.FESTE),
         Sticker("s_pumpkin", "Kürbis", "🎃", StickerSet.FESTE),
         Sticker("s_ghost", "Gespenst", "👻", StickerSet.FESTE),
         Sticker("s_tree", "Tannenbaum", "🎄", StickerSet.FESTE),
@@ -86,6 +90,8 @@ object Stickers {
         SeasonEvent.SOMMERFEST -> listOf(byId.getValue("s_beach"))
         SeasonEvent.HALLOWEEN -> listOf(byId.getValue("s_pumpkin"), byId.getValue("s_ghost"))
         SeasonEvent.WINTERZAUBER -> listOf(byId.getValue("s_tree"), byId.getValue("s_gift"))
+        SeasonEvent.FASCHING -> listOf(byId.getValue("s_mask"), byId.getValue("s_confetti"))
+        SeasonEvent.LATERNEN -> listOf(byId.getValue("s_lantern"), byId.getValue("s_candle"))
     }
 
     /** Random sticker from the normal sets; rare ones appear less often. */
@@ -122,6 +128,9 @@ enum class Destination(
     REGENWALD("Regenwald", "🌴", 9, 5, EggLine.DSCHUNGEL, "Lianen, Papageien und riesige Blätter."),
     OASE("Wüstenoase", "🏜️", 13, 7, EggLine.WUESTE, "Palmen, Dünen und ein glitzernder See."),
     MINE("Glitzermine", "💎", 16, 9, EggLine.EDELSTEIN, "Tief im Berg funkeln Edelsteine."),
+    BAUERNHOF("Bauernhof", "🚜", 2, 2, EggLine.HASE, "Kühe streicheln, Eier suchen und ins Heu springen."),
+    TIERPARK("Tierpark", "🦒", 6, 4, EggLine.DSCHUNGEL, "Giraffen, Pinguine und ein Streichelzoo."),
+    JAHRMARKT("Jahrmarkt", "🎡", 10, 5, EggLine.ZUCKER, "Karussell, Zuckerwatte und Riesenrad!"),
     ;
 
     val durationMs: Long get() = hours * 3_600_000L
@@ -286,5 +295,7 @@ object EventShop {
         SeasonEvent.SOMMERFEST -> listOf("hat_captain", "popsicle")
         SeasonEvent.HALLOWEEN -> listOf("hat_witch", "pumpkin_pie")
         SeasonEvent.WINTERZAUBER -> listOf("hat_santa", "gingerbread")
+        SeasonEvent.FASCHING -> listOf("face_mask", "krapfen")
+        SeasonEvent.LATERNEN -> listOf("hat_lanternband", "martinsbrezel")
     }
 }

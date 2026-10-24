@@ -18,6 +18,11 @@ Eine neue Version lässt sich einfach über die alte installieren, dein Spielsta
 
 ## Funktionen
 
+- **Neu in 4.3**: Tanzparty (Rhythmusspiel) und Schneeballwurf, Ausflüge zu Bauernhof, Tierpark und Jahrmarkt
+  mit neuen Andenken, Faschingsfest und Laternenfest mit eigener Deko und Ausrüstung, Lieblingsplätze
+  (das Haustier nutzt Sofa, Klavier, Kamin, Spielecke & Co.), neue Freundes-Momente, Essen-Menü mit Reitern
+  und Mehrfach-Füttern, Akku-Regler für den Startbildschirm, 3D mit Fell, Glitzer, runden Teilen,
+  Licht nach Tageszeit und weichem Schatten, Fehlerbericht in den Einstellungen.
 - **Echtes 3D**: Haustiere und Eier werden mit OpenGL ES 3 als echte 3D-Figuren gerendert (runder Körper,
   aufgemaltes Gesicht und Muster, Ohren, Flügel, Hüte und Zubehör als weiche 3D-Formen, echtes Licht und Drehen).
   Das funktioniert in der App, im Live-Hintergrund, beim schwebenden Haustier und im Widget. In den Einstellungen

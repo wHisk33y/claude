@@ -446,6 +446,8 @@ fun eventColors(event: de.knuffi.core.SeasonEvent): Pair<Color, Color> = when (e
     de.knuffi.core.SeasonEvent.SOMMERFEST -> Color(0xFF2EB8E0) to Color(0xFFFFB02E)
     de.knuffi.core.SeasonEvent.HALLOWEEN -> Color(0xFF6A3AB8) to Color(0xFFFF8A2A)
     de.knuffi.core.SeasonEvent.WINTERZAUBER -> Color(0xFF3A7AD6) to Color(0xFF7ED8E8)
+    de.knuffi.core.SeasonEvent.FASCHING -> Color(0xFFB25AF0) to Color(0xFFFF5A8A)
+    de.knuffi.core.SeasonEvent.LATERNEN -> Color(0xFF3A3A8A) to Color(0xFFFF9A3D)
 }
 
 /** Dialog asking for a name (e.g. when an egg is hatched). */

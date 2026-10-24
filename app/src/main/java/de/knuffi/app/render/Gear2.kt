@@ -16,6 +16,34 @@ internal fun PetRenderer.drawBackItem(c: Canvas, id: String, pose: PetPose, bw: 
     val flying = pose.lift > 0.05f
     val flap = sin(t * (if (flying) 14f else 2.6f)) * (if (flying) 1f else 0.4f)
     when (id) {
+        "back_lanternstick" -> {
+            val side = if (pose.turn > 0.05f) -1f else 1f
+            val bx = side * bw * 0.7f
+            val by = cy + bh * 0.4f
+            val tx = side * bw * 1.25f
+            val ty = top - u * 0.35f
+            line.shader = null
+            line.color = 0xFF9A6A3A.toInt()
+            line.strokeWidth = u * 0.045f
+            c.drawLine(bx, by, tx, ty, line)
+            val swing = sin(t * 2.2f) * 10f
+            c.save()
+            c.rotate(swing, tx, ty)
+            line.color = 0xFF5A4A3A.toInt()
+            line.strokeWidth = u * 0.015f
+            c.drawLine(tx, ty, tx, ty + u * 0.12f, line)
+            val ly = ty + u * 0.27f
+            val glow = 0.8f + 0.2f * sin(t * 3f)
+            shaderFill(radial(tx, ly, u * 0.4f, intArrayOf(Colors.alpha(0xFFFFC85A.toInt(), 0.5f * glow), Colors.alpha(0xFFFFC85A.toInt(), 0f))))
+            c.drawCircle(tx, ly, u * 0.4f, fill)
+            fill.shader = null
+            ovalPath(path, tx - u * 0.15f, ly - u * 0.15f, tx + u * 0.15f, ly + u * 0.15f)
+            shaded(c, path, 0xFFFFF0B0.toInt(), 0xFFFF9A3D.toInt(), 0xFFC85A10.toInt())
+            fill.color = 0xFF4A3A2A.toInt()
+            c.drawRect(tx - u * 0.08f, ly - u * 0.18f, tx + u * 0.08f, ly - u * 0.13f, fill)
+            c.drawRect(tx - u * 0.07f, ly + u * 0.13f, tx + u * 0.07f, ly + u * 0.17f, fill)
+            c.restore()
+        }
         "back_backpack", "back_treasure" -> {
             val treasure = id == "back_treasure"
             val main = if (treasure) 0xFF9A6A3A.toInt() else 0xFF4DA8FF.toInt()
@@ -208,6 +236,58 @@ internal fun PetRenderer.drawMoreHat(c: Canvas, id: String, pose: PetPose, bw: F
             fill.color = Color.WHITE
             c.drawPath(path3, fill)
         }
+        "hat_jester" -> {
+            val base = top + bh * 0.18f
+            val cols = intArrayOf(0xFFB25AF0.toInt(), 0xFFFFC83D.toInt(), 0xFFFF5A8A.toInt())
+            for ((k, a) in floatArrayOf(-1f, 0f, 1f).withIndex()) {
+                val bob = sin(t * 3f + k) * u * 0.03f
+                val tipX = hx + a * bw * 0.85f
+                val tipY = base - u * (if (k == 1) 0.62f else 0.38f) + bob
+                path.reset()
+                path.moveTo(hx + a * bw * 0.32f - bw * 0.25f, base)
+                path.quadTo(hx + a * bw * 0.4f, base - u * 0.45f, tipX, tipY)
+                path.quadTo(hx + a * bw * 0.55f, base - u * 0.2f, hx + a * bw * 0.32f + bw * 0.25f, base)
+                path.close()
+                shaded(c, path, Colors.lighten(cols[k], 0.4f), cols[k], Colors.darken(cols[k], 0.3f))
+                ovalPath(path2, tipX - u * 0.06f, tipY - u * 0.06f, tipX + u * 0.06f, tipY + u * 0.06f)
+                shaded(c, path2, Color.WHITE, 0xFFFFD84D.toInt(), 0xFFC08000.toInt(), outline = false)
+            }
+            path.reset()
+            path.addRoundRect(hx - bw * 0.62f, base - u * 0.05f, hx + bw * 0.62f, base + u * 0.06f, u * 0.05f, u * 0.05f, Path.Direction.CW)
+            shaded(c, path, 0xFFFFF4C2.toInt(), 0xFFFFC83D.toInt(), 0xFFB87A00.toInt())
+        }
+        "hat_lanternband", "hat_starlantern" -> {
+            val star = id == "hat_starlantern"
+            val base = top + bh * 0.16f
+            if (!star) {
+                rect.set(hx - bw * 0.62f, base - u * 0.1f, hx + bw * 0.62f, base + bh * 0.5f)
+                line.shader = null
+                line.color = 0xFF5A4A3A.toInt()
+                line.strokeWidth = u * 0.04f
+                c.drawArc(rect, 200f, 140f, false, line)
+            }
+            val sx = hx + if (star) 0f else bw * 0.25f
+            val sway = sin(t * 2.4f) * u * 0.04f
+            val ly = base - u * (if (star) 0.32f else 0.42f)
+            line.shader = null
+            line.color = 0xFF5A4A3A.toInt()
+            line.strokeWidth = u * 0.02f
+            c.drawLine(sx, base - u * 0.05f, sx + sway, ly + u * 0.12f, line)
+            val col = if (star) 0xFFFFE066.toInt() else 0xFFFF9A3D.toInt()
+            val glow = 0.75f + 0.25f * sin(t * 3.2f)
+            shaderFill(radial(sx + sway, ly, u * 0.36f, intArrayOf(Colors.alpha(col, 0.5f * glow), Colors.alpha(col, 0f))))
+            c.drawCircle(sx + sway, ly, u * 0.36f, fill)
+            fill.shader = null
+            if (star) {
+                Shapes.softStar(path, sx + sway, ly, u * 0.16f, u * 0.08f, 5, sin(t) * 8f)
+                shaded(c, path, Color.WHITE, col, 0xFFC89A00.toInt())
+            } else {
+                ovalPath(path, sx + sway - u * 0.13f, ly - u * 0.12f, sx + sway + u * 0.13f, ly + u * 0.12f)
+                shaded(c, path, 0xFFFFF0B0.toInt(), col, 0xFFC85A10.toInt())
+                fill.color = 0xFF4A3A2A.toInt()
+                c.drawRect(sx + sway - u * 0.07f, ly - u * 0.15f, sx + sway + u * 0.07f, ly - u * 0.1f, fill)
+            }
+        }
         "hat_catears" -> {
             val base = top + bh * 0.16f
             rect.set(hx - bw * 0.62f, base - u * 0.1f, hx + bw * 0.62f, base + bh * 0.5f)
@@ -288,6 +368,30 @@ internal fun PetRenderer.drawMoreFace(c: Canvas, id: String, pose: PetPose, bw: 
     val ex = bw * 0.36f * (1f - 0.1f * kotlin.math.abs(pose.turn))
     val ey = cy - bh * 0.1f
     when (id) {
+        "face_mask" -> {
+            path.reset()
+            path.fillType = Path.FillType.EVEN_ODD
+            path.moveTo(fx - ex - re * 1.9f, ey - re * 0.6f)
+            path.quadTo(fx - ex, ey - re * 2.1f, fx, ey - re * 0.9f)
+            path.quadTo(fx + ex, ey - re * 2.1f, fx + ex + re * 1.9f, ey - re * 0.6f)
+            path.quadTo(fx + ex + re * 1.2f, ey + re * 1.4f, fx + re * 0.4f, ey + re * 0.9f)
+            path.quadTo(fx, ey + re * 0.6f, fx - re * 0.4f, ey + re * 0.9f)
+            path.quadTo(fx - ex - re * 1.2f, ey + re * 1.4f, fx - ex - re * 1.9f, ey - re * 0.6f)
+            path.close()
+            for (sd in intArrayOf(-1, 1)) path.addOval(fx + sd * ex - re * 1.05f, ey - re * 0.95f, fx + sd * ex + re * 1.05f, ey + re * 0.95f, Path.Direction.CW)
+            shaded(c, path, 0xFFE8C8FF.toInt(), 0xFF9A5AF0.toInt(), 0xFF5A2AA8.toInt())
+            path.fillType = Path.FillType.WINDING
+            // glitter dots and a feather
+            fill.shader = null
+            fill.color = 0xFFFFD84D.toInt()
+            for (k in 0 until 5) c.drawCircle(fx + (k - 2) * re * 0.6f, ey - re * 1.25f + kotlin.math.abs(k - 2) * re * 0.12f, re * 0.12f, fill)
+            path.reset()
+            path.moveTo(fx + ex + re * 1.5f, ey - re * 0.9f)
+            path.quadTo(fx + ex + re * 2.6f, ey - re * 3.0f, fx + ex + re * 1.2f, ey - re * 3.4f)
+            path.quadTo(fx + ex + re * 1.6f, ey - re * 2.0f, fx + ex + re * 1.5f, ey - re * 0.9f)
+            path.close()
+            shaded(c, path, 0xFFFFC6DC.toInt(), 0xFFFF5A8A.toInt(), 0xFFB82C66.toInt(), outline = false)
+        }
         "face_aviator" -> {
             path.reset()
             path.moveTo(-bw * 1.02f, ey - re * 0.3f)
@@ -322,6 +426,18 @@ internal fun PetRenderer.drawMoreNeck(c: Canvas, id: String, pose: PetPose, bw: 
     val neckY = cy + bh * 0.55f
     val x0 = fx * 0.6f
     when (id) {
+        "neck_ruffle" -> {
+            val cols = intArrayOf(0xFFFF5A8A.toInt(), 0xFFFFC83D.toInt(), 0xFF4CC8FF.toInt(), 0xFF5AD88A.toInt(), 0xFFB27CFF.toInt())
+            for (i in 0 until 9) {
+                val k = (i - 4) / 4f
+                val x = x0 + k * bw * 0.72f
+                val y = neckY - bh * 0.06f + k * k * bh * 0.1f
+                val r = u * 0.1f
+                ovalPath(path, x - r, y - r * 0.8f, x + r, y + r * 0.8f)
+                val col = cols[i % cols.size]
+                shaded(c, path, Colors.lighten(col, 0.45f), col, Colors.darken(col, 0.3f))
+            }
+        }
         "neck_pearls", "neck_goldchain" -> {
             val gold = id == "neck_goldchain"
             for (i in 0 until 11) {

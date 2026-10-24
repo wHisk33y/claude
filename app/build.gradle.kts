@@ -14,8 +14,8 @@ android {
         applicationId = "de.knuffi.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 15
-        versionName = "4.2.2"
+        versionCode = 16
+        versionName = "4.3.0"
         manifestPlaceholders["appLabel"] = "Knuffi"
     }
 

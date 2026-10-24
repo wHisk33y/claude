@@ -40,6 +40,8 @@ class FriendPlay(seed: Int = 21) {
         FriendMoment.HIDE -> 9f
         FriendMoment.CUDDLE -> 6f
         FriendMoment.SQUABBLE -> 6.4f
+        FriendMoment.BUBBLES -> 5.6f
+        FriendMoment.MUSIC -> 5.8f
     }
 
     fun reset() {

@@ -187,11 +187,13 @@ object Engine {
         MiniGame.SPACE -> GameReward(coins = (score / 12).coerceIn(2, 60), xp = (5 + score / 15).coerceAtMost(50))
         MiniGame.JUMPER -> GameReward(coins = (score / 10).coerceIn(2, 60), xp = (5 + score / 12).coerceAtMost(50))
         MiniGame.RACE -> GameReward(coins = (score / 15).coerceIn(2, 60), xp = (5 + score / 18).coerceAtMost(50))
+        MiniGame.TANZ -> GameReward(coins = (score / 3).coerceIn(2, 60), xp = (5 + score / 4).coerceAtMost(50))
+        MiniGame.SCHNEEBALL -> GameReward(coins = (score * 2).coerceIn(2, 60), xp = (5 + score * 2).coerceAtMost(50))
     }
 
     fun gameMaxCoins(game: MiniGame): Int = when (game) {
         MiniGame.CATCH, MiniGame.RUNNER, MiniGame.COOK, MiniGame.MATCH, MiniGame.FLIGHT, MiniGame.STACK, MiniGame.FISHING, MiniGame.PACMAN,
-        MiniGame.SPOT, MiniGame.SPACE, MiniGame.JUMPER, MiniGame.RACE -> 60
+        MiniGame.SPOT, MiniGame.SPACE, MiniGame.JUMPER, MiniGame.RACE, MiniGame.TANZ, MiniGame.SCHNEEBALL -> 60
         MiniGame.MEMORY, MiniGame.YARN -> 40
         MiniGame.PUZZLE -> 45
         MiniGame.COLORING -> 30

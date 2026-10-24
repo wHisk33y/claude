@@ -86,6 +86,9 @@ class PetDirector(seed: Int = 7) {
     var hidden = false
         private set
 
+    /** Furniture the pet likes to use: item id -> (x, depth) in the room. Set by the scene. */
+    val spots = LinkedHashMap<String, FloatArray>()
+
     /** Free for doing something together with a friend. */
     val canDuo: Boolean
         get() = !act.care && act !is Act.Sleeping && act !is Act.GoSleep && act !is Act.Ladder && act !is Act.Duo &&
@@ -265,6 +268,16 @@ class PetDirector(seed: Int = 7) {
         class Flip : Act(1.3f)
         class Butterfly : Act(5.5f)
         class Daydream : Act(3.6f)
+
+        // Favourite places: the pet uses the furniture of its room
+        class Favorite(val what: String) : Act(
+            when (what) {
+                "sofa", "beanbag" -> 6.5f
+                "fire", "fish" -> 5f
+                "tent", "cave" -> 4.6f
+                else -> 4.2f
+            },
+        )
 
         // The house: out of one room through a door, into the next one
         class Door(val door: de.knuffi.core.Door, val exit: Boolean) : Act(if (exit) 10f else 6f) {
@@ -801,6 +814,7 @@ class PetDirector(seed: Int = 7) {
                 say(line("Oh, ein Schmetterling!", "Miau?! Ein Schmetterling!"), 1.6f)
             }
             is Act.Daydream -> Unit
+            is Act.Favorite -> say(favoriteLine(a.what), 1.9f)
             is Act.Door -> {
                 if (a.exit) {
                     targetX = doorPoints.outX(a.door)
@@ -815,6 +829,174 @@ class PetDirector(seed: Int = 7) {
             is Act.Fall -> if (fallV > 1f) say(line("Huiiii!", "Miauuu!"), 1f)
             else -> Unit
         }
+    }
+
+    private fun favoriteOf(id: String): String? = when (id) {
+        "deco_sofa" -> "sofa"
+        "deco_beanbag" -> "beanbag"
+        "deco_piano" -> "piano"
+        "deco_bookshelf" -> "books"
+        "deco_fireplace" -> "fire"
+        "deco_globe" -> "globe"
+        "deco_tent" -> "tent"
+        "deco_stage" -> "stage"
+        "toy_box" -> "teddy"
+        "toy_scratcher" -> "scratch"
+        "toy_horse" -> "horse"
+        "toy_aquarium" -> "fish"
+        "toy_cave" -> "cave"
+        "toy_wheel" -> "wheel"
+        "toy_trophy" -> "cups"
+        else -> null
+    }
+
+    /** Walks to a piece of furniture and uses it (tired pets prefer the sofa or bean bag). */
+    private fun favorite(tired: Boolean): Act? {
+        val options = spots.entries.mapNotNull { (id, pos) -> favoriteOf(id)?.let { it to pos } }
+        if (options.isEmpty()) return null
+        val cozy = options.filter { it.first == "sofa" || it.first == "beanbag" || it.first == "cave" }
+        val (what, pos) = if (tired && cozy.isNotEmpty()) cozy[rnd.nextInt(cozy.size)] else options[rnd.nextInt(options.size)]
+        if (tired && what != "sofa" && what != "beanbag" && what != "cave") return null
+        // sit on soft things, stand next to everything else
+        val onIt = what == "sofa" || what == "beanbag" || what == "horse" || what == "stage"
+        val side = if (pos[0] > 0.5f) -1f else 1f
+        val tx = (pos[0] + if (onIt) 0f else side * 0.1f).coerceIn(minX, maxX)
+        queue.addLast(Act.Favorite(what))
+        return Act.Walk(tx, 1f, pos[1])
+    }
+
+    private fun favoriteLine(what: String): String = when (what) {
+        "sofa" -> line(listOf("Hach, gemütlich! 🛋️", "Kurz die Füße hochlegen …").random(rnd), "Prrr … das Sofa gehört jetzt mir.")
+        "beanbag" -> line("Plumps! So weich! 🫘", "Miau … weich wie eine Wolke.")
+        "piano" -> line(listOf("Plim, plim, plim! 🎹", "Ich spiel dir was vor!").random(rnd), "Miau! Pfoten-Konzert! 🎹")
+        "books" -> line(listOf("Welches Buch nehm ich nur? 📚", "Eine Geschichte vor dem Schlafen!").random(rnd), "Miau … ich sitz auf dem Buch.")
+        "fire" -> line("Schön warm hier! 🔥", "Prrrrr … am Kamin ist es am schönsten.")
+        "globe" -> line(listOf("Wohin geht die nächste Reise? 🌍", "Da will ich mal hin!").random(rnd), "Miau? Die Welt dreht sich!")
+        "tent" -> line("Ein Abenteuer im Zelt! ⛺", "Miau! Meine Höhle!")
+        "stage" -> line("Bühne frei! 🎤", "Miau! Applaus bitte!")
+        "teddy" -> line("Mein Teddy! 🧸💕", "Prrr … mein Kuscheltier.")
+        "scratch" -> line("Kratz, kratz! 🐾", "Miau! Krallen schärfen!")
+        "horse" -> line("Hüh, hott! 🐴", "Miau! Schaukeln!")
+        "fish" -> line("Blubb! Schau mal, die Fische! 🐠", "Miau … Fische … so viele Fische …")
+        "cave" -> line("Ab in die Kuschelhöhle! 🛖", "Miau! Mein Versteck!")
+        "wheel" -> line("Hui, im Laufrad! 🎡", "Miau! Ich renne!")
+        "cups" -> line("Meine Pokale! 🏆", "Miau! Alle meine!")
+        else -> line("Schön hier!", "Miau!")
+    }
+
+    private fun runFavorite(a: Act.Favorite, el: Float, dt: Float, ps: ParticleSystem, headX: Float, headY: Float) {
+        val dur = a.dur
+        when (a.what) {
+            "sofa", "beanbag" -> {
+                val k = (el / 0.8f).coerceIn(0f, 1f) * (1f - ((el - (dur - 0.8f)) / 0.8f).coerceIn(0f, 1f))
+                pose.lying = (if (a.what == "beanbag") 0.55f else 0.35f) * k
+                pose.eyes = if (el > 2.2f && el < dur - 0.8f) EyeShape.CLOSED else EyeShape.SLEEPY
+                pose.mouth = MouthShape.CAT
+                pose.blush = 0.9f
+                pose.scaleY *= 1f - 0.05f * k
+                if (el > 2.4f && el < dur - 0.9f && (el % 1.4f) < dt) ps.add(Particle(PKind.ZZZ, headX + 0.04f, headY, 0.02f, -0.06f, 1.6f, 0.035f, 0xFF8FA8FF.toInt()))
+            }
+            "piano", "stage" -> {
+                if (a.what == "piano") {
+                    pose.holding = "🎹"
+                    pose.hold = 1f
+                } else {
+                    val k = el * 7f
+                    pose.tilt += sin(k) * 10f
+                    pose.lift += abs(sin(k)) * 0.08f
+                    pose.armL = 0.75f + 0.25f * sin(k)
+                    pose.armR = 0.75f - 0.25f * sin(k)
+                }
+                pose.eyes = if ((el % 1.6f) < 1f) EyeShape.CLOSED else EyeShape.HAPPY
+                pose.mouth = MouthShape.SMILE
+                pose.tilt += sin(el * 5f) * 5f
+                if ((el % 0.35f) < dt) ps.add(Particle(PKind.NOTE, headX + (rnd.nextFloat() - 0.5f) * 0.18f, headY, (rnd.nextFloat() - 0.5f) * 0.05f, -0.08f, 1.4f, 0.035f, listOf(0xFF7C6CFF, 0xFFFF6B9A, 0xFF2EC4A0, 0xFFFFB84D).random(rnd).toInt()))
+            }
+            "books" -> {
+                pose.holding = "📖"
+                pose.hold = 1f
+                pose.lookY = 0.7f
+                pose.eyes = if ((el % 1.5f) < 0.25f) EyeShape.HAPPY else EyeShape.OPEN
+            }
+            "fire" -> {
+                pose.lookX = if (spots.values.firstOrNull()?.let { it[0] > x } == true) 0.7f else -0.7f
+                pose.eyes = EyeShape.HAPPY
+                pose.blush = 1f
+                pose.mouth = MouthShape.SMILE
+                pose.scaleY *= 0.95f
+                pose.scaleX *= 1.04f
+                if ((el % 0.5f) < dt) ps.add(Particle(PKind.SPARKLE, headX + facing * 0.08f, headY + 0.12f, facing * 0.02f, -0.05f, 1f, 0.014f, 0xFFFFB84D.toInt()))
+            }
+            "globe" -> {
+                pose.lookY = -0.4f
+                pose.lookX = facing * 0.7f
+                pose.armR = 0.9f
+                pose.eyes = if (el < 1.5f) EyeShape.WIDE else EyeShape.HAPPY
+                pose.mouth = MouthShape.O
+            }
+            "tent", "cave" -> {
+                hidden = el > 0.8f && el < dur - 1.2f
+                if (el > dur - 1.2f && el - dt <= dur - 1.2f) {
+                    say(line("Kuckuck! 😄", "Miau! Da bin ich!"), 1.4f)
+                    jump(0.3f, 0.5f)
+                }
+                pose.eyes = EyeShape.HAPPY
+                pose.mouth = MouthShape.OPEN
+            }
+            "teddy" -> {
+                pose.holding = "🧸"
+                pose.hold = 1f
+                pose.scaleX *= 1f + 0.04f * sin(el * 4f)
+                pose.eyes = EyeShape.HAPPY
+                pose.blush = 1f
+                if ((el % 0.9f) < dt) ps.burst(PKind.HEART, headX, headY, 1, 0.12f, 1.1f, 0.022f, ParticleSystem.HEART_COLORS, upward = true)
+            }
+            "scratch" -> {
+                val k = sin(el * 12f)
+                pose.armL = 0.9f + 0.1f * k
+                pose.armR = 0.9f - 0.1f * k
+                pose.eyes = EyeShape.CLOSED
+                pose.mouth = MouthShape.TONGUE
+                pose.tilt += k * 3f
+            }
+            "horse" -> {
+                val k = sin(el * 4f)
+                pose.lift += abs(k) * 0.05f
+                pose.tilt += k * 9f
+                pose.eyes = EyeShape.HAPPY
+                pose.mouth = MouthShape.OPEN
+                pose.armL = 0.5f
+                pose.armR = 0.5f
+            }
+            "fish" -> {
+                pose.lookX = facing * (0.6f + 0.3f * sin(el * 1.3f))
+                pose.lookY = 0.2f + 0.2f * sin(el * 0.9f)
+                pose.eyes = EyeShape.WIDE
+                pose.mouth = MouthShape.O
+                if ((el % 0.6f) < dt) ps.add(Particle(PKind.BUBBLE, headX + facing * 0.12f, headY + 0.06f, 0f, -0.05f, 1.4f, 0.016f, 0xFFFFFFFF.toInt()))
+            }
+            "wheel" -> {
+                val k = sin(el * 20f)
+                pose.footL = max(0f, k)
+                pose.footR = max(0f, -k)
+                pose.armL = 0.6f + 0.2f * k
+                pose.armR = 0.6f - 0.2f * k
+                pose.tilt += facing * 8f
+                pose.sweat = (el / dur).coerceIn(0f, 1f)
+                pose.mouth = MouthShape.OPEN
+            }
+            "cups" -> {
+                pose.eyes = EyeShape.STAR
+                pose.mouth = MouthShape.OPEN
+                pose.armL = 1f
+                pose.armR = 1f
+                if (el > 0.6f && el - dt <= 0.6f) {
+                    jump(0.3f, 0.5f)
+                    ps.burst(PKind.STAR, headX, headY, 8, 0.25f, 1f, 0.022f, ParticleSystem.STAR_COLORS, upward = true)
+                }
+            }
+        }
+        if (el > dur - 0.05f) hidden = false
     }
 
     /** A random little hobby. */
@@ -852,6 +1034,7 @@ class PetDirector(seed: Int = 7) {
                 "snack" -> Act.Snack("🍪")
                 "flip" -> Act.Flip()
                 "butterfly" -> Act.Butterfly()
+                "fav" -> favorite(false) ?: Act.Daydream()
                 else -> Act.Daydream()
             }
         }
@@ -868,6 +1051,7 @@ class PetDirector(seed: Int = 7) {
             Emotion.VERSPIELT -> if (r < 0.2f) return if (rnd.nextBoolean()) Act.Dance() else Act.Spin()
             else -> Unit
         }
+        if (!look.sick && look.mood != Mood.SAD && spots.isNotEmpty() && rnd.nextFloat() < (if (look.tired) 0.2f else 0.14f)) favorite(look.tired)?.let { return it }
         if (!look.sick && !look.tired && look.mood != Mood.SAD && rnd.nextFloat() < 0.22f) return hobby()
         if (toys.hasMess() && r > 0.94f) say(line("Upps … das war ich nicht! 🎨", "Miau? Ich war das nicht!"), 2f)
         return when {
@@ -1409,6 +1593,7 @@ class PetDirector(seed: Int = 7) {
                 pose.mouth = MouthShape.OPEN
                 if (el > a.dur - 0.05f) companion = null
             }
+            is Act.Favorite -> runFavorite(a, el, dt, ps, headX, headY)
             is Act.Daydream -> {
                 pose.lookY = -1f
                 pose.lookX = 0.4f * sin(el * 0.6f)
@@ -1914,6 +2099,40 @@ class PetDirector(seed: Int = 7) {
                         pose.mouth = MouthShape.OPEN
                     }
                 }
+            }
+            FriendMoment.BUBBLES -> if (a.lead) {
+                // blows bubbles towards the friend
+                pose.holding = "🫧"
+                pose.hold = 1f
+                pose.mouth = MouthShape.O
+                pose.mouthOpen = 0.6f
+                pose.lookX = face * 0.7f
+                if ((el % 0.3f) < dt && el < a.dur - 0.6f) {
+                    ps.add(Particle(PKind.BUBBLE, headX + face * 0.07f, headY + 0.03f, face * (0.06f + rnd.nextFloat() * 0.05f), -0.02f - rnd.nextFloat() * 0.03f, 2f, 0.02f + rnd.nextFloat() * 0.015f, 0xFFFFFFFF.toInt(), drag = 0.2f))
+                }
+                if (el - dt < 0.4f && el >= 0.4f) say(line("Fang die Blasen! 🫧", "Miau! Blasen für dich!"), 1.5f)
+            } else {
+                // jumps after them
+                if ((el % 1.1f) < dt && el > 0.6f) jump(0.3f, 0.5f)
+                pose.armL = 1f
+                pose.armR = 1f
+                pose.lookY = -0.8f
+                pose.lookX = -face * 0.4f
+                pose.eyes = EyeShape.WIDE
+                pose.mouth = MouthShape.OPEN
+                if (el - dt < 3.2f && el >= 3.2f) say(line("Hab eine! Hihi!", "Mrrp! Erwischt!"), 1.3f)
+            }
+            FriendMoment.MUSIC -> {
+                pose.holding = if (a.lead) "🎸" else "🥁"
+                pose.hold = 1f
+                val k = el * 6.5f
+                pose.tilt += sin(k + if (a.lead) 0f else 1.5f) * 7f
+                pose.lift += abs(sin(k)) * 0.03f
+                pose.eyes = if ((el % 2f) < 1.3f) EyeShape.CLOSED else EyeShape.HAPPY
+                pose.mouth = MouthShape.SMILE
+                if ((el % 0.45f) < dt) ps.add(Particle(PKind.NOTE, headX + (rnd.nextFloat() - 0.5f) * 0.15f, headY, (rnd.nextFloat() - 0.5f) * 0.05f, -0.08f, 1.4f, 0.035f, listOf(0xFF7C6CFF, 0xFFFF6B9A, 0xFF2EC4A0, 0xFFFFB84D).random(rnd).toInt()))
+                if (a.lead && el - dt < 0.5f && el >= 0.5f) say(line("Eins, zwei, drei, vier! 🎶", "Miau! Band-Probe!"), 1.5f)
+                if (!a.lead && el - dt < a.dur - 0.6f && el >= a.dur - 0.6f) say(line("Zugabe! 🎉", "Miau! Nochmal!"), 1.3f)
             }
             FriendMoment.CUDDLE -> {
                 pose.eyes = if (el % 3f < 2.4f) EyeShape.HEART else EyeShape.HAPPY

@@ -334,9 +334,9 @@ object Talents {
     fun natural(p: Pet): Talent = Talent.entries[Math.floorMod(p.bornAt / 7L + 3L, Talent.entries.size.toLong()).toInt()]
 
     fun of(game: MiniGame): Talent = when (game) {
-        MiniGame.CATCH, MiniGame.RUNNER, MiniGame.WHACK, MiniGame.FLIGHT, MiniGame.STACK, MiniGame.JUMPER, MiniGame.RACE -> Talent.SPORT
+        MiniGame.CATCH, MiniGame.RUNNER, MiniGame.WHACK, MiniGame.FLIGHT, MiniGame.STACK, MiniGame.JUMPER, MiniGame.RACE, MiniGame.SCHNEEBALL -> Talent.SPORT
         MiniGame.MEMORY, MiniGame.PUZZLE, MiniGame.COLORING, MiniGame.YARN, MiniGame.MATCH, MiniGame.SPOT, MiniGame.WORDS -> Talent.BASTELN
-        MiniGame.BUBBLES, MiniGame.SIMON -> Talent.MUSIK
+        MiniGame.BUBBLES, MiniGame.SIMON, MiniGame.TANZ -> Talent.MUSIK
         MiniGame.COOK -> Talent.KOCHEN
         MiniGame.FISHING, MiniGame.PACMAN, MiniGame.SHADOW, MiniGame.SPACE -> Talent.ENTDECKEN
     }
@@ -413,6 +413,8 @@ object EventPrizes {
         SeasonEvent.SOMMERFEST -> listOf("hat_sunvisor", "face_starshades")
         SeasonEvent.HALLOWEEN -> listOf("neck_batbow", "hat_pumpkinlamp")
         SeasonEvent.WINTERZAUBER -> listOf("neck_lights", "hat_icecrown")
+        SeasonEvent.FASCHING -> listOf("hat_jester", "neck_ruffle")
+        SeasonEvent.LATERNEN -> listOf("hat_starlantern", "back_lanternstick")
     }
 
     /** The four prizes of a festival in the order they unlock. */

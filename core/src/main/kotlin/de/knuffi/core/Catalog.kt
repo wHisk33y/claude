@@ -149,6 +149,8 @@ object Catalog {
         food("popsicle", "Wassereis", "🍧", 0, "Perfekt für heiße Tage.", Effect(satiety = 4, joy = 16, energy = 6), snack = true, sold = false),
         food("pumpkin_pie", "Kürbiskuchen", "🥧", 0, "Gewürzt mit Zimt.", Effect(satiety = 20, joy = 14), sold = false),
         food("gingerbread", "Lebkuchen", "🍪", 0, "Duftet nach Weihnachten.", Effect(satiety = 12, joy = 16), snack = true, sold = false),
+        food("krapfen", "Krapfen", "🍩", 0, "Mit Marmelade gefüllt und Puderzucker obendrauf.", Effect(satiety = 14, joy = 18), snack = true, sold = false),
+        food("martinsbrezel", "Martinsbrezel", "🥨", 0, "Zum Teilen beim Laternenumzug.", Effect(satiety = 20, joy = 12, health = 2), sold = false),
         // Pflege
         Item("medicine", "Medizin", "💊", ItemKind.CARE, 20, "Heilt Krankheiten sofort.", effect = Effect(health = 30, cures = true)),
         Item("cocoa", "Kakao", "☕", ItemKind.CARE, 12, "Warmer Energieschub.", minLevel = 2, effect = Effect(energy = 30, joy = 5)),
@@ -209,6 +211,7 @@ object Catalog {
         wear("hat_straw", "Strohhut", "👒", ItemKind.HAT, 0, "Nur im Sommer-Pass.", sold = false),
         wear("hat_acorn", "Eichelmütze", "🌰", ItemKind.HAT, 0, "Nur im Herbst-Pass.", sold = false),
         wear("hat_bobble", "Bommelmütze", "🧶", ItemKind.HAT, 0, "Nur im Winter-Pass.", sold = false),
+        wear("hat_lanternband", "Laternen-Haarreif", "🏮", ItemKind.HAT, 0, "Nur zum Laternenfest.", sold = false),
         wear("hat_bunnyears", "Hasenohren", "🐰", ItemKind.HAT, 0, "Nur zum Osterfest.", sold = false),
         wear("hat_captain", "Kapitänsmütze", "⚓", ItemKind.HAT, 0, "Nur zum Sommerfest.", sold = false),
         wear("hat_witch", "Hexenhut", "🧹", ItemKind.HAT, 0, "Nur zu Halloween.", sold = false),
@@ -235,6 +238,8 @@ object Catalog {
         gear("hat_sunvisor", "Sonnenschild", "🕶️", ItemKind.HAT, "Für lange Sonnentage. Zu gewinnen beim Sommerfest.", Perk.TRIP),
         gear("hat_pumpkinlamp", "Kürbislaterne", "🏮", ItemKind.HAT, "Leuchtet im Dunkeln. Zu gewinnen an Halloween.", Perk.COINS),
         gear("hat_icecrown", "Eiskrone", "💠", ItemKind.HAT, "Aus funkelndem Eis. Zu gewinnen beim Winterzauber.", Perk.XP),
+        gear("hat_jester", "Narrenkappe", "🃏", ItemKind.HAT, "Mit klingelnden Glöckchen. Zu gewinnen beim Faschingsfest.", Perk.JOY),
+        gear("hat_starlantern", "Sternenlaterne", "⭐", ItemKind.HAT, "Eine kleine leuchtende Sternlaterne. Zu gewinnen beim Laternenfest.", Perk.XP),
         // Gesicht
         wear("face_round", "Nerdbrille", "👓", ItemKind.FACE, 45, "Sieht klug aus."),
         wear("face_sun", "Sonnenbrille", "😎", ItemKind.FACE, 70, "Einfach cool.", 3),
@@ -243,6 +248,7 @@ object Catalog {
         wear("face_stars", "Sternenbrille", "🤩", ItemKind.FACE, 0, "Nur zum Neujahrsfest.", sold = false),
         wear("face_aviator", "Fliegerbrille", "🥽", ItemKind.FACE, 85, "Bereit zum Abheben!", 4),
         wear("face_monocle", "Monokel", "🧐", ItemKind.FACE, 0, "Belohnung für Level 30.", sold = false),
+        wear("face_mask", "Faschingsmaske", "🎭", ItemKind.FACE, 0, "Nur zum Faschingsfest.", sold = false),
         gear("face_starshades", "Sternen-Sonnenbrille", "⭐", ItemKind.FACE, "Glänzt in der Sonne. Zu gewinnen beim Sommerfest.", Perk.WORK),
         // Hals
         wear("neck_bowtie", "Fliege", "👔", ItemKind.NECK, 50, "Schick für jeden Anlass."),
@@ -261,6 +267,8 @@ object Catalog {
         gear("neck_carrotscarf", "Karottenschal", "🥕", ItemKind.NECK, "Orange und kuschelig. Zu gewinnen beim Osterfest.", Perk.GARDEN),
         gear("neck_batbow", "Fledermaus-Fliege", "🦇", ItemKind.NECK, "Flattert ein bisschen. Zu gewinnen an Halloween.", Perk.ENERGY),
         gear("neck_lights", "Lichterkette", "💡", ItemKind.NECK, "Blinkt in allen Farben. Zu gewinnen beim Winterzauber.", Perk.TALENT),
+        gear("neck_ruffle", "Halskrause", "🪅", ItemKind.NECK, "Bunt gerüscht wie beim Narrenumzug. Zu gewinnen beim Faschingsfest.", Perk.COINS),
+        gear("back_lanternstick", "Laternenstab", "🪔", ItemKind.BACK, "Eine Laterne am Stab, die sanft schaukelt. Zu gewinnen beim Laternenfest.", Perk.ENERGY),
         // Zimmer
         Item("room_cozy", "Kinderzimmer", "🏠", ItemKind.ROOM, 0, "Das erste Zuhause. Mit Möbeln einrichtbar."),
         Item("room_forest", "Zauberwald", "🌳", ItemKind.ROOM, 150, "Glühwürmchen und raschelnde Blätter.", minLevel = 3),

@@ -96,6 +96,8 @@ fun GameHost(game: MiniGame, state: GameState, onExit: () -> Unit) {
                 MiniGame.SPACE -> SpaceGame(startState, onFinished = finish, onBack = onExit)
                 MiniGame.JUMPER -> JumperGame(startState, onFinished = finish, onBack = onExit)
                 MiniGame.RACE -> RaceGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.TANZ -> DanceGame(startState, onFinished = finish, onBack = onExit)
+                MiniGame.SCHNEEBALL -> SnowballGame(startState, onFinished = finish, onBack = onExit)
             }
         }
         result?.let { score ->

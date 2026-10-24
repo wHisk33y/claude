@@ -407,4 +407,7 @@ private fun destinationColor(d: Destination): Color = when (d) {
     Destination.REGENWALD -> Color(0xFF4FC07A)
     Destination.OASE -> Color(0xFFFFC27A)
     Destination.MINE -> Color(0xFF7FD8E8)
+    Destination.BAUERNHOF -> Color(0xFFB8D86A)
+    Destination.TIERPARK -> Color(0xFFFFB86A)
+    Destination.JAHRMARKT -> Color(0xFFFF7EB6)
 }

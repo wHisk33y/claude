@@ -45,6 +45,7 @@ enum class FindSet(val title: String, val emoji: String, val reward: Int) {
     STEINE("Steine & Kristalle", "💎", 150),
     FEDERN("Federn", "🪶", 120),
     BLAETTER("Blätter & Blüten", "🍁", 100),
+    ANDENKEN("Andenken", "🎟️", 140),
 }
 
 /** Things pets bring back from trips and walks. */
@@ -71,6 +72,12 @@ object Finds {
         Find("f_rose", "Getrocknete Rose", "🌹", FindSet.BLAETTER),
         Find("f_tulip", "Tulpe", "🌷", FindSet.BLAETTER),
         Find("f_acorn", "Eichel", "🌰", FindSet.BLAETTER),
+        Find("f_ticket", "Eintrittskarte", "🎟️", FindSet.ANDENKEN),
+        Find("f_postcard", "Postkarte", "💌", FindSet.ANDENKEN),
+        Find("f_balloon", "Luftballon", "🎈", FindSet.ANDENKEN),
+        Find("f_photo", "Tierfoto", "📸", FindSet.ANDENKEN),
+        Find("f_ribbon", "Gewinnerschleife", "🎀", FindSet.ANDENKEN, rare = true),
+        Find("f_feather_hen", "Hühnerfeder", "🐔", FindSet.FEDERN),
     )
     private val byId = all.associateBy { it.id }
     operator fun get(id: String): Find? = byId[id]
@@ -87,6 +94,9 @@ object Finds {
         Destination.REGENWALD -> listOf(FindSet.FEDERN, FindSet.BLAETTER)
         Destination.OASE -> listOf(FindSet.MUSCHELN, FindSet.STEINE)
         Destination.MINE -> listOf(FindSet.STEINE)
+        Destination.BAUERNHOF -> listOf(FindSet.FEDERN, FindSet.BLAETTER, FindSet.ANDENKEN)
+        Destination.TIERPARK -> listOf(FindSet.FEDERN, FindSet.ANDENKEN)
+        Destination.JAHRMARKT -> listOf(FindSet.ANDENKEN)
     }
 
     fun roll(sets: List<FindSet>, rnd: Random): Find {

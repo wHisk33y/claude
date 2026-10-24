@@ -507,6 +507,8 @@ enum class MiniGame(
     SPACE("Sternenflug", "🚀", "Steuere die Rakete, schieße Meteore ab und besiege das Ufo!", unit = "Punkte"),
     JUMPER("Wolkenhüpfer", "☁️", "Hüpfe von Wolke zu Wolke immer höher hinaus. Tippe links oder rechts zum Lenken.", unit = "Meter"),
     RACE("Kartrennen", "🏎️", "Wechsle die Spur, weiche Hindernissen aus und sammle Münzen!", unit = "Meter"),
+    TANZ("Tanzparty", "💃", "Tippe im Takt auf die Noten, wenn sie die Linie erreichen. Dein Haustier tanzt dazu!", unit = "Punkte"),
+    SCHNEEBALL("Schneeballwurf", "❄️", "Tippe auf die Schneemänner, um sie mit Schneebällen zu treffen. Aber nicht auf die Pinguine!", unit = "Punkte"),
     ;
 
     val group: GameGroup get() = when {
