@@ -216,8 +216,10 @@ fun LearnScreen(state: GameState, onBack: () -> Unit, onStats: () -> Unit, onSet
                                     pose.eyes = EyeShape.HAPPY
                                     pose.mouth = MouthShape.GRIN
                                     pose.mouthOpen = 0.6f
-                                    pose.armWaveL = 1f
-                                    pose.armWaveR = 1f
+                                    pose.armL = 1f
+                                    pose.armR = 1f
+                                    pose.armWaveL = sin(t * 14f) * 22f
+                                    pose.armWaveR = -sin(t * 14f) * 22f
                                     pose.lift = 0.06f * kotlin.math.abs(sin(t * 9f))
                                 }
                                 reaction == -1 && since < 1.6f -> {

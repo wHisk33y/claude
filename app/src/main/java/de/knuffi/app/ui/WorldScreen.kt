@@ -99,6 +99,7 @@ fun WorldScreen(state: GameState, onOpen: (Route) -> Unit) {
         item { ScreenHeader("Welt", "🌍", "Sammeln, gärtnern und entdecken") }
         item { EventBanner(state, today, Modifier.staggered(0)) { onOpen(Route.EventShop) } }
         if (state.settings.learnEnabled) item { LearnBanner(state, Modifier.staggered(1)) { onOpen(Route.Learn) } }
+        item { QuizBanner(state, Modifier.staggered(1)) { onOpen(Route.Quiz) } }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 WorldTile(

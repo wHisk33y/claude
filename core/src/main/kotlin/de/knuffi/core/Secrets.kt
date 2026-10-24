@@ -147,6 +147,7 @@ object Diary {
         if (n("hidden") > 0) parts += "Wir haben etwas Verstecktes gefunden!"
         if (n("secret") > 0) parts += "Psst … wir haben ein Geheimnis entdeckt!"
         if (n("bath") > 0) parts += if (cat) "Ich wurde gebürstet. Jetzt glänzt mein Fell." else "Ich hatte ein Schaumbad. Blubb!"
+        if (n("quiz") > 0) parts += if (n("quiz") >= 2) "Wir haben ${n("quiz")} Quizrunden gespielt. Ich weiß jetzt so viel!" else "Wir haben zusammen ein Quiz gespielt."
         if (n("learn") > 0) parts += if (n("learn") >= 9) "Wir haben zusammen gelernt, ${n("learn")} Aufgaben! Ich bin jetzt bestimmt auch schlauer." else "Wir haben ein bisschen zusammen gelernt."
         val quiet = parts.size <= 2
         if (quiet) parts += "Heute war ein ruhiger Tag. Ich habe dich vermisst."

@@ -121,6 +121,7 @@ sealed interface Route {
     /** Furnishing a room in 3D ([room] null: the classic room). */
     data class Furnish(val room: de.knuffi.core.RoomKind?, val fromHouse: Boolean) : Route
     data object Learn : Route
+    data object Quiz : Route
     /** The Lernzeit overview for parents, going back to [from]. */
     data class LearnStats(val from: Route) : Route
 }
@@ -261,7 +262,7 @@ private fun MainNavigation(state: GameState, debug: DebugScenes.Launch?) {
                             backToKuschelhaus = false
                             if (it == Route.Goals) tab = Tab.GOALS else route = it
                         }
-                        Tab.GAMES -> GamesScreen(state, onStart = { route = Route.Game(it) }, onTournament = { route = Route.Tournament })
+                        Tab.GAMES -> GamesScreen(state, onStart = { route = Route.Game(it) }, onTournament = { route = Route.Tournament }, onQuiz = { route = Route.Quiz })
                         Tab.SHOP -> ShopScreen(state)
                         Tab.GOALS -> GoalsScreen(state, onOpenPass = { route = Route.Pass }, onOpenAdventure = { route = Route.Adventure })
                     }
@@ -305,6 +306,7 @@ private fun MainNavigation(state: GameState, debug: DebugScenes.Launch?) {
             Route.Cards -> CardsScreen(state, onBack = { route = Route.Main })
             Route.Learn -> LearnScreen(state, onBack = { route = Route.Main }, onStats = { route = Route.LearnStats(Route.Learn) }, onSettings = { route = Route.Settings })
             is Route.LearnStats -> LearnStatsScreen(state, onBack = { route = r.from })
+            Route.Quiz -> QuizScreen(state, onBack = { route = Route.Main })
         }
     }
 }

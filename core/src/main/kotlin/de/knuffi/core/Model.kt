@@ -462,6 +462,8 @@ data class GameState(
     val lastSimulated: Long = 0,
     /** Lernzeit progress (see [Learn]). */
     val learn: LearnState = LearnState(),
+    /** Wissensquiz progress (see [Quiz]). */
+    val quiz: QuizState = QuizState(),
 ) {
     fun count(itemId: String): Int = inventory[itemId] ?: 0
     fun eggCount(line: EggLine): Int = eggs[line] ?: 0

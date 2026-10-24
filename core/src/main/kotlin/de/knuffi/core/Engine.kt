@@ -123,6 +123,11 @@ sealed interface Action {
     // Lernzeit
     /** An answer to the current task of [subject] ([topic] for the statistics). */
     data class LearnAnswer(val subject: Subject, val correct: Boolean, val topic: String) : Action
+
+    // Wissensquiz
+    data class QuizAnswered(val id: Int, val correct: Boolean) : Action
+    /** A quiz round is over ([category] null: all topics). */
+    data class QuizRoundDone(val category: QuizCategory?, val score: Int, val total: Int) : Action
 }
 
 data class GameReward(val coins: Int, val xp: Int)
@@ -1041,6 +1046,10 @@ object Engine {
                 is Action.DeleteSong -> if (action.index in s.songs.indices) s = s.copy(songs = s.songs.filterIndexed { i, _ -> i != action.index })
                 is Action.BackupMade -> s = s.copy(lastAutoBackup = action.at)
                 is Action.LearnAnswer -> learnAnswer(action.subject, action.correct, action.topic, now)
+                is Action.QuizAnswered -> s = s.copy(
+                    quiz = s.quiz.copy(seen = s.quiz.seen + action.id, answered = s.quiz.answered + 1, right = s.quiz.right + if (action.correct) 1 else 0),
+                )
+                is Action.QuizRoundDone -> quizRoundDone(action.category, action.score, action.total, now)
             }
             checkPerfect()
         }
@@ -1128,6 +1137,21 @@ object Engine {
             val dayDone = subjectDone && Learn.allDone(s.settings, s.learn, today)
             emit(GameEvent.LearnSolved(subject, firstTry, subjectDone, dayDone))
             if (dayDone) learnDayDone(today, now)
+        }
+
+        private fun quizRoundDone(category: QuizCategory?, score: Int, total: Int, now: Long) {
+            if (total <= 0) return
+            val key = category?.name ?: Quiz.ALL
+            val q = s.quiz
+            val perfect = total >= Quiz.ROUND && score == total
+            s = s.copy(quiz = q.copy(rounds = q.rounds + 1, perfect = q.perfect + if (perfect) 1 else 0, best = q.best + (key to maxOf(q.best[key] ?: 0, score))))
+            addCoins(Quiz.coins(score, total))
+            addXp(Quiz.xp(score), now)
+            dayLog("quiz")
+            if (perfect) {
+                message("🧠 Alle $total Fragen richtig! Du bist ein echtes Quiz-Ass! +${Quiz.COINS_PERFECT} 🪙 extra")
+                feel(Emotion.STOLZ, now)
+            }
         }
 
         private fun learnDayDone(today: Long, now: Long) {

@@ -18,6 +18,12 @@ Eine neue Version lässt sich einfach über die alte installieren, dein Spielsta
 
 ## Funktionen
 
+- **Neu in 4.5**: Wissensquiz mit über 600 Fragen aus 15 Themen (Tiere, Weltraum, Geschichte, Sport,
+  Filme & Spiele, Deutschland …) in drei Schwierigkeiten, mit einer kurzen Erklärung zu jeder Frage und
+  einem 50:50-Joker, allein oder abwechselnd mit bis zu vier Spielern. Sprachkommandos funktionieren jetzt
+  auch einfach durch Ansprechen (das Haustier spitzt die Ohren und hört eine Weile zu), Kommandos werden
+  toleranter erkannt, und alle Kunststücke haben neue, klar unterscheidbare Bewegungen, darunter eine echte
+  3D-Pirouette und eine Verbeugung nach vorn. Dazu ein kleines Herzchen-Easter-Egg.
 - **Neu in 4.4: Lernzeit**: jeden Tag Aufgaben in Mathe (eintippen), Deutsch und Physik (auswählen),
   einstellbar pro Fach von Klasse 5 bis 13 (Gymnasium) und 3 bis 10 Aufgaben pro Fach. Die Aufgaben
   kommen auch als Benachrichtigung und lassen sich direkt dort lösen (Uhrzeit einstellbar, abends eine

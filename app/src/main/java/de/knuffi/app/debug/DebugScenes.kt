@@ -221,6 +221,7 @@ object DebugScenes {
         "music" -> Route.Music
         "cards" -> Route.Cards
         "learn" -> Route.Learn
+        "quiz" -> Route.Quiz
         "learnstats" -> Route.LearnStats(Route.Learn)
         "adventuremap" -> Route.Adventure
         "tournament" -> Route.Tournament

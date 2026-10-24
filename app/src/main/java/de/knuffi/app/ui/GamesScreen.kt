@@ -115,7 +115,7 @@ private fun previewEmojis(game: MiniGame): List<String> = when (game) {
 }
 
 @Composable
-fun GamesScreen(state: GameState, onStart: (MiniGame) -> Unit, onTournament: () -> Unit = {}) {
+fun GamesScreen(state: GameState, onStart: (MiniGame) -> Unit, onTournament: () -> Unit = {}, onQuiz: () -> Unit = {}) {
     val p = LocalPalette.current
     val blocker = Engine.gameBlocker(state)
     val pet = state.pet
@@ -128,6 +128,8 @@ fun GamesScreen(state: GameState, onStart: (MiniGame) -> Unit, onTournament: () 
     ) {
         ScreenHeader("Spielhalle", "🎮", "Spielen macht glücklich und bringt Münzen.") { CoinPill(state.coins) }
         Spacer(Modifier.height(8.dp))
+        QuizBanner(state, Modifier.staggered(0), onQuiz)
+        Spacer(Modifier.height(12.dp))
         SurfaceCard(Modifier.fillMaxWidth().staggered(0), color = if (p.dark) p.surfaceAlt else Color(0xFFFFEAF4)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PetPortrait(look, Modifier.size(92.dp), sizeFactor = 0.8f) { pose, t ->
