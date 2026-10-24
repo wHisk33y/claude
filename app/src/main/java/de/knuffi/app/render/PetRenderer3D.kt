@@ -75,7 +75,16 @@ internal fun PetRenderer.draw3D(c: Canvas, cx: Float, groundY: Float, size: Floa
         val f = s.frame
         f.left = left; f.top = rTop; f.right = right; f.bottom = rBottom
         f.width = ow; f.height = oh
-        f.yaw = turn * 0.55f
+        // turning for real, plus a gentle idle sway
+        f.yaw = turn * 0.55f + sin(pose.t * 0.6f) * 0.05f
+        f.time = pose.t
+        surfaceOf(look, fl, f.surface)
+        f.surface[3] = 1f / max(1f, u * 0.035f)
+        f.wobble[0] = bw * (0.006f + 0.03f * f.surface[2])
+        f.wobble[1] = (2f * Math.PI.toFloat()) / max(1f, bh * 2.2f)
+        f.wobble[2] = pose.t
+        System.arraycopy(lightKey, 0, f.key, 0, 3)
+        System.arraycopy(lightAmb, 0, f.amb, 0, 3)
         f.bodyBottom = bottom
         f.bodyH = bh
         rgb(col.body, f.bodyColor)
@@ -129,7 +138,7 @@ internal fun PetRenderer.draw3D(c: Canvas, cx: Float, groundY: Float, size: Floa
             if (fl.ring) drawRing(bc, fl, bw, bh, cy, front = false)
             drawBack(bc, fl, look, p0, bw, bh, top, cy, 0f)
             bc.restore()
-            if (s.relief.build(s.backMesh, bmp, left, rTop, right, rBottom, grid, u * 0.07f, 1f) { _, _ -> 0f }) {
+            if (s.relief.build(s.backMesh, bmp, left, rTop, right, rBottom, grid, u * 0.05f, 1f, maxRadius = u * 0.3f) { _, _ -> 0f }) {
                 f.back = s.backMesh.build()
                 f.backTex = bmp
             }
@@ -149,8 +158,8 @@ internal fun PetRenderer.draw3D(c: Canvas, cx: Float, groundY: Float, size: Floa
             fc.restore()
             val lift = u * 0.012f
             // in front of the body surface, and always in front of the parts behind (antennae under a hat)
-            val minZ = u * 0.085f
-            if (s.relief.build(s.frontMesh, bmp, left, rTop, right, rBottom, grid, u * 0.045f, 0.3f) { x, y -> max(prof.front(x, y) + lift, minZ) }) {
+            val minZ = u * 0.13f
+            if (s.relief.build(s.frontMesh, bmp, left, rTop, right, rBottom, grid, u * 0.035f, 0.3f, maxRadius = u * 0.12f) { x, y -> max(prof.front(x, y) + lift, minZ) }) {
                 f.front = s.frontMesh.build()
                 f.frontTex = bmp
             }
@@ -210,6 +219,7 @@ internal fun PetRenderer.draw3D(c: Canvas, cx: Float, groundY: Float, size: Floa
         last3dAt = now
         last3dLook = look
         last3dSilhouette = silhouette
+        updateShadow(img, left, rTop, right, rBottom)
     }
 
     val save = c.save()
@@ -268,6 +278,11 @@ internal fun PetRenderer.draw3DEgg(c: Canvas, cx: Float, groundY: Float, look: P
         f.yaw = 0f
         f.bodyBottom = 0f
         f.bodyH = eh
+        f.time = pose.t
+        if (look.shiny) f.surface[1] = 1f
+        f.surface[3] = 1f / max(1f, u * 0.035f)
+        System.arraycopy(lightKey, 0, f.key, 0, 3)
+        System.arraycopy(lightAmb, 0, f.amb, 0, 3)
         rgb(col.body, f.bodyColor)
         rgb(col.light, f.lightColor)
         eggPath(body, ew, eh)
@@ -295,6 +310,7 @@ internal fun PetRenderer.draw3DEgg(c: Canvas, cx: Float, groundY: Float, look: P
         last3dAt = now
         last3dLook = look
         last3dSilhouette = silhouette
+        updateShadow(img, left, rTop, right, rBottom)
     }
     val save = c.save()
     c.translate(cx, groundY)
@@ -311,5 +327,85 @@ internal fun PetRenderer.draw3DEgg(c: Canvas, cx: Float, groundY: Float, look: P
     c.drawBitmap(img, null, dst, bmpPaint)
     if (look.shiny && silhouette == null) drawSparkles(c, ew, eh * 0.7f, -eh, pose.t)
     c.restoreToCount(save)
+    return true
+}
+
+
+/** Fur for cats, small animals and fluffy creatures, glitter for shiny pets, gloss for jelly and ghosts. */
+private fun surfaceOf(look: PetLook, fl: FormLook, out: FloatArray) {
+    val soft = !fl.jelly && !fl.ghost && fl.shape != Shape.DROP
+    val furry = soft && (
+        fl.pattern == Pattern.TABBY || fl.pattern == Pattern.CALICO || fl.pattern == Pattern.TUXEDO || fl.pattern == Pattern.POINTS ||
+            fl.ears == Ears.CAT || fl.ears == Ears.BUNNY || fl.ears == Ears.FOX || fl.ears == Ears.ROUND || fl.ears == Ears.HORSE ||
+            fl.muzzle == Muzzle.WHISKERS || fl.muzzle == Muzzle.CAT || fl.back == Back.MANE
+        )
+    out[0] = when {
+        look.isCat || look.isSmall -> 1f
+        furry -> 0.7f
+        else -> 0f
+    }
+    out[1] = if (look.shiny) 1f else if (fl.sparkles) 0.5f else 0f
+    out[2] = when {
+        fl.jelly -> 1f
+        fl.ghost -> 0.6f
+        fl.shape == Shape.DROP -> 0.4f
+        else -> 0f
+    }
+}
+
+/** Keeps a small, soft copy of the picture for the shadow on the floor. */
+private fun PetRenderer.updateShadow(img: android.graphics.Bitmap, left: Float, top: Float, right: Float, bottom: Float) {
+    val sw = max(4, img.width / 6)
+    val sh = max(4, img.height / 6)
+    var b = shadow3d
+    if (b == null || b.width != sw || b.height != sh) {
+        b = android.graphics.Bitmap.createBitmap(sw, sh, android.graphics.Bitmap.Config.ARGB_8888)
+        shadow3d = b
+    } else {
+        b.eraseColor(0)
+    }
+    shadowCanvas.setBitmap(b)
+    shadowDst.set(0, 0, sw, sh)
+    shadowCanvas.drawBitmap(img, null, shadowDst, shadowScale)
+    shadowCanvas.setBitmap(null)
+    shadowRegion.set(left, top, right, bottom)
+}
+
+/**
+ * A shadow in the shape of the pet that falls onto the floor away from the light, plus a small
+ * dark spot right under the feet. Returns false if there is no 3D picture yet.
+ */
+internal fun PetRenderer.drawSoftShadow(c: Canvas, cx: Float, groundY: Float, size: Float, pose: PetPose, look: PetLook?): Boolean {
+    val b = shadow3d ?: return false
+    if (!Pet3D.available || look == null || last3dLook == null) return false
+    val lift = pose.lift.coerceIn(0f, 1.5f)
+    val fade = (1f - lift * 0.8f).coerceIn(0.15f, 1f)
+    val u = size / 2f
+    val save = c.save()
+    c.translate(cx + lift * u * 0.25f, groundY)
+    // squash the picture onto the floor and lean it to the back right (light from the front left)
+    shadowMatrix.reset()
+    shadowMatrix.setValues(floatArrayOf(1f, -0.55f, 0f, 0f, 0.22f, 0f, 0f, 0f, 1f))
+    c.concat(shadowMatrix)
+    shadowPaint.alpha = (78 * fade).toInt()
+    dst.set(shadowRegion)
+    c.drawBitmap(b, null, dst, shadowPaint)
+    c.restoreToCount(save)
+    // contact shadow
+    val fl = look.formLook
+    val w = u * 0.55f * fl.width * (1f - lift * 0.6f).coerceIn(0.3f, 1f)
+    val h = w * 0.16f
+    c.save()
+    c.scale(1f, h / w, cx, groundY)
+    shaderFill(
+        radial(
+            cx, groundY, w,
+            intArrayOf(Colors.alpha(0xFF2A1740.toInt(), 0.32f * fade), Colors.alpha(0xFF2A1740.toInt(), 0.12f * fade), Colors.alpha(0xFF2A1740.toInt(), 0f)),
+            floatArrayOf(0f, 0.6f, 1f),
+        ),
+    )
+    c.drawCircle(cx, groundY, w, fill)
+    fill.shader = null
+    c.restore()
     return true
 }

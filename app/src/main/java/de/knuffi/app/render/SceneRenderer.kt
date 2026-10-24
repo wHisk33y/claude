@@ -225,7 +225,30 @@ class SceneRenderer {
         cacheKey = key
     }
 
+    /** Colour of the light on the 3D pets: warm morning, neutral day, orange evening, cool night. */
+    private fun lightPets(hour: Float, lightsOff: Boolean) {
+        val key = FloatArray(3)
+        val amb = FloatArray(3)
+        fun set(k: Float, kg: Float, kb: Float, a: Float, ag: Float, ab: Float) {
+            key[0] = k; key[1] = kg; key[2] = kb
+            amb[0] = a; amb[1] = ag; amb[2] = ab
+        }
+        val hr = ((hour % 24f) + 24f) % 24f
+        when {
+            hr >= 6f && hr < 9f -> set(1.04f, 0.95f, 0.84f, 0.98f, 0.97f, 1.0f)
+            hr >= 9f && hr < 17f -> set(1.0f, 0.99f, 0.96f, 1.0f, 1.0f, 1.0f)
+            hr >= 17f && hr < 20.5f -> set(1.08f, 0.88f, 0.7f, 0.98f, 0.92f, 0.94f)
+            lightsOff -> set(0.72f, 0.8f, 1.02f, 0.86f, 0.9f, 1.04f)
+            else -> set(1.05f, 0.9f, 0.72f, 0.9f, 0.9f, 1.0f)
+        }
+        for (r in arrayOf(pet, guestPet, guestPet2)) {
+            System.arraycopy(key, 0, r.lightKey, 0, 3)
+            System.arraycopy(amb, 0, r.lightAmb, 0, 3)
+        }
+    }
+
     fun draw(c: Canvas, w: Float, h: Float, kind: LayoutKind, m: SceneModel, d: PetDirector, ps: ParticleSystem?, t: Float, guest: PetDirector? = null, friends: FriendPlay? = null, guest2: PetDirector? = null) {
+        lightPets(m.hour, m.lightsOff)
         furnishing = m.furniture
         spec3 = m.room3
         configure(d, w, h, kind)

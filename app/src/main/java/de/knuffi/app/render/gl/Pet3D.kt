@@ -73,6 +73,14 @@ object Pet3D {
         var tint = FloatArray(4)
         var bodyColor = FloatArray(3)
         var lightColor = FloatArray(3)
+        /** fur, glitter, jelly, 1 / fibre size */
+        val surface = FloatArray(4)
+        /** Colour of the main light and of the light all around (time of day). */
+        val key = floatArrayOf(1f, 1f, 1f)
+        val amb = floatArrayOf(1f, 1f, 1f)
+        /** Soft jiggle: amplitude, wave number, time. */
+        val wobble = FloatArray(3)
+        var time = 0f
         var body: Mesh? = null
         var decal: Bitmap? = null
         var back: Mesh? = null
@@ -129,6 +137,11 @@ object Pet3D {
             frame.front = null
             frame.frontTex = null
             frame.tint.fill(0f)
+            frame.surface.fill(0f)
+            frame.key.fill(1f)
+            frame.amb.fill(1f)
+            frame.wobble.fill(0f)
+            frame.time = 0f
         }
     }
 
@@ -318,6 +331,11 @@ object Pet3D {
         GLES30.glUniform4fv(u("uTint"), 1, f.tint, 0)
         GLES30.glUniform3fv(u("uRim"), 1, f.lightColor, 0)
         GLES30.glUniform1i(u("uTex"), 0)
+        GLES30.glUniform4fv(u("uSurface"), 1, f.surface, 0)
+        GLES30.glUniform3fv(u("uKey"), 1, f.key, 0)
+        GLES30.glUniform3fv(u("uAmb"), 1, f.amb, 0)
+        GLES30.glUniform3fv(u("uWobble"), 1, f.wobble, 0)
+        GLES30.glUniform1f(u("uTime"), f.time)
 
         // body with the painted face, belly and pattern
         f.body?.let { body ->

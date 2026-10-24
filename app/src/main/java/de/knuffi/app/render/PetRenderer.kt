@@ -51,6 +51,19 @@ class PetRenderer {
     internal var out3d: android.graphics.Bitmap? = null
     internal var last3dAt = 0L
 
+    // soft 3D shadow and light of the room (set by the scene for the time of day)
+    internal var shadow3d: android.graphics.Bitmap? = null
+    internal val shadowRegion = RectF()
+    internal val shadowCanvas = Canvas()
+    internal val shadowDst = android.graphics.Rect()
+    internal val shadowScale = Paint(Paint.FILTER_BITMAP_FLAG)
+    internal val shadowMatrix = android.graphics.Matrix()
+    internal val shadowPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply {
+        colorFilter = PorterDuffColorFilter(0xFF2A1740.toInt(), PorterDuff.Mode.SRC_IN)
+    }
+    val lightKey = floatArrayOf(1f, 1f, 1f)
+    val lightAmb = floatArrayOf(1f, 1f, 1f)
+
     /** Shortest time between two 3D pictures of this pet (longer = less battery). */
     var min3dIntervalNs = 30_000_000L
     internal var last3dLook: PetLook? = null
@@ -148,6 +161,7 @@ class PetRenderer {
     // ------------------------------------------------------------------ public API
 
     fun drawShadow(c: Canvas, cx: Float, groundY: Float, size: Float, pose: PetPose, look: PetLook?) {
+        if (drawSoftShadow(c, cx, groundY, size, pose, look)) return
         val u = size / 2f
         val fl = look?.formLook
         val ghost = fl?.ghost == true

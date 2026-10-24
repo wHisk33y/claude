@@ -228,6 +228,9 @@ class Relief {
     private var h = FloatArray(0)
     private var vid = IntArray(0)
     private var zc = FloatArray(0)
+    private var lab = IntArray(0)
+    private var queue = IntArray(0)
+    private var islandR = FloatArray(16)
 
     /**
      * @param base depth of the middle of the relief at (x, y) (0 = through the body's centre plane)
@@ -238,6 +241,7 @@ class Relief {
         mb: MeshBuilder, bmp: Bitmap,
         left: Float, top: Float, right: Float, bottom: Float,
         grid: Int, radius: Float, backFactor: Float,
+        maxRadius: Float = radius,
         base: (Float, Float) -> Float,
     ): Boolean {
         mb.reset()
@@ -313,10 +317,44 @@ class Relief {
             }
             d[k] = v
         }
+        // Every separate part (an ear, a horn, a hat) is puffed up by its own width, so thin parts
+        // become fully round and big ones do not get too fat.
+        if (lab.size < cells) {
+            lab = IntArray(cells)
+            queue = IntArray(cells)
+        }
+        java.util.Arrays.fill(lab, 0, cells, -1)
+        var islands = 0
+        for (start in 0 until cells) {
+            if (d[start] == 0f || lab[start] >= 0) continue
+            if (islandR.size <= islands) islandR = islandR.copyOf(islandR.size * 2)
+            var head = 0
+            var tail = 0
+            queue[tail++] = start
+            lab[start] = islands
+            var maxD = 0f
+            while (head < tail) {
+                val k = queue[head++]
+                if (d[k] > maxD) maxD = d[k]
+                val i = k % gw
+                val j = k / gw
+                if (i > 0 && d[k - 1] > 0f && lab[k - 1] < 0) { lab[k - 1] = islands; queue[tail++] = k - 1 }
+                if (i < gw - 1 && d[k + 1] > 0f && lab[k + 1] < 0) { lab[k + 1] = islands; queue[tail++] = k + 1 }
+                if (j > 0 && d[k - gw] > 0f && lab[k - gw] < 0) { lab[k - gw] = islands; queue[tail++] = k - gw }
+                if (j < gh - 1 && d[k + gw] > 0f && lab[k + gw] < 0) { lab[k + gw] = islands; queue[tail++] = k + gw }
+            }
+            islandR[islands] = maxD
+            islands++
+        }
         for (k in 0 until cells) {
+            if (d[k] == 0f) {
+                h[k] = 0f
+                continue
+            }
+            val r = (islandR[lab[k]] * 0.9f).coerceIn(radius, max(radius, maxRadius))
             val dd = (d[k] - 0.5f * min(cw, ch)).coerceAtLeast(0f)
-            val q = 1f - min(dd / radius, 1f)
-            h[k] = if (d[k] == 0f) 0f else radius * sqrt(max(0f, 1f - q * q))
+            val q = 1f - min(dd / r, 1f)
+            h[k] = r * sqrt(max(0f, 1f - q * q))
         }
 
         // corner heights and depths

@@ -13,6 +13,8 @@ uniform mat3 uNrm;
 uniform vec2 uYaw;
 uniform vec4 uRegion;
 uniform float uZRange;
+uniform vec2 uFloor;        // bottom of the body and body half height
+uniform vec3 uWobble;       // amplitude, wave number, time
 out vec3 vRest;
 out vec3 vRestN;
 out vec3 vN;
@@ -21,6 +23,10 @@ void main() {
     vec3 n = normalize(uNrm * aNrm);
     vRest = p.xyz;
     vRestN = n;
+    // soft jiggle: the head sways more than the feet
+    float up = clamp((uFloor.x - p.y) / max(uFloor.y * 2.0, 1.0), 0.0, 1.2);
+    p.x += sin(p.y * uWobble.y + uWobble.z * 3.1) * uWobble.x * up;
+    p.z += cos(p.y * uWobble.y * 0.7 + uWobble.z * 2.3) * uWobble.x * 0.5 * up;
     float c = uYaw.x;
     float s = uYaw.y;
     vec3 w = vec3(p.x * c + p.z * s, p.y, -p.x * s + p.z * c);
@@ -45,7 +51,27 @@ uniform float uGloss;
 uniform float uLit;         // how much of the 3D light is applied (reliefs already carry painted shading)
 uniform vec2 uFloor;        // bottom of the body and body half height, for ambient occlusion
 uniform vec4 uTint;         // sick / golden tint (rgb, amount)
+uniform vec4 uSurface;      // fur, glitter, jelly, 1 / fur fibre size
+uniform vec3 uKey;          // colour of the main light (time of day)
+uniform vec3 uAmb;          // colour of the soft light all around
+uniform float uTime;
 out vec4 outColor;
+
+float hash(vec3 p) {
+    p = fract(p * 0.3183099 + vec3(0.71, 0.113, 0.419));
+    p *= 17.0;
+    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+}
+
+float noise(vec3 x) {
+    vec3 i = floor(x);
+    vec3 f = fract(x);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(
+        mix(mix(hash(i), hash(i + vec3(1, 0, 0)), f.x), mix(hash(i + vec3(0, 1, 0)), hash(i + vec3(1, 1, 0)), f.x), f.y),
+        mix(mix(hash(i + vec3(0, 0, 1)), hash(i + vec3(1, 0, 1)), f.x), mix(hash(i + vec3(0, 1, 1)), hash(i + vec3(1, 1, 1)), f.x), f.y),
+        f.z);
+}
 
 void main() {
     vec3 n = normalize(vN);
@@ -65,6 +91,18 @@ void main() {
         alpha = smoothstep(0.04, 0.55, d.a);
     }
 
+    float fur = uSurface.x;
+    float glitter = uSurface.y;
+    float jelly = uSurface.z;
+    vec3 q = vRest * uSurface.w;
+    if (fur > 0.0) {
+        // fine fibres: stretched noise along the body, a little lighter and darker
+        float fib = noise(vec3(q.x * 2.2, q.y * 0.7, q.z * 2.2)) * 0.6 + noise(q * 5.0) * 0.4;
+        albedo *= mix(1.0, 0.88 + 0.24 * fib, fur * uLit);
+        // the fur bends the light a little
+        n = normalize(n + (vec3(noise(q * 3.1), noise(q * 3.7 + 9.0), noise(q * 4.3 + 3.0)) - 0.5) * 0.25 * fur);
+    }
+
     // key light from the top left front (y is down)
     vec3 L = normalize(vec3(-0.5, -0.75, 0.6));
     float ndl = dot(n, L);
@@ -73,19 +111,29 @@ void main() {
     vec3 V = vec3(0.0, 0.0, 1.0);
     vec3 H = normalize(L + V);
     float nh = max(dot(n, H), 0.0);
-    float spec = (pow(nh, 70.0) * 0.9 + pow(nh, 14.0) * 0.12) * uGloss;
+    float gloss = uGloss * mix(1.0, 0.3, fur) * mix(1.0, 1.4, jelly);
+    float spec = (pow(nh, mix(70.0, 120.0, jelly)) * 0.9 + pow(nh, 14.0) * 0.12) * gloss;
     float fres = pow(1.0 - clamp(n.z, 0.0, 1.0), 3.0);
 
     // soft occlusion towards the floor
     float ao = mix(0.84, 1.0, smoothstep(uFloor.x, uFloor.x - uFloor.y * 0.8, vRest.y));
-    float light = 0.58 + 0.12 * sky + 0.46 * wrap;
-    light = mix(1.0, light, uLit) * mix(1.0, ao, uLit);
+    vec3 light = uAmb * (0.58 + 0.12 * sky) + uKey * (0.46 * wrap);
+    light = mix(vec3(1.0), light, uLit) * mix(1.0, ao, uLit);
     vec3 col = albedo * light;
-    // subsurface-like warm glow in the shadow
-    col += albedo * vec3(0.10, 0.06, 0.04) * clamp(-ndl, 0.0, 1.0) * uLit;
-    col += uRim * fres * 0.32 * ao * uLit;
-    col += vec3(spec) * mix(0.35, 1.0, uLit);
+    // subsurface-like warm glow in the shadow (stronger for jelly)
+    col += albedo * vec3(0.10, 0.06, 0.04) * clamp(-ndl, 0.0, 1.0) * uLit * (1.0 + 2.0 * jelly);
+    col += uRim * fres * (0.32 + 0.25 * fur + 0.3 * jelly) * ao * uLit;
+    col += uKey * vec3(spec) * mix(0.35, 1.0, uLit);
+    if (glitter > 0.0) {
+        // tiny sparkles that twinkle
+        vec3 cell = floor(q * 1.6);
+        float hsh = hash(cell);
+        float tw = 0.5 + 0.5 * sin(uTime * 5.0 + hsh * 40.0);
+        float g = step(0.955, hsh) * tw * (0.4 + 0.6 * pow(nh, 4.0));
+        col += vec3(1.0, 0.96, 0.82) * g * 1.3 * glitter;
+    }
     col = mix(col, uTint.rgb, uTint.a);
+    alpha *= mix(1.0, 0.9, jelly * step(0.5, float(uMode == 1)));
     outColor = vec4(clamp(col, 0.0, 1.0) * alpha, alpha);
 }
 """
