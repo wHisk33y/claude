@@ -133,7 +133,8 @@ object DebugScenes {
                 petKind = if (pet.isCat) de.knuffi.core.PetKind.CAT else state.petKind,
                 settings = (if (scene == "toys") state.settings.copy(toyLadder = 4, toyPlanes = 4, toyFootprints = 4, toyPaint = 4) else state.settings)
                     .copy(overlayPinned = intent.getStringExtra("debug_pinned") != null, graphics3d = intent.getStringExtra("debug_2d") == null, house3d = intent.getStringExtra("debug_flat") == null),
-                inventory = state.inventory + mapOf("carrot" to 2, "pumpkin" to 1, "flour" to 3, "milk" to 2, "strawberry" to 2, "tomato" to 2, "cheese" to 1),
+                inventory = state.inventory + mapOf("carrot" to 2, "pumpkin" to 1, "flour" to 3, "milk" to 2, "strawberry" to 2, "tomato" to 2, "cheese" to 1) +
+                    (if (intent.getStringExtra("debug_allfood") != null) de.knuffi.core.Catalog.foods.filter { !it.unlimited }.associate { it.id to 3 } else emptyMap()),
                 finds = mapOf("f_shell" to 2, "f_snail" to 1, "f_pebble" to 1, "f_clover" to 1, "f_feather_blue" to 1),
                 visit = if (scene == "visit" || scene == "visit2") de.knuffi.core.Visit(state.resting.first().id, System.currentTimeMillis() + 3_600_000L) else null,
                 visit2 = if (scene == "visit2") de.knuffi.core.Visit(state.resting[2].id, System.currentTimeMillis() + 3_600_000L) else null,

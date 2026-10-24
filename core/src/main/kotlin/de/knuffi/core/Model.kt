@@ -300,6 +300,8 @@ data class Settings(
     val overlayPinned: Boolean = false,
     /** Real 3D pets (off = the drawn look, e.g. for older phones). */
     val graphics3d: Boolean = true,
+    /** How smoothly the pet moves on the home screen: 0 smooth, 1 balanced, 2 battery saver. */
+    val screenPower: Int = 1,
     /** The pet reacts to blowing, clapping and singing (microphone, nothing is recorded). */
     val micReactions: Boolean = false,
     /** The house with several rooms (false: the single classic room). */

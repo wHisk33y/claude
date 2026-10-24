@@ -182,6 +182,8 @@ class PetOverlayService : Service(), OverlayPetView.Host {
             return
         }
         toyCfg.from(state.settings)
+        v.frameIntervalNs = ScreenPower.overlayFrameNs(state.settings.screenPower)
+        v.renderer3dInterval(ScreenPower.pet3dNs(state.settings.screenPower))
         v.name = state.pet?.name ?: ""
         v.showName = state.settings.showNameTag
         v.pinned = state.settings.overlayPinned

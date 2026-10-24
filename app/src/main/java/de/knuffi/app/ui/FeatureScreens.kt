@@ -470,7 +470,7 @@ fun MoodSheet(state: GameState, onDismiss: () -> Unit) {
         containerColor = if (p.dark) p.surface else p.bgTop,
         shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
     ) {
-        Column(Modifier.padding(horizontal = 18.dp).navigationBarsPadding().padding(bottom = 18.dp)) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).navigationBarsPadding().padding(bottom = 18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(e.emoji, fontSize = 48.sp)
                 Spacer(Modifier.width(12.dp))

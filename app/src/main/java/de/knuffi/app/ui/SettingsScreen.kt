@@ -306,6 +306,20 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
             SurfaceCard(Modifier.fillMaxWidth().padding(top = 10.dp)) {
                 SwitchRow("Namensschild", "Zeigt den Namen über bzw. unter dem Haustier auf dem Startbildschirm", s.showNameTag) { update(s.copy(showNameTag = it)) }
                 SwitchRow("Oben links anheften", "Das schwebende Haustier sitzt still in der Ecke. Geht auch mit Doppeltippen", s.overlayPinned) { update(s.copy(overlayPinned = it)) }
+                Spacer(Modifier.height(10.dp))
+                Text("Bewegung auf dem Startbildschirm", style = MaterialTheme.typography.titleSmall, color = p.text)
+                Spacer(Modifier.height(8.dp))
+                SegmentedControl(
+                    de.knuffi.app.screen.ScreenPower.titles,
+                    s.screenPower.coerceIn(0, 2),
+                    { update(s.copy(screenPower = it)) },
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    de.knuffi.app.screen.ScreenPower.describe(s.screenPower) + " Gilt für den Live-Hintergrund und das schwebende Haustier, nicht für die App.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = p.textMuted,
+                )
             }
 
             SectionHeader("Bildschirm-Spielereien", "🪄")

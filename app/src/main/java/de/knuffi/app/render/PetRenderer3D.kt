@@ -69,7 +69,7 @@ internal fun PetRenderer.draw3D(c: Canvas, cx: Float, groundY: Float, size: Floa
     val old = out3d
     val now = System.nanoTime()
     val fresh = old != null && old.width == ow && old.height == oh && look == last3dLook
-    val reuse = fresh && silhouette == last3dSilhouette && (now - last3dAt < 30_000_000L || !Pet3D.mayUpdate())
+    val reuse = fresh && silhouette == last3dSilhouette && (now - last3dAt < min3dIntervalNs || !Pet3D.mayUpdate())
     val grid = (max(ow, oh) / 7).coerceIn(36, 92)
     val img = if (reuse) old!! else Pet3D.render(out3d) { s ->
         val f = s.frame
@@ -260,7 +260,7 @@ internal fun PetRenderer.draw3DEgg(c: Canvas, cx: Float, groundY: Float, look: P
     val old = out3d
     val now = System.nanoTime()
     val fresh = old != null && old.width == ow && old.height == oh && look == last3dLook
-    val reuse = fresh && silhouette == last3dSilhouette && (now - last3dAt < 30_000_000L || !Pet3D.mayUpdate())
+    val reuse = fresh && silhouette == last3dSilhouette && (now - last3dAt < min3dIntervalNs || !Pet3D.mayUpdate())
     val img = if (reuse) old!! else Pet3D.render(out3d) { s ->
         val f = s.frame
         f.left = left; f.top = rTop; f.right = right; f.bottom = rBottom

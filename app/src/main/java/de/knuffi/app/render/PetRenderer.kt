@@ -50,6 +50,9 @@ class PetRenderer {
     // 3D: the last rendered image and a pose copy without turning (the 3D model turns for real)
     internal var out3d: android.graphics.Bitmap? = null
     internal var last3dAt = 0L
+
+    /** Shortest time between two 3D pictures of this pet (longer = less battery). */
+    var min3dIntervalNs = 30_000_000L
     internal var last3dLook: PetLook? = null
     internal var last3dSilhouette: Int? = null
     internal val flat = PetPose()

@@ -84,6 +84,10 @@ class OverlayPetView(context: Context, private val host: Host) : View(context) {
     private val footInWindow = windowH * 0.9f
 
     private val renderer = PetRenderer()
+
+    fun renderer3dInterval(ns: Long) {
+        renderer.min3dIntervalNs = ns
+    }
     private val pose = PetPose()
     private val particles = ParticleSystem()
     private val rnd = Random(System.nanoTime())
@@ -135,10 +139,18 @@ class OverlayPetView(context: Context, private val host: Host) : View(context) {
     }
 
     private var running = false
+    /** Battery setting: shortest time between two frames (0 = every screen refresh). */
+    var frameIntervalNs = 0L
+    private var lastStepNs = 0L
+
     private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
             if (!running) return
-            step(frameTimeNanos)
+            // while being carried the pet always follows the finger smoothly
+            if (mode == Mode.DRAG || frameTimeNanos - lastStepNs >= frameIntervalNs - 2_000_000L) {
+                lastStepNs = frameTimeNanos
+                step(frameTimeNanos)
+            }
             Choreographer.getInstance().postFrameCallback(this)
         }
     }
@@ -173,7 +185,7 @@ class OverlayPetView(context: Context, private val host: Host) : View(context) {
     }
 
     private fun step(frameTimeNanos: Long) {
-        val dt = if (lastFrameNs == 0L) 0.016f else ((frameTimeNanos - lastFrameNs) / 1e9f).coerceIn(0f, 0.05f)
+        val dt = if (lastFrameNs == 0L) 0.016f else ((frameTimeNanos - lastFrameNs) / 1e9f).coerceIn(0f, 0.12f)
         lastFrameNs = frameTimeNanos
         now += dt
         val b = host.bounds()

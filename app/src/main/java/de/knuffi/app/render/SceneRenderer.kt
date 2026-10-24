@@ -195,6 +195,13 @@ class SceneRenderer {
         d.toys.ladderHeight = if (kind == LayoutKind.WALLPAPER) max(1.55f, (layout.groundY - h * 0.2f) / layout.petSize) else 1.55f
     }
 
+    /** Battery: how often the pets on this scene get a new 3D picture. */
+    fun setPetUpdateInterval(ns: Long) {
+        pet.min3dIntervalNs = ns
+        guestPet.min3dIntervalNs = ns
+        guestPet2.min3dIntervalNs = ns
+    }
+
     fun release() {
         // not recycled: the render thread may still draw the last frame with it
         cache = null

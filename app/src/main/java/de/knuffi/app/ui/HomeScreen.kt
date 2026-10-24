@@ -1,5 +1,10 @@
 package de.knuffi.app.ui
 
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -237,10 +242,8 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
             items = Catalog.foods,
             state = state,
             onDismiss = { sheet = null },
-            onUse = {
-                act(Action.Feed(it.id))
-                sheet = null
-            },
+            onUse = { act(Action.Feed(it.id)) },
+            tabs = true,
             onShop = {
                 sheet = null
                 onOpenShop()
@@ -252,10 +255,7 @@ fun HomeScreen(state: GameState, debugHour: Float? = null, onOpenSettings: () ->
             items = Catalog.careItems,
             state = state,
             onDismiss = { sheet = null },
-            onUse = {
-                act(Action.UseItem(it.id))
-                sheet = null
-            },
+            onUse = { act(Action.UseItem(it.id)) },
             onShop = {
                 sheet = null
                 onOpenShop()
@@ -294,7 +294,7 @@ private fun PlaySheet(pet: Pet, onDismiss: () -> Unit, onBall: () -> Unit, onRoo
         shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
     ) {
         Column(
-            Modifier
+            Modifier.verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
                 .navigationBarsPadding()
                 .padding(bottom = 16.dp),
@@ -792,6 +792,7 @@ private fun ItemSheet(
     onDismiss: () -> Unit,
     onUse: (Item) -> Unit,
     onShop: () -> Unit,
+    tabs: Boolean = false,
 ) {
     val p = LocalPalette.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -810,10 +811,46 @@ private fun ItemSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 EmojiTile(emoji, size = 42.dp, color = p.pink)
                 Spacer(Modifier.width(12.dp))
-                Text(title, style = MaterialTheme.typography.titleLarge, color = p.text)
+                Text(title, style = MaterialTheme.typography.titleLarge, color = p.text, modifier = Modifier.weight(1f))
             }
-            Spacer(Modifier.height(14.dp))
-            val visible = items.filter { it.unlimited || state.count(it.id) > 0 }
+            // how the pet is doing right now (updates while feeding several things in a row)
+            state.pet?.let { pet ->
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    NeedPill("🍙", pet.satiety, p.orange, Modifier.weight(1f))
+                    NeedPill("😊", pet.joy, p.pink, Modifier.weight(1f))
+                    NeedPill("⚡", pet.energy, p.gold, Modifier.weight(1f))
+                    NeedPill("🫧", pet.hygiene, p.sky, Modifier.weight(1f))
+                    NeedPill("❤️", pet.health, p.mint, Modifier.weight(1f))
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            val owned = items.filter { it.unlimited || state.count(it.id) > 0 }
+            var tab by rememberSaveable { mutableStateOf(FoodTab.ALL) }
+            val groups = if (tabs) FoodTab.entries.filter { t -> t == FoodTab.ALL || owned.any { foodTab(it) == t } } else emptyList()
+            if (tab !in groups) tab = FoodTab.ALL
+            if (groups.size > 2) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 10.dp)) {
+                    items(groups.size) { i ->
+                        val g = groups[i]
+                        val active = g == tab
+                        val n = if (g == FoodTab.ALL) owned.size else owned.count { foodTab(it) == g }
+                        Text(
+                            "${g.emoji} ${g.title} · $n",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (active) Color.White else p.text,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(if (active) Brush.linearGradient(listOf(p.pink, p.violet)) else Brush.linearGradient(listOf(p.track, p.track)))
+                                .clickable { tab = g }
+                                .padding(horizontal = 12.dp, vertical = 7.dp),
+                        )
+                    }
+                }
+            }
+            val visible = if (tab == FoodTab.ALL) owned else owned.filter { foodTab(it) == tab }
+            // the list scrolls (lots of food no longer gets cut off), the shop button stays visible
+            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
             if (visible.isEmpty()) {
                 Text("Dein Vorrat ist leer.", style = MaterialTheme.typography.bodyLarge, color = p.textMuted)
                 Spacer(Modifier.height(10.dp))
@@ -872,15 +909,69 @@ private fun ItemSheet(
                 }
                 Spacer(Modifier.height(10.dp))
             }
+            }
             Spacer(Modifier.height(4.dp))
-            ClayTextButton(
-                "Mehr im Shop",
-                onShop,
-                emoji = "🛍️",
-                modifier = Modifier.fillMaxWidth(),
-                color = p.violet,
-                deep = p.violetDeep,
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ClayTextButton(
+                    "Mehr im Shop",
+                    onShop,
+                    emoji = "🛍️",
+                    modifier = Modifier.weight(1f),
+                    color = p.violet,
+                    deep = p.violetDeep,
+                )
+                ClayTextButton(
+                    "Fertig",
+                    onDismiss,
+                    emoji = "✔️",
+                    modifier = Modifier.weight(1f),
+                    color = p.mint,
+                    deep = p.mintDeep,
+                )
+            }
         }
+    }
+}
+
+/** Groups of food in the food menu. */
+private enum class FoodTab(val title: String, val emoji: String) {
+    ALL("Alle", "🍽️"),
+    MEALS("Mahlzeiten", "🍝"),
+    SNACKS("Snacks", "🍬"),
+    COOKED("Selbstgekocht", "👩‍🍳"),
+    HARVEST("Ernte", "🥕"),
+    FEAST("Festtage", "🎉"),
+}
+
+private val harvestIds: Set<String> by lazy { Catalog.seeds.mapNotNull { it.yieldId }.toSet() }
+
+private fun foodTab(item: Item): FoodTab = when {
+    item.id.startsWith("dish_") -> FoodTab.COOKED
+    item.id in harvestIds -> FoodTab.HARVEST
+    !item.sold && !item.unlimited -> FoodTab.FEAST
+    item.snack -> FoodTab.SNACKS
+    else -> FoodTab.MEALS
+}
+
+/** A small value bar (0..100) with an emoji. */
+@Composable
+private fun NeedPill(emoji: String, value: Double, color: Color, modifier: Modifier = Modifier) {
+    val p = LocalPalette.current
+    val v = (value / 100.0).toFloat().coerceIn(0f, 1f)
+    val shown by animateFloatAsState(v, label = "need")
+    Row(
+        modifier
+            .clip(RoundedCornerShape(50))
+            .background(p.track)
+            .drawBehind {
+                drawRoundRect(color.copy(alpha = 0.55f), size = androidx.compose.ui.geometry.Size(size.width * shown, size.height), cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f))
+            }
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Text(emoji, fontSize = 12.sp)
+        Spacer(Modifier.width(3.dp))
+        Text("${(v * 100).toInt()}", style = MaterialTheme.typography.labelMedium, color = p.text)
     }
 }

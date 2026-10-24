@@ -223,11 +223,12 @@ class KnuffiWallpaperService : WallpaperService() {
                 if (canvas != null) runCatching { holder.unlockCanvasAndPost(canvas) }
             }
             handler.removeCallbacks(frame)
-            if (visible) handler.postDelayed(frame, FRAME_MS)
+            // battery setting: smooth / balanced / saver
+            val power = GameRepository.current.settings.screenPower
+            scene.setPetUpdateInterval(ScreenPower.pet3dNs(power))
+            if (visible) handler.postDelayed(frame, ScreenPower.wallpaperFrameMs(power))
         }
     }
 
-    private companion object {
-        const val FRAME_MS = 33L
-    }
+
 }

@@ -1,5 +1,7 @@
 package de.knuffi.app.ui
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -407,7 +409,7 @@ private fun ItemDetailSheet(item: Item, state: GameState, onDismiss: () -> Unit)
         shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
     ) {
         Column(
-            Modifier
+            Modifier.verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .navigationBarsPadding()
                 .padding(bottom = 16.dp),
