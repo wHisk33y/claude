@@ -51,7 +51,7 @@ uniform float uGloss;
 uniform float uLit;         // how much of the 3D light is applied (reliefs already carry painted shading)
 uniform vec2 uFloor;        // bottom of the body and body half height, for ambient occlusion
 uniform vec4 uTint;         // sick / golden tint (rgb, amount)
-uniform vec4 uSurface;      // fur, glitter, jelly, 1 / fur fibre size
+uniform vec4 uSurface;      // fur, (unused), jelly, 1 / fur fibre size
 uniform vec3 uKey;          // colour of the main light (time of day)
 uniform vec3 uAmb;          // colour of the soft light all around
 uniform float uTime;
@@ -92,7 +92,6 @@ void main() {
     }
 
     float fur = uSurface.x;
-    float glitter = uSurface.y;
     float jelly = uSurface.z;
     vec3 q = vRest * uSurface.w;
     if (fur > 0.0) {
@@ -124,14 +123,6 @@ void main() {
     col += albedo * vec3(0.10, 0.06, 0.04) * clamp(-ndl, 0.0, 1.0) * uLit * (1.0 + 2.0 * jelly);
     col += uRim * fres * (0.32 + 0.25 * fur + 0.3 * jelly) * ao * uLit;
     col += uKey * vec3(spec) * mix(0.35, 1.0, uLit);
-    if (glitter > 0.0) {
-        // tiny sparkles that twinkle
-        vec3 cell = floor(q * 1.6);
-        float hsh = hash(cell);
-        float tw = 0.5 + 0.5 * sin(uTime * 5.0 + hsh * 40.0);
-        float g = step(0.955, hsh) * tw * (0.4 + 0.6 * pow(nh, 4.0));
-        col += vec3(1.0, 0.96, 0.82) * g * 1.3 * glitter;
-    }
     col = mix(col, uTint.rgb, uTint.a);
     alpha *= mix(1.0, 0.9, jelly * step(0.5, float(uMode == 1)));
     outColor = vec4(clamp(col, 0.0, 1.0) * alpha, alpha);

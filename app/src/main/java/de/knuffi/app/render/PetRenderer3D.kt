@@ -279,7 +279,6 @@ internal fun PetRenderer.draw3DEgg(c: Canvas, cx: Float, groundY: Float, look: P
         f.bodyBottom = 0f
         f.bodyH = eh
         f.time = pose.t
-        if (look.shiny) f.surface[1] = 1f
         f.surface[3] = 1f / max(1f, u * 0.035f)
         System.arraycopy(lightKey, 0, f.key, 0, 3)
         System.arraycopy(lightAmb, 0, f.amb, 0, 3)
@@ -331,7 +330,7 @@ internal fun PetRenderer.draw3DEgg(c: Canvas, cx: Float, groundY: Float, look: P
 }
 
 
-/** Fur for cats, small animals and fluffy creatures, glitter for shiny pets, gloss for jelly and ghosts. */
+/** Fur for cats, small animals and fluffy creatures, gloss for jelly and ghosts. */
 private fun surfaceOf(look: PetLook, fl: FormLook, out: FloatArray) {
     val soft = !fl.jelly && !fl.ghost && fl.shape != Shape.DROP
     val furry = soft && (
@@ -344,7 +343,7 @@ private fun surfaceOf(look: PetLook, fl: FormLook, out: FloatArray) {
         furry -> 0.7f
         else -> 0f
     }
-    out[1] = if (look.shiny) 1f else if (fl.sparkles) 0.5f else 0f
+    out[1] = 0f
     out[2] = when {
         fl.jelly -> 1f
         fl.ghost -> 0.6f
