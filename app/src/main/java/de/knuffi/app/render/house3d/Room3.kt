@@ -128,7 +128,7 @@ object Room3 {
     fun clampInside(p: Piece, x: Float, z: Float, turn: Float, w: Float, d: Float): Pair<Float, Float> {
         if (p.onWall) {
             val hw = p.w / 2f
-            return x.coerceIn(-w / 2f + hw + 0.02f, w / 2f - hw - 0.02f) to z
+            return x.clampSafe(-w / 2f + hw + 0.02f, w / 2f - hw - 0.02f) to z
         }
         val r = footprint(p, 0f, 0f, turn)
         val front = d / 2f - FRONT_KEEP
@@ -282,7 +282,7 @@ object Room3 {
             val candidates = listOf(0.55f, -0.55f, 0f, 0.8f)
             val x = candidates.firstOrNull { c -> c - piece.w / 2f > win[2] + 0.05f || c + piece.w / 2f < win[0] - 0.05f } ?: 0.55f
             val y = if (northX.any { abs(it - x) < 0.7f }) 2.0f else 1.75f
-            return Quad4(x.coerceIn(-hw + piece.w / 2f, hw - piece.w / 2f), back, 0f, y)
+            return Quad4(x.clampSafe(-hw + piece.w / 2f, hw - piece.w / 2f), back, 0f, y)
         }
         val cands: List<Triple<Float, Float, Float>> = when (slot) {
             Slot.RUG -> listOf(Triple(0f, 0.12f, 0f), Triple(0f, -0.2f, 0f))
@@ -616,3 +616,6 @@ object Colors3 {
         return (0xFF shl 24) or (r shl 16) or (g shl 8) or bl
     }
 }
+
+/** Like coerceIn, but never crashes when the range is empty (something wider than its place): then the middle. */
+internal fun Float.clampSafe(lo: Float, hi: Float): Float = if (lo <= hi) coerceIn(lo, hi) else (lo + hi) / 2f

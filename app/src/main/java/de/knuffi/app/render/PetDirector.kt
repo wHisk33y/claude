@@ -1035,6 +1035,7 @@ class PetDirector(seed: Int = 7) {
                 "flip" -> Act.Flip()
                 "butterfly" -> Act.Butterfly()
                 "fav" -> favorite(false) ?: Act.Daydream()
+                "longsay" -> Act.Idle(3f).also { say("Das ist ein ganz besonders langer Satz, der früher nicht in die Sprechblase gepasst hat! 🎈", 3f) }
                 else -> Act.Daydream()
             }
         }

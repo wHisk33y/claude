@@ -51,7 +51,7 @@ class OverlayToys {
                 f.y += f.vy * dt
                 if (f.x < left || f.x > right) {
                     f.vx = -f.vx * 0.8f
-                    f.x = f.x.coerceIn(left, right)
+                    f.x = if (left <= right) f.x.coerceIn(left, right) else (left + right) / 2f
                 }
                 if (f.y >= ground) {
                     f.y = ground

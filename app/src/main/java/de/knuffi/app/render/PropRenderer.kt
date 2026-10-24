@@ -13,6 +13,7 @@ import android.graphics.Shader
 import android.graphics.Typeface
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.sin
 
 /** Shared soft-3D painting helpers. */
@@ -627,15 +628,38 @@ class PropRenderer : Painter() {
     // ------------------------------------------------------------------ speech bubble
 
     fun speech(c: Canvas, msg: String, ax: Float, ay: Float, sceneW: Float, size: Float, alpha: Float, minTop: Float = 0f) {
-        if (alpha < 0.02f) return
-        text.textSize = size
-        val tw = text.measureText(msg)
+        if (alpha < 0.02f || msg.isEmpty()) return
+        val margin = size * 0.4f
         val padX = size * 0.8f
         val padY = size * 0.55f
-        val bw = tw + padX * 2f
-        val bh = size + padY * 2f
+        val maxBw = max(size * 3f, sceneW - margin * 2f)
+        text.textSize = size
+        // Long sentences go onto two lines, and if that is still too wide the text gets smaller,
+        // so the bubble always fits on the screen (a too wide bubble used to crash the app).
+        var lines = listOf(msg)
+        var tw = text.measureText(msg)
+        if (tw + padX * 2f > maxBw) {
+            val split = splitPoint(msg)
+            if (split > 0) {
+                lines = listOf(msg.substring(0, split).trimEnd(), msg.substring(split).trimStart())
+                tw = max(text.measureText(lines[0]), text.measureText(lines[1]))
+            }
+        }
+        var ts = size
+        if (tw + padX * 2f > maxBw && tw > 0f) {
+            val k = ((maxBw - padX * 2f) / tw).coerceIn(0.5f, 1f)
+            ts = size * k
+            text.textSize = ts
+            tw *= k
+        }
+        val lineH = ts * 1.2f
+        val bw = min(tw + padX * 2f, maxBw)
+        val bh = ts + lineH * (lines.size - 1) + padY * 2f
+        val radius = min(bh / 2f, size * 1.1f)
         val tail = size * 0.6f
-        val cx = ax.coerceIn(bw / 2f + size * 0.4f, sceneW - bw / 2f - size * 0.4f)
+        val lo = bw / 2f + margin
+        val hi = sceneW - bw / 2f - margin
+        val cx = if (lo <= hi) ax.coerceIn(lo, hi) else sceneW / 2f
         // Keep the bubble on screen when the pet is high up (e.g. on top of the ladder).
         val bottom = max(ay - tail, minTop + bh + size * 0.6f)
         val top = bottom - bh
@@ -645,11 +669,13 @@ class PropRenderer : Painter() {
         val a = alpha.coerceIn(0f, 1f)
         fill.shader = null
         fill.color = Colors.alpha(0xFF2A1740.toInt(), 0.18f * a)
-        c.drawRoundRect(cx - bw / 2f + size * 0.12f, top + size * 0.18f, cx + bw / 2f + size * 0.12f, bottom + size * 0.18f, bh / 2f, bh / 2f, fill)
+        c.drawRoundRect(cx - bw / 2f + size * 0.12f, top + size * 0.18f, cx + bw / 2f + size * 0.12f, bottom + size * 0.18f, radius, radius, fill)
         path.reset()
-        path.addRoundRect(cx - bw / 2f, top, cx + bw / 2f, bottom, bh / 2f, bh / 2f, Path.Direction.CW)
+        path.addRoundRect(cx - bw / 2f, top, cx + bw / 2f, bottom, radius, radius, Path.Direction.CW)
         path2.reset()
-        val tx = ax.coerceIn(cx - bw / 2f + bh / 2f, cx + bw / 2f - bh / 2f)
+        val tLo = cx - bw / 2f + radius
+        val tHi = cx + bw / 2f - radius
+        val tx = if (tLo <= tHi) ax.coerceIn(tLo, tHi) else cx
         path2.moveTo(tx - tail * 0.6f, bottom - 2f)
         path2.quadTo(tx - tail * 0.1f, bottom + tail * 0.5f, ax, ay)
         path2.quadTo(tx + tail * 0.2f, bottom + tail * 0.3f, tx + tail * 0.6f, bottom - 2f)
@@ -662,8 +688,20 @@ class PropRenderer : Painter() {
         line.strokeWidth = size * 0.08f
         c.drawPath(path, line)
         text.color = Colors.alpha(0xFF3A2A45.toInt(), a)
-        c.drawText(msg, cx, bottom - padY - size * 0.18f, text)
+        for ((i, l) in lines.withIndex()) c.drawText(l, cx, top + padY + ts * 0.82f + i * lineH, text)
+        text.textSize = size
         c.restore()
+    }
+
+    /** The space closest to the middle of [msg] (where a long sentence is wrapped), or -1. */
+    private fun splitPoint(msg: String): Int {
+        val mid = msg.length / 2
+        var best = -1
+        for (i in msg.indices) {
+            if (msg[i] != ' ') continue
+            if (best < 0 || kotlin.math.abs(i - mid) < kotlin.math.abs(best - mid)) best = i
+        }
+        return best
     }
 }
 
