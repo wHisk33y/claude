@@ -76,7 +76,15 @@ object Skins {
         Skin("skin_ghost", "Gespenst", "👻", "Fast durchsichtig und leuchtet im Dunkeln.", 0xFFEEF0FF, 0xFFB8B8E8, 0xFFD8DCFF, 0xFF6A6AD6, belly = 0xFFFFFFFF, aura = SkinAura.SMOKE, sparkle = true, glow = true, event = SeasonEvent.HALLOWEEN),
         Skin("skin_frost", "Eiskristall", "❄️", "Eisblau und funkelnd wie Raureif.", 0xFFBDE6FF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFF2E7FB0, belly = 0xFFEFF9FF, pattern = SkinPattern.STARS, aura = SkinAura.SNOW, sparkle = true, event = SeasonEvent.WINTERZAUBER),
         Skin("skin_ginger", "Lebkuchen", "🍪", "Braun gebacken mit Zuckerguss.", 0xFFC0804A, 0xFFFF6A7A, 0xFFFFFFFF, 0xFF4A2410, belly = 0xFFE0A870, pattern = SkinPattern.ICING, event = SeasonEvent.WINTERZAUBER),
+    ) + listOf(
+        // Lernzeit: only for learning every day (see [Learn.prizes])
+        Skin("skin_bookworm", "Bücherwurm", "🐛", "Hellgrün mit Seitenstreifen. Für 7 Lerntage am Stück.", 0xFFA8DC8C, 0xFFFFE6A0, 0xFF5E9A44, 0xFF2E5A2A, belly = 0xFFF2FFE6, pattern = SkinPattern.STRIPES),
+        Skin("skin_inventor", "Erfinder", "💡", "Kupfer mit Blitzen. Für 30 Lerntage am Stück.", 0xFFE6A066, 0xFF5CC8F2, 0xFFFFE066, 0xFF1E5A8A, belly = 0xFFFFE8CC, pattern = SkinPattern.ZIGZAG, aura = SkinAura.STARS),
+        Skin("skin_stargazer", "Sternenforscher", "🔭", "Tiefblau wie der Nachthimmel und leuchtet. Für 100 Lerntage am Stück.", 0xFF3A2F80, 0xFF9AD8FF, 0xFFFFE680, 0xFFB8E8FF, belly = 0xFF5A4CA6, pattern = SkinPattern.GALAXY, aura = SkinAura.STARS, glow = true),
     )
+
+    /** The skins that can only be won in the Lernzeit. */
+    val learnSkins: List<Skin> get() = costumes.filter { it.id in Learn.skinIds }
 
     private const val DARK_EYE = 0xFF2A1F2A
 
@@ -156,7 +164,7 @@ object Perks {
     /** Perks of everything the pet is wearing right now. */
     fun active(s: GameState): Set<Perk> {
         val out = HashSet<Perk>()
-        for (slot in arrayOf(Slot.HAT, Slot.FACE, Slot.NECK)) {
+        for (slot in arrayOf(Slot.HAT, Slot.FACE, Slot.NECK, Slot.BACK)) {
             val id = s.equipped[slot] ?: continue
             Catalog[id]?.perk?.let { out += it }
         }

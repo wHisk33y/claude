@@ -310,6 +310,16 @@ data class Settings(
     val autoBackup: Boolean = true,
     /** The house and its rooms in 3D (false: the drawn rooms). */
     val house3d: Boolean = true,
+    /** Lernzeit: daily tasks in Mathe, Deutsch and Physik (off = no tasks, reminders or sad pet). */
+    val learnEnabled: Boolean = true,
+    /** Tasks per subject and day (3 to 10). */
+    val learnPerSubject: Int = 3,
+    /** From this hour on the tasks are announced. */
+    val learnHour: Int = 15,
+    /** A second reminder in the evening if the tasks are not done yet. */
+    val learnEvening: Boolean = true,
+    /** School grade per subject (Klasse 5 to 13). */
+    val learnGrades: Map<String, Int> = emptyMap(),
 )
 
 /** Player-adjustable pace of the needs and of sleep. Level 2 is the original balance. */
@@ -450,6 +460,8 @@ data class GameState(
     /** Time of the last automatic backup. */
     val lastAutoBackup: Long = 0,
     val lastSimulated: Long = 0,
+    /** Lernzeit progress (see [Learn]). */
+    val learn: LearnState = LearnState(),
 ) {
     fun count(itemId: String): Int = inventory[itemId] ?: 0
     fun eggCount(line: EggLine): Int = eggs[line] ?: 0
@@ -557,6 +569,8 @@ sealed interface GameEvent {
     data class CardsOpened(val forms: List<Form>) : GameEvent
     data class RoomBuilt(val room: RoomKind) : GameEvent
     data class RoomEntered(val room: RoomKind) : GameEvent
+    /** A Lernzeit task was solved. */
+    data class LearnSolved(val subject: Subject, val firstTry: Boolean, val subjectDone: Boolean, val dayDone: Boolean) : GameEvent
 }
 
 data class Outcome(val state: GameState, val events: List<GameEvent> = emptyList())

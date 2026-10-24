@@ -17,6 +17,11 @@ class ActionReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         GameRepository.init(context)
+        if (intent.action == LearnNotifier.ACTION_ANSWER) {
+            LearnNotifier.handle(context, intent)
+            WidgetUpdater.updateAll(context, null)
+            return
+        }
         val state = GameRepository.current
         val pet = state.pet
         val action: Action? = when (intent.action) {

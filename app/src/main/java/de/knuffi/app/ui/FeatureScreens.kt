@@ -372,8 +372,8 @@ fun WardrobeScreen(state: GameState, onBack: () -> Unit) {
                 )
             }
 
-            SectionHeader("Fest-Skins", "🎭")
-            Text("Skins gewinnst du bei den Festen des Jahres: mit Fest-Punkten oder am Glücksrad.", style = MaterialTheme.typography.bodySmall, color = p.textMuted)
+            SectionHeader("Fest- und Lern-Skins", "🎭")
+            Text("Skins gewinnst du bei den Festen des Jahres (mit Fest-Punkten oder am Glücksrad) und in der Lernzeit, wenn du viele Tage am Stück lernst.", style = MaterialTheme.typography.bodySmall, color = p.textMuted)
             Spacer(Modifier.height(8.dp))
             val skins = listOf<String?>(null) + Skins.costumes.map { it.id }
             for (row in skins.chunked(3)) {
@@ -401,7 +401,7 @@ fun WardrobeScreen(state: GameState, onBack: () -> Unit) {
                             }
                             Text(skin?.name ?: "Normal", style = MaterialTheme.typography.labelMedium, color = p.text, maxLines = 1)
                             Text(
-                                if (owned) (skin?.emoji ?: "✨") else "${skin?.event?.emoji ?: ""} ${skin?.event?.title ?: ""}",
+                                if (owned) (skin?.emoji ?: "✨") else if (skin?.event == null) "📚 Lernzeit" else "${skin.event?.emoji ?: ""} ${skin.event?.title ?: ""}",
                                 style = MaterialTheme.typography.labelSmall, color = p.textMuted, maxLines = 1,
                             )
                         }
@@ -412,7 +412,7 @@ fun WardrobeScreen(state: GameState, onBack: () -> Unit) {
             }
 
             SectionHeader("Besondere Ausrüstung", "🛡️")
-            Text("Nur bei Festen zu gewinnen. Jedes Teil hat einen Bonus, solange es getragen wird.", style = MaterialTheme.typography.bodySmall, color = p.textMuted)
+            Text("Nur bei Festen und in der Lernzeit zu gewinnen. Jedes Teil hat einen Bonus, solange es getragen wird.", style = MaterialTheme.typography.bodySmall, color = p.textMuted)
             Spacer(Modifier.height(8.dp))
             val gear = Catalog.items.filter { it.perk != null }
             for (item in gear) {

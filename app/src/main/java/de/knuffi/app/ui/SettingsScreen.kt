@@ -80,7 +80,7 @@ import kotlinx.coroutines.withContext
 private val themeOrder = listOf(ThemeMode.SYSTEM, ThemeMode.LIGHT, ThemeMode.DARK)
 
 @Composable
-fun SettingsScreen(state: GameState, onBack: () -> Unit) {
+fun SettingsScreen(state: GameState, onBack: () -> Unit, onLearnStats: () -> Unit = {}) {
     val context = LocalContext.current
     val p = LocalPalette.current
     var confirmReset by remember { mutableStateOf(false) }
@@ -434,6 +434,11 @@ fun SettingsScreen(state: GameState, onBack: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = p.textMuted,
                 )
+            }
+
+            SectionHeader("Lernzeit", "📚")
+            SurfaceCard(Modifier.fillMaxWidth()) {
+                LearnSettings(s, ::update, onLearnStats)
             }
 
             SectionHeader("Gassi gehen", "👟")
@@ -878,7 +883,7 @@ fun KSwitch(checked: Boolean, onChange: (Boolean) -> Unit) {
 }
 
 @Composable
-private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val p = LocalPalette.current
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 6.dp)) {
         Column(Modifier.weight(1f)) {

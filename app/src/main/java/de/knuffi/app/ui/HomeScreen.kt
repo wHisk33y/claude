@@ -519,6 +519,7 @@ private fun Hud(
                 Text(if (left >= 60) "${left / 60}:${(left % 60).toString().padStart(2, '0')} h" else "$left Min", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.85f))
             }
         }
+        LearnPill(state, Modifier.padding(top = 8.dp)) { onOpen(Route.Learn) }
         val guests = state.visitors
         val guest = guests.firstOrNull()
         if (guest != null) {

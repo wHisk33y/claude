@@ -220,6 +220,8 @@ object DebugScenes {
         "furnish" -> Route.Furnish(de.knuffi.core.RoomKind.LIVING, fromHouse = false)
         "music" -> Route.Music
         "cards" -> Route.Cards
+        "learn" -> Route.Learn
+        "learnstats" -> Route.LearnStats(Route.Learn)
         "adventuremap" -> Route.Adventure
         "tournament" -> Route.Tournament
         "settings" -> Route.Settings
@@ -498,6 +500,7 @@ object DebugScenes {
             Notifier.Spec("daily", Notifier.CH_EVENTS, "🎁 Deine tägliche Belohnung wartet!", "Hol dir heute 30 Münzen und halte deine Serie von 4 Tagen!", 0),
             state,
         )
+        de.knuffi.app.notify.LearnNotifier.post(context, state, header = "⏰ Zeit für die Lernzeit! Mochi hat schon die Brille auf. Hier ist die erste Aufgabe:")
     }
 
     @Composable

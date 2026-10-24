@@ -18,6 +18,14 @@ Eine neue Version lässt sich einfach über die alte installieren, dein Spielsta
 
 ## Funktionen
 
+- **Neu in 4.4: Lernzeit**: jeden Tag Aufgaben in Mathe (eintippen), Deutsch und Physik (auswählen),
+  einstellbar pro Fach von Klasse 5 bis 13 (Gymnasium) und 3 bis 10 Aufgaben pro Fach. Die Aufgaben
+  kommen auch als Benachrichtigung und lassen sich direkt dort lösen (Uhrzeit einstellbar, abends eine
+  zweite Erinnerung). Bei Fehlern gibt es einen Lösungsweg und einen neuen Versuch, die Schwierigkeit passt
+  sich ein bisschen an, und eine Lern-Übersicht für Eltern zeigt Themen, die noch Übung brauchen. Belohnungen:
+  Münzen und Erfahrung, Serien-Preise mit exklusiven Skins (Bücherwurm, Erfinder, Sternenforscher) und
+  Ausrüstung mit Bonus (Doktorhut, Laborbrille, Bücherrucksack). Das Haustier lernt mit Brille mit und ist
+  ein bisschen traurig, wenn ein Tag ausfällt. In den Einstellungen komplett abschaltbar.
 - **Neu in 4.3**: Tanzparty (Rhythmusspiel) und Schneeballwurf, Ausflüge zu Bauernhof, Tierpark und Jahrmarkt
   mit neuen Andenken, Faschingsfest und Laternenfest mit eigener Deko und Ausrüstung, Lieblingsplätze
   (das Haustier nutzt Sofa, Klavier, Kamin, Spielecke & Co.), neue Freundes-Momente, Essen-Menü mit Reitern

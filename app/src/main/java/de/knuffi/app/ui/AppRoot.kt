@@ -120,6 +120,14 @@ sealed interface Route {
 
     /** Furnishing a room in 3D ([room] null: the classic room). */
     data class Furnish(val room: de.knuffi.core.RoomKind?, val fromHouse: Boolean) : Route
+    data object Learn : Route
+    /** The Lernzeit overview for parents, going back to [from]. */
+    data class LearnStats(val from: Route) : Route
+}
+
+/** A page to open from outside the app, e.g. from a notification. */
+object AppNav {
+    val pending = kotlinx.coroutines.flow.MutableStateFlow<Route?>(null)
 }
 
 /** Space that scrolling pages keep free at the bottom for the floating navigation bar. */
@@ -197,11 +205,19 @@ private fun MainNavigation(state: GameState, debug: DebugScenes.Launch?) {
     var route by remember { mutableStateOf(DebugScenes.initialRoute(debug?.scene)) }
     var tab by remember { mutableStateOf(DebugScenes.initialTab(debug?.scene)) }
     var backToKuschelhaus by remember { mutableStateOf(false) }
+    val pending by AppNav.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(pending) {
+        pending?.let {
+            route = it
+            AppNav.pending.value = null
+        }
+    }
 
     // Sub pages of the world hub go back to the hub, everything else to the main screen.
     val parent: Route = when (route) {
         Route.Trips -> if (backToKuschelhaus) Route.Kuschelhaus else Route.Main
         is Route.Furnish -> if ((route as Route.Furnish).fromHouse) Route.House else Route.Main
+        is Route.LearnStats -> (route as Route.LearnStats).from
         else -> Route.Main
     }
     BackHandler(enabled = route != Route.Main || tab != Tab.HOME) {
@@ -252,7 +268,7 @@ private fun MainNavigation(state: GameState, debug: DebugScenes.Launch?) {
                 FloatingNavBar(state, tab, Modifier.align(Alignment.BottomCenter)) { tab = it }
             }
             is Route.Game -> GameHost(r.game, state, onExit = { route = Route.Main })
-            Route.Settings -> SettingsScreen(state, onBack = { route = Route.Main })
+            Route.Settings -> SettingsScreen(state, onBack = { route = Route.Main }, onLearnStats = { route = Route.LearnStats(Route.Settings) })
             Route.Gallery -> DebugScenes.Gallery(state, debug?.scene)
             Route.WidgetPreview -> DebugScenes.WidgetPreview(state)
             Route.WallpaperPreview -> DebugScenes.WallpaperPreview(state)
@@ -286,6 +302,8 @@ private fun MainNavigation(state: GameState, debug: DebugScenes.Launch?) {
             is Route.Furnish -> FurnishScreen(state, r.room, onBack = { route = if (r.fromHouse) Route.House else Route.Main })
             Route.Music -> MusicScreen(state, onBack = { route = Route.Main })
             Route.Cards -> CardsScreen(state, onBack = { route = Route.Main })
+            Route.Learn -> LearnScreen(state, onBack = { route = Route.Main }, onStats = { route = Route.LearnStats(Route.Learn) }, onSettings = { route = Route.Settings })
+            is Route.LearnStats -> LearnStatsScreen(state, onBack = { route = r.from })
         }
     }
 }

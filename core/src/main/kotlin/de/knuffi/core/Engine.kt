@@ -119,6 +119,10 @@ sealed interface Action {
     data class SaveSong(val song: Song) : Action
     data class DeleteSong(val index: Int) : Action
     data class BackupMade(val at: Long) : Action
+
+    // Lernzeit
+    /** An answer to the current task of [subject] ([topic] for the statistics). */
+    data class LearnAnswer(val subject: Subject, val correct: Boolean, val topic: String) : Action
 }
 
 data class GameReward(val coins: Int, val xp: Int)
@@ -621,6 +625,7 @@ object Engine {
                 steps = steps.copy(day = today, today = 0, claimedTiers = emptySet())
             }
             s = s.copy(daily = daily, weekly = weekly, monthly = monthly, counters = counters, steps = steps, pass = pass, event = event)
+            learnDay(today, now, userPresent)
             if (newLogin) {
                 addPassXp(10)
                 addTokens(2)
@@ -797,6 +802,11 @@ object Engine {
 
         private fun grantPrize(id: String, skin: Boolean) {
             s = s.copy(event = s.event.copy(prizes = s.event.prizes + id))
+            award(id, skin)
+        }
+
+        /** Gives a skin or a piece of gear (once) and celebrates it. */
+        private fun award(id: String, skin: Boolean) {
             val already = if (skin) id in s.skins else id in s.owned
             if (already) return
             s = if (skin) s.copy(skins = s.skins + id) else s.copy(owned = s.owned + id)
@@ -1030,11 +1040,121 @@ object Engine {
                 is Action.SaveSong -> saveSong(action.song, now)
                 is Action.DeleteSong -> if (action.index in s.songs.indices) s = s.copy(songs = s.songs.filterIndexed { i, _ -> i != action.index })
                 is Action.BackupMade -> s = s.copy(lastAutoBackup = action.at)
+                is Action.LearnAnswer -> learnAnswer(action.subject, action.correct, action.topic, now)
             }
             checkPerfect()
         }
 
+        // ---------------------------------------------------------------- Lernzeit
+
+        /** A new day: yesterday's tasks are counted, the streak may break and the pet may be a little sad. */
+        private fun learnDay(today: Long, now: Long, userPresent: Boolean) {
+            var l = s.learn
+            if (l.day != today) {
+                val started = l.doneDays > 0
+                val missed = started && l.lastDoneDay < today - 1 && s.settings.learnEnabled
+                l = l.copy(
+                    day = today,
+                    solved = emptyMap(),
+                    tries = emptyMap(),
+                    streak = if (l.lastDoneDay >= today - 1) l.streak else 0,
+                    missed = missed,
+                    missedTold = false,
+                )
+                s = s.copy(learn = l)
+            }
+            if (!s.settings.learnEnabled) {
+                if (l.missed) s = s.copy(learn = l.copy(missed = false))
+                return
+            }
+            val p = s.pet
+            if (userPresent && s.onboarded && l.missed && !l.missedTold && p != null && p.alive && !p.isEgg) {
+                s = s.copy(learn = l.copy(missedTold = true))
+                updatePet { it.copy(joy = max(0.0, it.joy - 8)) }
+                feel(Emotion.TRAURIG, now)
+                message("${p.name} ist ein bisschen traurig, weil ihr gestern nicht zusammen gelernt habt. Heute klappt's bestimmt! 📚")
+            }
+        }
+
+        private fun learnAnswer(subject: Subject, correct: Boolean, topic: String, now: Long) {
+            if (!s.settings.learnEnabled) return
+            val today = TimeUtil.epochDay(now, zone)
+            var l = s.learn
+            if (l.day != today) l = l.copy(day = today, solved = emptyMap(), tries = emptyMap())
+            val key = subject.name
+            val per = s.settings.learnPerSubject
+            if ((l.solved[key] ?: 0) >= per) return
+            val statKey = "$key:$topic"
+            val stat = l.stats[statKey] ?: TopicStat()
+            val tries = l.tries[key] ?: 0
+            if (!correct) {
+                s = s.copy(learn = l.copy(tries = l.tries + (key to tries + 1), stats = l.stats + (statKey to stat.copy(wrong = stat.wrong + 1, lastDay = today))))
+                return
+            }
+            val firstTry = tries == 0
+            val solved = (l.solved[key] ?: 0) + 1
+            l = l.copy(
+                solved = l.solved + (key to solved),
+                tries = l.tries - key,
+                stats = l.stats + (statKey to stat.copy(tasks = stat.tasks + 1, firstTry = stat.firstTry + if (firstTry) 1 else 0, lastDay = today)),
+                totalSolved = l.totalSolved + 1,
+            )
+            // The tasks get a little easier or harder when they are much too hard or too easy.
+            val recent = ((l.recent[key] ?: emptyList()) + firstTry).takeLast(10)
+            var adjust = l.adjust[key] ?: 0
+            var change = 0
+            if (recent.size >= 8) {
+                val rate = recent.count { it }.toFloat() / recent.size
+                if (rate >= 0.85f && adjust < 1 && Learn.grade(s.settings, l, subject) < Learn.MAX_GRADE) change = 1
+                if (rate <= 0.4f && adjust > -1 && Learn.grade(s.settings, l, subject) > Learn.MIN_GRADE) change = -1
+            }
+            if (change != 0) {
+                adjust += change
+                l = l.copy(adjust = l.adjust + (key to adjust), recent = l.recent + (key to emptyList()))
+            } else {
+                l = l.copy(recent = l.recent + (key to recent))
+            }
+            s = s.copy(learn = l)
+            addCoins(if (firstTry) Learn.COINS_FIRST_TRY else Learn.COINS_LATER)
+            addXp(2, now)
+            dayLog("learn")
+            val subjectDone = solved >= per
+            if (subjectDone) {
+                message("${subject.emoji} ${subject.title} für heute geschafft! +${Learn.COINS_SUBJECT} 🪙")
+                addCoins(Learn.COINS_SUBJECT)
+            }
+            if (change > 0) message("Super! ${subject.title} wird ab jetzt etwas kniffliger. 💪")
+            if (change < 0) message("${subject.title} wird ab jetzt etwas leichter, damit es wieder Spaß macht. 🙂")
+            val dayDone = subjectDone && Learn.allDone(s.settings, s.learn, today)
+            emit(GameEvent.LearnSolved(subject, firstTry, subjectDone, dayDone))
+            if (dayDone) learnDayDone(today, now)
+        }
+
+        private fun learnDayDone(today: Long, now: Long) {
+            val l = s.learn
+            if (l.lastDoneDay == today) return
+            val streak = if (l.lastDoneDay == today - 1) l.streak + 1 else 1
+            s = s.copy(learn = l.copy(doneDays = l.doneDays + 1, streak = streak, bestStreak = max(l.bestStreak, streak), lastDoneDay = today, missed = false))
+            val name = s.pet?.takeIf { !it.isEgg }?.name
+            message("📚 Lernzeit geschafft! ${if (name != null) "$name ist mächtig stolz auf dich. " else ""}+${Learn.COINS_DAY} 🪙 · $streak ${if (streak == 1) "Tag" else "Tage"} am Stück")
+            addCoins(Learn.COINS_DAY)
+            addXp(Learn.XP_DAY, now)
+            feel(Emotion.STOLZ, now)
+            for (prize in Learn.prizes) {
+                if (prize.id in s.learn.prizes) continue
+                val reached = if (prize.streak) s.learn.streak >= prize.days else s.learn.doneDays >= prize.days
+                if (!reached) continue
+                s = s.copy(learn = s.learn.copy(prizes = s.learn.prizes + prize.id))
+                award(prize.id, prize.skin)
+            }
+        }
+
         private fun updateSettings(settings: Settings) {
+            val gradesChanged = Subject.entries.filter { (settings.learnGrades[it.name] ?: Learn.MIN_GRADE) != (s.settings.learnGrades[it.name] ?: Learn.MIN_GRADE) }
+            if (gradesChanged.isNotEmpty()) {
+                // A new grade starts without the automatic adjustment.
+                s = s.copy(learn = s.learn.copy(adjust = s.learn.adjust - gradesChanged.map { it.name }.toSet(), recent = s.learn.recent - gradesChanged.map { it.name }.toSet()))
+            }
             val stepsChanged = settings.stepsAvailable != s.settings.stepsAvailable
             val lookChanged = settings.look != s.settings.look
             s = s.copy(settings = settings)

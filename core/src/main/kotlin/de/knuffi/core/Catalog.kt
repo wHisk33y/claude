@@ -240,6 +240,9 @@ object Catalog {
         gear("hat_icecrown", "Eiskrone", "💠", ItemKind.HAT, "Aus funkelndem Eis. Zu gewinnen beim Winterzauber.", Perk.XP),
         gear("hat_jester", "Narrenkappe", "🃏", ItemKind.HAT, "Mit klingelnden Glöckchen. Zu gewinnen beim Faschingsfest.", Perk.JOY),
         gear("hat_starlantern", "Sternenlaterne", "⭐", ItemKind.HAT, "Eine kleine leuchtende Sternlaterne. Zu gewinnen beim Laternenfest.", Perk.XP),
+        gear("hat_mortarboard", "Doktorhut", "🎓", ItemKind.HAT, "Für kluge Köpfe. Nur in der Lernzeit zu gewinnen (3 Lerntage).", Perk.XP),
+        gear("face_labgoggles", "Laborbrille", "🥽", ItemKind.FACE, "Für echte Forscher. Nur in der Lernzeit zu gewinnen (14 Lerntage).", Perk.COINS),
+        gear("back_bookbag", "Bücherrucksack", "📚", ItemKind.BACK, "Voller Wissen. Nur in der Lernzeit zu gewinnen (50 Lerntage).", Perk.TALENT),
         // Gesicht
         wear("face_round", "Nerdbrille", "👓", ItemKind.FACE, 45, "Sieht klug aus."),
         wear("face_sun", "Sonnenbrille", "😎", ItemKind.FACE, 70, "Einfach cool.", 3),

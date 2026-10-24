@@ -23,6 +23,7 @@ import de.knuffi.core.DailyRewards
 import de.knuffi.core.Difficulty
 import de.knuffi.core.EventCalendar
 import de.knuffi.core.GameState
+import de.knuffi.core.Learn
 import de.knuffi.core.StepRewards
 import de.knuffi.core.TimeUtil
 import java.time.ZoneId
@@ -64,6 +65,7 @@ object Notifier {
                 setShowBadge(false)
             },
         )
+        LearnNotifier.createChannel(context)
     }
 
     fun hasPermission(context: Context): Boolean =
@@ -140,8 +142,32 @@ object Notifier {
                 }
             }
         }
+        if (!quiet) learnSpec(state, now, zone, hour)?.let { list += it }
         if (!quiet) list += worldSpecs(state, now, zone)
         return list.filter { now - (state.notifyLog[it.key] ?: 0L) >= it.cooldownMs }.take(2)
+    }
+
+    /** The Lernzeit: once from [de.knuffi.core.Settings.learnHour] on and again in the evening if it is not done yet. */
+    private fun learnSpec(state: GameState, now: Long, zone: ZoneId, hour: Int): Spec? {
+        val s = state.settings
+        if (!s.learnEnabled) return null
+        val today = TimeUtil.epochDay(now, zone)
+        if (Learn.allDone(s, state.learn, today)) return null
+        val dayStart = java.time.LocalDate.ofEpochDay(today).atStartOfDay(zone).toInstant().toEpochMilli()
+        val sentToday = { key: String -> (state.notifyLog[key] ?: 0L) >= dayStart }
+        val left = Learn.left(s, state.learn, today)
+        val name = state.pet?.takeIf { !it.isEgg }?.name ?: "Dein Haustier"
+        val evening = maxOf(s.learnHour + 3, 18)
+        if (s.learnEvening && hour >= evening && !sentToday("learn_evening")) {
+            return Spec(
+                "learn_evening", LearnNotifier.CHANNEL, "",
+                "🌙 Noch $left ${if (left == 1) "Aufgabe" else "Aufgaben"} offen! $name wartet auf eure Lernzeit, sonst ist $name morgen ein bisschen traurig. 🥺", 0L,
+            )
+        }
+        if (hour >= s.learnHour && !sentToday("learn") && !sentToday("learn_evening")) {
+            return Spec("learn", LearnNotifier.CHANNEL, "", "⏰ Zeit für die Lernzeit! $name hat schon die Brille auf. Heute warten $left Aufgaben, hier ist die erste:", 0L)
+        }
+        return null
     }
 
     /** Garden, trips, festivals and birthdays. Each fires once for each new occasion. */
@@ -193,7 +219,7 @@ object Notifier {
         val state = GameRepository.current
         val specs = evaluate(state, now, GameRepository.zone)
         for (spec in specs) {
-            post(context, spec, state)
+            if (spec.channel == LearnNotifier.CHANNEL) LearnNotifier.post(context, state, header = spec.text) else post(context, spec, state)
             GameRepository.perform(Action.MarkNotified(spec.key), userPresent = false, sync = true)
         }
     }

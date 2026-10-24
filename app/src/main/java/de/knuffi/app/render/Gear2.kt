@@ -44,17 +44,47 @@ internal fun PetRenderer.drawBackItem(c: Canvas, id: String, pose: PetPose, bw: 
             c.drawRect(tx - u * 0.07f, ly + u * 0.13f, tx + u * 0.07f, ly + u * 0.17f, fill)
             c.restore()
         }
-        "back_backpack", "back_treasure" -> {
+        "back_backpack", "back_treasure", "back_bookbag" -> {
             val treasure = id == "back_treasure"
-            val main = if (treasure) 0xFF9A6A3A.toInt() else 0xFF4DA8FF.toInt()
+            val main = when (id) {
+                "back_treasure" -> 0xFF9A6A3A.toInt()
+                "back_bookbag" -> 0xFFC8504A.toInt()
+                else -> 0xFF4DA8FF.toInt()
+            }
             val side = if (pose.turn > 0.05f) -1f else 1f
             val x = side * bw * 0.55f
+            if (id == "back_bookbag") {
+                // books peeking out at the top
+                val cols = intArrayOf(0xFF4D8DFF.toInt(), 0xFF5ED17A.toInt(), 0xFFFFC83D.toInt())
+                for (k in 0..2) {
+                    val bx = x - bw * 0.3f + k * bw * 0.2f
+                    val h = u * (0.2f + 0.06f * ((k + 1) % 3))
+                    c.save()
+                    c.rotate((k - 1) * 7f, bx, cy - bh * 0.55f)
+                    path.reset()
+                    path.addRoundRect(bx - bw * 0.08f, cy - bh * 0.55f - h, bx + bw * 0.08f, cy - bh * 0.45f, u * 0.02f, u * 0.02f, Path.Direction.CW)
+                    shaded(c, path, Colors.lighten(cols[k], 0.35f), cols[k], Colors.darken(cols[k], 0.35f))
+                    fill.shader = null
+                    fill.color = Colors.alpha(Color.WHITE, 0.75f)
+                    c.drawRect(bx - bw * 0.06f, cy - bh * 0.55f - h * 0.7f, bx + bw * 0.06f, cy - bh * 0.55f - h * 0.6f, fill)
+                    c.restore()
+                }
+            }
             path.reset()
             path.addRoundRect(x - bw * 0.45f, cy - bh * 0.55f, x + bw * 0.45f, cy + bh * 0.55f, u * 0.08f, u * 0.08f, Path.Direction.CW)
             shaded(c, path, Colors.lighten(main, 0.35f), main, Colors.darken(main, 0.35f))
             path.reset()
             path.addRoundRect(x - bw * 0.35f, cy + bh * 0.05f, x + bw * 0.35f, cy + bh * 0.42f, u * 0.05f, u * 0.05f, Path.Direction.CW)
             shaded(c, path, Colors.lighten(main, 0.5f), Colors.lighten(main, 0.15f), Colors.darken(main, 0.2f))
+            if (id == "back_bookbag") {
+                // an "A" on the pocket
+                line.shader = null
+                line.color = Color.WHITE
+                line.strokeWidth = u * 0.025f
+                c.drawLine(x - bw * 0.1f, cy + bh * 0.36f, x, cy + bh * 0.1f, line)
+                c.drawLine(x, cy + bh * 0.1f, x + bw * 0.1f, cy + bh * 0.36f, line)
+                c.drawLine(x - bw * 0.05f, cy + bh * 0.26f, x + bw * 0.05f, cy + bh * 0.26f, line)
+            }
             if (treasure) {
                 gem(c, x, cy - bh * 0.25f, u * 0.06f, 0xFFFFC83D.toInt())
                 for (k in 0..2) gem(c, x - bw * 0.2f + k * bw * 0.2f, cy - bh * 0.55f, u * 0.035f, intArrayOf(0xFFFF5C7A.toInt(), 0xFF4D8DFF.toInt(), 0xFF5ED17A.toInt())[k])
@@ -153,9 +183,10 @@ internal fun PetRenderer.drawBackItem(c: Canvas, id: String, pose: PetPose, bw: 
 /** Straps and other front parts of back items. */
 internal fun PetRenderer.drawBackFront(c: Canvas, id: String, bw: Float, bh: Float, cy: Float, fx: Float) {
     when (id) {
-        "back_backpack", "back_treasure", "back_jetpack" -> {
+        "back_backpack", "back_treasure", "back_jetpack", "back_bookbag" -> {
             val col = when (id) {
                 "back_treasure" -> 0xFF7A4A22.toInt()
+                "back_bookbag" -> 0xFF8A2E2A.toInt()
                 "back_jetpack" -> 0xFF6E7A96.toInt()
                 else -> 0xFF2A70C8.toInt()
             }
@@ -235,6 +266,42 @@ internal fun PetRenderer.drawMoreHat(c: Canvas, id: String, pose: PetPose, bw: F
             fill.shader = null
             fill.color = Color.WHITE
             c.drawPath(path3, fill)
+        }
+        "hat_mortarboard" -> {
+            val base = top + bh * 0.16f
+            path.reset()
+            path.moveTo(hx - bw * 0.5f, base)
+            path.lineTo(hx - bw * 0.46f, base - u * 0.2f)
+            path.lineTo(hx + bw * 0.46f, base - u * 0.2f)
+            path.lineTo(hx + bw * 0.5f, base)
+            path.quadTo(hx, base + u * 0.07f, hx - bw * 0.5f, base)
+            path.close()
+            shaded(c, path, 0xFF5A5470.toInt(), 0xFF2E2A3E.toInt(), 0xFF15121E.toInt())
+            val by = base - u * 0.24f
+            path.reset()
+            path.moveTo(hx - bw * 0.95f, by)
+            path.lineTo(hx, by - u * 0.15f)
+            path.lineTo(hx + bw * 0.95f, by)
+            path.lineTo(hx, by + u * 0.15f)
+            path.close()
+            shaded(c, path, 0xFF6E6890.toInt(), 0xFF36324C.toInt(), 0xFF15121E.toInt())
+            val sway = sin(t * 2.6f) * u * 0.04f
+            val kx = hx + bw * 0.72f
+            line.shader = null
+            line.color = 0xFFFFC83D.toInt()
+            line.strokeWidth = u * 0.025f
+            c.drawLine(hx, by, kx, by + u * 0.05f, line)
+            c.drawLine(kx, by + u * 0.05f, kx + sway, by + u * 0.3f, line)
+            path.reset()
+            path.moveTo(kx + sway - u * 0.035f, by + u * 0.28f)
+            path.lineTo(kx + sway + u * 0.035f, by + u * 0.28f)
+            path.lineTo(kx + sway + u * 0.06f, by + u * 0.43f)
+            path.lineTo(kx + sway - u * 0.06f, by + u * 0.43f)
+            path.close()
+            shaded(c, path, 0xFFFFF0A0.toInt(), 0xFFFFC83D.toInt(), 0xFFB87A00.toInt(), outline = false)
+            fill.shader = null
+            fill.color = 0xFFFFC83D.toInt()
+            c.drawCircle(hx, by, u * 0.04f, fill)
         }
         "hat_jester" -> {
             val base = top + bh * 0.18f
@@ -391,6 +458,26 @@ internal fun PetRenderer.drawMoreFace(c: Canvas, id: String, pose: PetPose, bw: 
             path.quadTo(fx + ex + re * 1.6f, ey - re * 2.0f, fx + ex + re * 1.5f, ey - re * 0.9f)
             path.close()
             shaded(c, path, 0xFFFFC6DC.toInt(), 0xFFFF5A8A.toInt(), 0xFFB82C66.toInt(), outline = false)
+        }
+        "face_labgoggles" -> {
+            path.reset()
+            path.moveTo(-bw * 1.02f, ey - re * 0.1f)
+            path.lineTo(bw * 1.02f, ey - re * 0.1f)
+            stroke(c, path, 0xFF2E6A8A.toInt(), u * 0.09f)
+            for (sd in intArrayOf(-1, 1)) {
+                val x = fx + sd * ex
+                path.reset()
+                path.addRoundRect(x - re * 1.45f, ey - re * 1.25f, x + re * 1.45f, ey + re * 1.15f, re * 0.9f, re * 0.9f, Path.Direction.CW)
+                fill.shader = null
+                fill.color = Colors.alpha(0xFFBFEFFF.toInt(), 0.42f)
+                c.drawPath(path, fill)
+                stroke(c, path, 0xFF4FB8E0.toInt(), u * 0.07f)
+                gloss(c, x - re * 0.5f, ey - re * 0.55f, re * 0.55f, re * 0.22f, 0.9f)
+            }
+            path.reset()
+            path.moveTo(fx - ex + re * 1.4f, ey - re * 0.2f)
+            path.quadTo(fx, ey - re * 0.7f, fx + ex - re * 1.4f, ey - re * 0.2f)
+            stroke(c, path, 0xFF4FB8E0.toInt(), u * 0.06f)
         }
         "face_aviator" -> {
             path.reset()

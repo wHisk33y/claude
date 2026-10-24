@@ -50,7 +50,21 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        openFrom(intent)
         setContent { AppRoot(debug) }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        openFrom(intent)
+    }
+
+    /** Notifications can open a page directly (e.g. the Lernzeit). */
+    private fun openFrom(intent: android.content.Intent?) {
+        if (intent?.getStringExtra(de.knuffi.app.notify.LearnNotifier.EXTRA_OPEN) == de.knuffi.app.notify.LearnNotifier.OPEN_LEARN) {
+            de.knuffi.app.ui.AppNav.pending.value = de.knuffi.app.ui.Route.Learn
+        }
     }
 
     override fun onStart() {
