@@ -24,6 +24,13 @@ enum class QuizCategory(val title: String, val emoji: String) {
     ESSEN("Essen & Trinken", "🍎"),
     DEUTSCHLAND("Deutschland", "🇩🇪"),
     ZAHLEN("Zahlen & Rekorde", "🔢"),
+    MYTHEN("Mythen & Sagen", "🐉"),
+    BERUFE("Berufe & Alltag", "💼"),
+    VERKEHR("Verkehr & Fahrzeuge", "🚗"),
+    PFLANZEN("Pflanzen & Garten", "🌻"),
+    FESTE("Feste & Bräuche", "🎄"),
+    RAETSEL("Rätsel & Logik", "🧩"),
+    BIONIK("Erfindungen der Natur", "🦎"),
 }
 
 /** How hard the questions are. Level 1 is fine for primary school, level 3 is for grown-ups. */

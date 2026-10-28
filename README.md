@@ -1,7 +1,7 @@
 # Knuffi – dein modernes Taschen-Haustier 🥚✨
 
 Knuffi ist ein Tamagotchi für Android im modernen Gewand: Ein kleines Wesen schlüpft aus einem Ei,
-wächst mit deiner Pflege heran und entwickelt sich je nach Pflege in eine von über 160 Formen.
+wächst mit deiner Pflege heran und entwickelt sich je nach Pflege in eine von fast 400 Formen, bis es nach einem langen Leben zu den Sternen reist.
 Du sammelst Fabelwesen aus 15 Ei-Sorten, dazu echte Katzen, Hasen, Hamster und Meerschweinchen, legst einen Garten an,
 schickst deine Lieblinge auf Ausflüge, bringst ihnen Kunststücke bei und feierst die Feste des Jahres.
 Dein Haustier wohnt in einem Haus mit bis zu acht Zimmern, die du selbst einrichtest. Dazu gibt es ein Homescreen-Widget,
@@ -18,6 +18,15 @@ Eine neue Version lässt sich einfach über die alte installieren, dein Spielsta
 
 ## Funktionen
 
+- **Neu in 5.0: Lebenszyklus**: Haustiere werden sichtbar alt (graue Härchen, buschige Augenbrauen, langsamere
+  Schritte) und reisen irgendwann zwischen Level 60 und 80 zu den Sternen. Vorher gibt es einen letzten gemeinsamen
+  Moment mit Tagebucheintrag und Kuscheln, danach steigt das Haustier mit Flügeln und Heiligenschein in den
+  Abendhimmel und wird zu einem Stern. Danach zieht ein Haustier aus dem Kuschelhaus ein, ein wartendes Ei schlüpft
+  oder ein neues Ei kommt. **228 neue Formen**: alle 10 Level eine neue Entwicklung (Prächtig, Erfahren, Weise,
+  Ehrwürdig, Uralt, Zeitlos), jeweils mit einem aktiven und einem gemütlichen Weg, für Fabelwesen und echte Tiere.
+  **Eier sind seltener** geworden; nicht gebrauchte Eier kann man in der Eier-Gärtnerei gegen Münzen abgeben.
+  Das **Wissensquiz** hat jetzt fast 2000 Fragen aus 22 Themen, neu sind Mythen & Sagen, Berufe & Alltag,
+  Verkehr & Fahrzeuge, Pflanzen & Garten, Feste & Bräuche, Rätsel & Logik und Erfindungen der Natur.
 - **Neu in 4.5**: Wissensquiz mit über 600 Fragen aus 15 Themen (Tiere, Weltraum, Geschichte, Sport,
   Filme & Spiele, Deutschland …) in drei Schwierigkeiten, mit einer kurzen Erklärung zu jeder Frage und
   einem 50:50-Joker, allein oder abwechselnd mit bis zu vier Spielern. Sprachkommandos funktionieren jetzt
@@ -53,7 +62,8 @@ Eine neue Version lässt sich einfach über die alte installieren, dein Spielsta
   Drachen, Dinos und Roboter). Der Look bestimmt Farben und Startausstattung, alle Inhalte gibt es für alle.
 - **12 Ei-Sorten mit über 100 Wesen**: Knuffel, Wald, Meer, Feuer, Urzeit, Techno, Regenbogen, Blüten, Sterne,
   Zucker sowie Frost und Grusel (nur zu Festen). Jede Familie hat ihre eigenen Entwicklungen:
-  Ei → Baby → Kind → Teenager → Erwachsen. Was entsteht, hängt von deiner Pflege ab, und mit perfekter Pflege
+  Ei → Baby → Kind → Teenager → Erwachsen, danach alle 10 Level eine neue Altersform bis Level 70. Was entsteht,
+  hängt von deiner Pflege ab, und mit perfekter Pflege
   gibt es eine legendäre Form. Selten schlüpft ein *schillerndes* Wesen ✨ (mit Glitzerstaub garantiert).
 - **Kuschelhaus**: Sammle viele Haustiere, eins ist aktiv, die anderen ruhen und brauchen keine Pflege.
   Eier ausbrüten, Haustiere wechseln und neue Plätze anbauen. Wird es zu voll, wählst du mit *Aufräumen*
@@ -73,7 +83,7 @@ Eine neue Version lässt sich einfach über die alte installieren, dein Spielsta
 - **Pflegebedarf und Schlafbedarf** (je ein Schieberegler in den Einstellungen): Wer mehr zu tun haben möchte,
   stellt die Pflege höher, dann kommen Hunger, Langeweile und Schmutz schneller. Mit weniger Schlaf werden
   die Nickerchen kürzer und das Haustier bleibt länger wach.
-- **Schwierigkeit** (umschaltbar): *Entspannt* (kann nicht sterben) oder *Klassisch* (schnellerer Verfall,
+- **Schwierigkeit** (umschaltbar): *Entspannt* (stirbt nicht an fehlender Pflege) oder *Klassisch* (schnellerer Verfall,
   bei Vernachlässigung reist das Haustier zu den Sternen, danach gibt es ein neues Ei).
 - **Sechs Minispiele** mit Countdown, Combos, Sternen und Effekten:
   - *Futterfang*: Power-ups (Magnet, Zeitlupe, Extraleben), Level, Explosionen
@@ -189,7 +199,7 @@ Eine neue Version lässt sich einfach über die alte installieren, dein Spielsta
   Aufgaben, Wünschen, Spielen und Turnieren bringen dein Haustier weiter, an jeder Station wartet eine Belohnung.
 - **Turniere**: Wettrennen, Hürdenlauf und Weitsprung gegen deine anderen Haustiere und Gäste um den Bronze-,
   Silber-, Gold- und Diamant-Pokal. Gewonnene Pokale stehen im Regal.
-- **Mehr Aufgaben**: 42 Aufgabentypen, dazu drei große Monatsziele mit Bonus-Ei und 9 große Sammelziele
+- **Mehr Aufgaben**: 42 Aufgabentypen, dazu drei große Monatsziele mit Bonus (manchmal ein Ei) und 9 große Sammelziele
   (z. B. „Kleiner Zoo“, „Zirkusstar“, „Champion“) mit besonderen Belohnungen wie Laufrad und Zirkusbühne.
 - **6 neue Minispiele** (jetzt 21, nach Action, Knobeln und Ruhig sortierbar): Unterschiede finden, Wortsuche,
   Schattenrätsel, Sternenflug mit Ufo-Boss, Wolkenhüpfer und Kartrennen.

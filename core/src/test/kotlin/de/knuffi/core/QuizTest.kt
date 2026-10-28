@@ -15,7 +15,7 @@ class QuizTest {
     @Test
     fun everyQuestionIsWellFormed() {
         val all = Quiz.all
-        assertTrue("only ${all.size} questions", all.size >= 550)
+        assertTrue("only ${all.size} questions", all.size >= 1900)
         assertEquals("duplicate ids", all.size, all.map { it.id }.toSet().size)
         assertEquals("duplicate questions", all.size, all.map { it.question.lowercase() }.toSet().size)
         for (q in all) {
@@ -33,8 +33,8 @@ class QuizTest {
     fun everyTopicHasManyQuestionsOnEveryLevel() {
         for (c in QuizCategory.entries) {
             val qs = Quiz.all.filter { it.category == c }
-            assertTrue("$c has ${qs.size}", qs.size >= 35)
-            for (l in 1..3) assertTrue("$c level $l", qs.count { it.level == l } >= 6)
+            assertTrue("$c has ${qs.size}", qs.size >= 75)
+            for (l in 1..3) assertTrue("$c level $l", qs.count { it.level == l } >= 18)
         }
     }
 

@@ -1,6 +1,6 @@
 package de.knuffi.core
 
-/** All quiz questions by topic (the texts are in QuizData1 to QuizData3). */
+/** All quiz questions by topic (the texts are in QuizData1 to QuizData13). */
 internal object QuizData {
     val raw: List<Pair<QuizCategory, String>> = listOf(
         QuizCategory.TIERE to QUIZ_TIERE,
@@ -18,5 +18,27 @@ internal object QuizData {
         QuizCategory.ESSEN to QUIZ_ESSEN,
         QuizCategory.DEUTSCHLAND to QUIZ_DEUTSCHLAND,
         QuizCategory.ZAHLEN to QUIZ_ZAHLEN,
+        QuizCategory.TIERE to QUIZ_TIERE_2,
+        QuizCategory.NATUR to QUIZ_NATUR_2,
+        QuizCategory.ERDE to QUIZ_ERDE_2,
+        QuizCategory.WELTRAUM to QUIZ_WELTRAUM_2,
+        QuizCategory.KOERPER to QUIZ_KOERPER_2,
+        QuizCategory.GESCHICHTE to QUIZ_GESCHICHTE_2,
+        QuizCategory.TECHNIK to QUIZ_TECHNIK_2,
+        QuizCategory.WISSENSCHAFT to QUIZ_WISSENSCHAFT_2,
+        QuizCategory.SPORT to QUIZ_SPORT_2,
+        QuizCategory.MUSIK to QUIZ_MUSIK_2,
+        QuizCategory.SPRACHE to QUIZ_SPRACHE_2,
+        QuizCategory.FILM to QUIZ_FILM_2,
+        QuizCategory.ESSEN to QUIZ_ESSEN_2,
+        QuizCategory.DEUTSCHLAND to QUIZ_DEUTSCHLAND_2,
+        QuizCategory.ZAHLEN to QUIZ_ZAHLEN_2,
+        QuizCategory.MYTHEN to QUIZ_MYTHEN,
+        QuizCategory.BERUFE to QUIZ_BERUFE,
+        QuizCategory.VERKEHR to QUIZ_VERKEHR,
+        QuizCategory.PFLANZEN to QUIZ_PFLANZEN,
+        QuizCategory.FESTE to QUIZ_FESTE,
+        QuizCategory.RAETSEL to QUIZ_RAETSEL,
+        QuizCategory.BIONIK to QUIZ_BIONIK,
     )
 }

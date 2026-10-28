@@ -12,6 +12,8 @@ class KnuffiApp : Application() {
         super.onCreate()
         de.knuffi.app.data.CrashLog.install(this)
         Thread { de.knuffi.app.data.CrashLog.checkExitReasons(this) }.start()
+        // read the ~2000 quiz questions early, so opening the quiz never waits for it
+        Thread { de.knuffi.core.Quiz.all }.start()
         GameRepository.init(this)
         Notifier.createChannels(this)
         PetWorker.schedule(this)
