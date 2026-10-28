@@ -38,19 +38,14 @@ object TimeUtil {
 }
 
 object Leveling {
-    const val MAX_LEVEL = 50
+    const val MAX_LEVEL = 80
 
     fun xpToNext(level: Int): Int = 40 + 20 * level
 
     fun levelUpCoins(level: Int): Int = 10 + 2 * level
 
     /** The form stage a pet should have reached at [level]. */
-    fun stageFor(level: Int): Stage = when {
-        level >= Stage.ADULT.minLevel -> Stage.ADULT
-        level >= Stage.TEEN.minLevel -> Stage.TEEN
-        level >= Stage.CHILD.minLevel -> Stage.CHILD
-        else -> Stage.BABY
-    }
+    fun stageFor(level: Int): Stage = Stage.entries.lastOrNull { it != Stage.EGG && level >= it.minLevel } ?: Stage.BABY
 
     /** Perfect care over several days as a teenager leads to the legendary form. */
     fun legendReady(care: CareLog): Boolean = care.mistakes == 0 && care.averageMood >= 78 && care.moodHours >= 72
@@ -81,7 +76,17 @@ object Leveling {
                 foodie -> f(Role.ADULT_FOODIE)
                 else -> f(Role.ADULT_BALANCED)
             }
-            Stage.ADULT -> pet.form
+            else -> {
+                // Every ten levels: the active or the cozy path, depending on how the pet was cared for.
+                val stage = Stage.entries.getOrNull(pet.form.stage.ordinal + 1) ?: return pet.form
+                val cozy = when {
+                    care.food > care.activity * 1.2 + 1 -> true
+                    care.activity > care.food * 1.2 + 1 -> false
+                    pet.form.role == Role.ADULT_BALANCED || pet.form.role == Role.LEGEND -> pet.id % 2L == 0L
+                    else -> pet.form.role.cozy
+                }
+                Role.elder(stage, cozy)?.let { f(it) }
+            }
         }
         return next ?: pet.form
     }

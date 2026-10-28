@@ -156,6 +156,9 @@ class PetDirector(seed: Int = 7) {
     private var targetZ = 0f
     private var targetX = 0.46f
     private var speed = 0.13f
+
+    /** Old pets walk a little slower. */
+    private var elderPace = 1f
     private var facing = 1f
     private var turn = 0f
     private var walking = false
@@ -1148,6 +1151,7 @@ class PetDirector(seed: Int = 7) {
     fun update(t: Float, look: PetLook?, needs: List<Need>, ps: ParticleSystem, headX: Float, headY: Float) {
         val dt = if (lastT < 0f) 0.016f else (t - lastT).coerceIn(0f, 0.1f)
         lastT = t
+        elderPace = 1f - 0.35f * (look?.age ?: 0f)
         now = t
         pose.reset()
         pose.t = t
@@ -1227,11 +1231,11 @@ class PetDirector(seed: Int = 7) {
         // Movement (x and depth)
         if (walking) {
             val dx = targetX - x
-            val step = min(abs(dx), speed * dt)
+            val step = min(abs(dx), speed * elderPace * dt)
             x += sign(dx) * step
             val dz = targetZ - z
             z += sign(dz) * min(abs(dz), 1.6f * dt)
-            vx = sign(dx) * speed
+            vx = sign(dx) * speed * elderPace
             if (abs(dx) > 0.002f) facing = sign(dx)
             walkPhase += dt * (6f + speed * 30f)
             val s = sin(walkPhase)

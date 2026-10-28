@@ -76,6 +76,8 @@ fun KuschelhausScreen(state: GameState, onBack: () -> Unit, onTrips: () -> Unit)
     val now = rememberNow(10_000L)
     var hatchLine by remember { mutableStateOf<EggLine?>(null) }
     var hatchFamily by remember { mutableStateOf<de.knuffi.core.FamilyEgg?>(null) }
+    var giveLine by remember { mutableStateOf<EggLine?>(null) }
+    var giveFamily by remember { mutableStateOf<de.knuffi.core.FamilyEgg?>(null) }
     var release by remember { mutableStateOf<Pet?>(null) }
     // "Aufräumen": pick several pets and say goodbye to all of them at once.
     var tidying by remember { mutableStateOf(false) }
@@ -147,7 +149,7 @@ fun KuschelhausScreen(state: GameState, onBack: () -> Unit, onTrips: () -> Unit)
                 item {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         items(state.familyEggs, key = { it.id }) { egg ->
-                            FamilyEggCard(egg, full) { hatchFamily = egg }
+                            FamilyEggCard(egg, full, onGiveAway = { giveFamily = egg }) { hatchFamily = egg }
                         }
                     }
                 }
@@ -157,7 +159,7 @@ fun KuschelhausScreen(state: GameState, onBack: () -> Unit, onTrips: () -> Unit)
                 item {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         items(EggLine.entries.filter { state.eggCount(it) > 0 }) { line ->
-                            EggCard(state, line, full) { hatchLine = line }
+                            EggCard(state, line, full, onGiveAway = { giveLine = line }) { hatchLine = line }
                         }
                     }
                 }
@@ -302,6 +304,30 @@ fun KuschelhausScreen(state: GameState, onBack: () -> Unit, onTrips: () -> Unit)
             onDismiss = { hatchFamily = null },
         )
     }
+    giveLine?.let { line ->
+        ConfirmDialog(
+            title = "${line.emoji} ${line.title} abgeben?",
+            text = "Das Ei zieht in die Eier-Gärtnerei, wo es liebevoll versorgt wird und später eine eigene Familie findet. Du bekommst ${de.knuffi.core.Eggs.giveAwayCoins(line)} Münzen.",
+            confirm = "Abgeben",
+            onConfirm = {
+                GameRepository.perform(Action.GiveAwayEgg(line))
+                giveLine = null
+            },
+            onDismiss = { giveLine = null },
+        )
+    }
+    giveFamily?.let { egg ->
+        ConfirmDialog(
+            title = "💕 ${egg.title} abgeben?",
+            text = "Das Ei zieht in die Eier-Gärtnerei, wo es liebevoll versorgt wird und später eine eigene Familie findet. Du bekommst ${de.knuffi.core.Eggs.FAMILY_EGG_COINS} Münzen.",
+            confirm = "Abgeben",
+            onConfirm = {
+                GameRepository.perform(Action.GiveAwayFamilyEgg(egg.id))
+                giveFamily = null
+            },
+            onDismiss = { giveFamily = null },
+        )
+    }
     release?.let { pet ->
         ConfirmDialog(
             title = "${pet.name} verabschieden?",
@@ -433,7 +459,7 @@ private fun BoxScope.PickOverlay(picked: Boolean, enabled: Boolean, label: Strin
 }
 
 @Composable
-private fun FamilyEggCard(egg: de.knuffi.core.FamilyEgg, full: Boolean, onHatch: () -> Unit) {
+private fun FamilyEggCard(egg: de.knuffi.core.FamilyEgg, full: Boolean, onGiveAway: () -> Unit, onHatch: () -> Unit) {
     val p = LocalPalette.current
     val look = remember(egg.id) { eggPreview(egg.line).let { it.copy(blend = egg.blend, fur = egg.fur ?: it.fur) } }
     SurfaceCard(Modifier.width(170.dp), contentPadding = PaddingValues(12.dp), color = if (p.dark) p.surfaceAlt else Color(0xFFFFEEF6)) {
@@ -453,11 +479,13 @@ private fun FamilyEggCard(egg: de.knuffi.core.FamilyEgg, full: Boolean, onHatch:
             color = p.pink,
             deep = p.pinkDeep,
         )
+        Spacer(Modifier.height(6.dp))
+        ClayTextButton("Abgeben", onGiveAway, small = true, emoji = "🌱", modifier = Modifier.fillMaxWidth(), color = p.violet, deep = p.violetDeep)
     }
 }
 
 @Composable
-private fun EggCard(state: GameState, line: EggLine, full: Boolean, onHatch: () -> Unit) {
+private fun EggCard(state: GameState, line: EggLine, full: Boolean, onGiveAway: () -> Unit, onHatch: () -> Unit) {
     val p = LocalPalette.current
     val look = remember(line) { eggPreview(line) }
     SurfaceCard(Modifier.width(150.dp), contentPadding = PaddingValues(12.dp)) {
@@ -477,6 +505,8 @@ private fun EggCard(state: GameState, line: EggLine, full: Boolean, onHatch: () 
             color = p.mint,
             deep = p.mintDeep,
         )
+        Spacer(Modifier.height(6.dp))
+        ClayTextButton("Abgeben", onGiveAway, small = true, emoji = "🌱", modifier = Modifier.fillMaxWidth(), color = p.violet, deep = p.violetDeep)
     }
 }
 

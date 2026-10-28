@@ -23,12 +23,13 @@ data class FamilyEgg(
 object Family {
     const val COOLDOWN_MS = 5 * 86_400_000L
     const val CHECK_MS = 20 * 3_600_000L
-    const val CHANCE = 0.35f
+    /** Family eggs are rare (a quarter of what it used to be). */
+    const val CHANCE = 0.09f
     const val MAX_WAITING = 2
     const val MIN_LEVEL = 6
 
     fun eligible(s: GameState, p: Pet): Boolean =
-        p.alive && !p.isEgg && p.level >= MIN_LEVEL && (p.stage == Stage.TEEN || p.stage == Stage.ADULT) && s.onTrip(p.id) == null
+        p.alive && !p.isEgg && p.level >= MIN_LEVEL && p.stage.ordinal >= Stage.TEEN.ordinal && s.onTrip(p.id) == null
 
     /** Parent and child or brothers and sisters don't become parents together. */
     fun related(a: Pet, b: Pet): Boolean =

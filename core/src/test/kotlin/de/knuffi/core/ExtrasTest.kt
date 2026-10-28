@@ -58,9 +58,9 @@ class ExtrasTest {
 
     @Test
     fun creatureCounts() {
-        assertEquals(124, Form.creatures.size)
-        assertEquals(10, Form.cats.size)
-        assertEquals(27, Form.smallAnimals.size)
+        assertEquals(304, Form.creatures.size)
+        assertEquals(22, Form.cats.size)
+        assertEquals(63, Form.smallAnimals.size)
         for (line in EggLine.entries.filter { it.real }) assertTrue("$line furs", Skins.furs(line).isNotEmpty())
     }
 

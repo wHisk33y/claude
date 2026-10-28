@@ -87,6 +87,15 @@ object Notifier {
         val quiet = settings.quietHours && inQuietHours(hour, settings.quietStart, settings.quietEnd)
         val list = mutableListOf<Spec>()
 
+        // The goodbye of an old pet and the first grey hairs, once each
+        if (pet.farewell) {
+            val key = "farewell_${pet.id}"
+            return if (key in state.notifyLog || quiet) emptyList()
+            else listOf(Spec(key, CH_CARE, "🌟 $name möchte sich verabschieden", "$name ist alt geworden und möchte dir noch etwas sagen. Komm vorbei, wenn du bereit bist.", 0L))
+        }
+        if (!pet.isEgg && de.knuffi.core.Lifespan.isElder(pet) && "elder_${pet.id}" !in state.notifyLog && !quiet) {
+            list += Spec("elder_${pet.id}", CH_EVENTS, "💛 $name wird langsam alt", "Die ersten grauen Härchen sind da, und Nickerchen werden wichtiger. Genießt die gemeinsame Zeit!", 0L)
+        }
         if (pet.isEgg) {
             if (now - pet.bornAt > 2 * HOUR && !quiet) {
                 list += Spec("egg", CH_CARE, "🥚 Dein Ei wackelt!", "Etwas möchte schlüpfen. Schau schnell nach!", 12 * HOUR)

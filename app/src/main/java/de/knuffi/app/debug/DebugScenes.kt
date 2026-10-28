@@ -116,6 +116,8 @@ object DebugScenes {
             intent.getStringExtra("debug_fur")?.let { pet = pet.copy(fur = it) }
             intent.getStringExtra("debug_skin")?.let { pet = pet.copy(skin = it) }
             intent.getStringExtra("debug_level")?.toIntOrNull()?.let { pet = pet.copy(level = it) }
+            // debug builds only: a pet that is old enough to say goodbye
+            if (intent.getStringExtra("debug_farewell") != null) pet = pet.copy(level = de.knuffi.core.Lifespan.level(pet), farewell = true)
             intent.getStringExtra("debug_job")?.let { j -> pet = pet.copy(job = de.knuffi.core.Job.entries.firstOrNull { it.name.equals(j, true) }, jobXp = 9) }
             if (pet.isCat && pet.fur == null) pet = pet.copy(fur = de.knuffi.core.Skins.DEFAULT_FUR)
             var eq = state.equipped
@@ -227,6 +229,7 @@ object DebugScenes {
         "tournament" -> Route.Tournament
         "settings" -> Route.Settings
         "gallery", "gallery1", "gallery2", "gallery3", "gallery4", "gallery5", "gallery6", "gallery7", "gallery8", "gallery9" -> Route.Gallery
+        in (1..12).map { "elder$it" } -> Route.Gallery
         "widget" -> Route.WidgetPreview
         "wallpaper" -> Route.WallpaperPreview
         "walk" -> Route.Walk
@@ -507,6 +510,15 @@ object DebugScenes {
     @Composable
     fun Gallery(state: GameState, scene: String? = null) {
         val page = scene?.removePrefix("gallery")?.toIntOrNull() ?: 0
+        scene?.removePrefix("elder")?.toIntOrNull()?.takeIf { scene.startsWith("elder") }?.let { n ->
+            // the older forms (from level 20), 24 per page
+            val forms = Form.entries.filter { it.stage.ordinal > de.knuffi.core.Stage.ADULT.ordinal }
+            GalleryPage(
+                "Ältere Formen, Seite $n",
+                forms.chunked(24).getOrElse(n - 1) { emptyList() }.map { "${it.title} (${it.stage.minLevel})" to PetLook(it, Mood.HAPPY, line = it.line, fur = de.knuffi.core.Skins.defaultFur(it.line)) },
+            )
+            return
+        }
         if (page in 1..5 || page in 8..9) {
             val chunk = if (page <= 5) page - 1 else page - 3
             GalleryPage(

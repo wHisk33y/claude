@@ -126,6 +126,12 @@ sealed interface Action {
 
     // Wissensquiz
     data class QuizAnswered(val id: Int, val correct: Boolean) : Action
+
+    // Life: saying goodbye and giving away spare eggs
+    /** The old pet says goodbye and becomes a star. */
+    data object SayGoodbye : Action
+    data class GiveAwayEgg(val line: EggLine) : Action
+    data class GiveAwayFamilyEgg(val id: Long) : Action
     /** A quiz round is over ([category] null: all topics). */
     data class QuizRoundDone(val category: QuizCategory?, val score: Int, val total: Int) : Action
 }
@@ -428,7 +434,7 @@ object Engine {
 
         fun simulate(now: Long, zone: ZoneId) {
             val pet = s.pet
-            if (pet == null || !pet.alive || pet.isEgg || s.lastSimulated <= 0L) {
+            if (pet == null || !pet.alive || pet.isEgg || pet.farewell || s.lastSimulated <= 0L) {
                 s = s.copy(lastSimulated = now)
                 return
             }
@@ -462,7 +468,7 @@ object Engine {
             val h = dt / 3_600_000.0
             val m = if (classic) 1.4 else 1.0
             val n = CareTuning.needs(s.settings.careLevel)
-            val tire = CareTuning.tiring(s.settings.sleepLevel) * (if (Perk.ENERGY in perks) 0.8 else 1.0)
+            val tire = CareTuning.tiring(s.settings.sleepLevel) * (if (Perk.ENERGY in perks) 0.8 else 1.0) * (if (Lifespan.isElder(p0)) 1.25 else 1.0)
             val hungerF = if (Perk.HUNGER in perks) 0.8 else 1.0
             val joyF = (if (Perk.JOY in perks) 0.8 else 1.0) * weatherJoy
             val rest = CareTuning.resting(s.settings.sleepLevel)
@@ -850,7 +856,9 @@ object Engine {
             questProgress(QuestType.XP, amount)
             var xp = pet.xp + amount
             var level = pet.level
-            while (level < Leveling.MAX_LEVEL && xp >= Leveling.xpToNext(level)) {
+            val lastLevel = minOf(Leveling.MAX_LEVEL, Lifespan.level(pet))
+            if (pet.farewell) return
+            while (level < lastLevel && xp >= Leveling.xpToNext(level)) {
                 xp -= Leveling.xpToNext(level)
                 level++
                 val coins = Leveling.levelUpCoins(level)
@@ -867,7 +875,10 @@ object Engine {
                     }
                 }
             }
-            if (level >= Leveling.MAX_LEVEL) xp = min(xp, Leveling.xpToNext(level))
+            if (level >= lastLevel) xp = min(xp, Leveling.xpToNext(level))
+            if (pet.level < Lifespan.ELDER_LEVEL && level >= Lifespan.ELDER_LEVEL) {
+                message("${pet.name} wird langsam alt. Die ersten grauen Härchen sind da, und Nickerchen werden wichtiger. 💛")
+            }
             if (level > pet.level) {
                 s = s.copy(pet = s.pet!!.copy(feeling = Emotion.STOLZ, feelingUntil = now + Emotions.triggerMs(Emotion.STOLZ)))
             }
@@ -881,6 +892,46 @@ object Engine {
                 addEgg(randomEggLine(Random(now)), "Ein zweites Ei ist aufgetaucht!")
             }
             maybeEvolve(now)
+            val p = s.pet ?: return
+            if (p.level >= Lifespan.level(p) && !p.farewell) {
+                s = s.copy(
+                    pet = p.copy(farewell = true, sleeping = false, sick = false),
+                    diary = (s.diary.filter { it.day != TimeUtil.epochDay(now, zone) } +
+                        DiaryEntry(TimeUtil.epochDay(now, zone), Lifespan.farewellText(p, now), "🌟")).takeLast(60),
+                )
+                emit(GameEvent.FarewellBegins(p.name))
+            }
+        }
+
+        /** The old pet becomes a star. */
+        private fun sayGoodbye(now: Long) {
+            val p = s.pet ?: return
+            if (!p.farewell || !p.alive) return
+            val memorial = Memorial(p.name, p.form, p.level, p.bornAt, now, p.shiny, oldAge = true)
+            s = s.copy(
+                pet = p.copy(alive = false),
+                memorials = s.memorials + memorial,
+                visit = null,
+                visit2 = null,
+                lastSimulated = now,
+            )
+            emit(GameEvent.Ascended(memorial))
+        }
+
+        private fun giveAwayEgg(line: EggLine) {
+            val n = s.eggCount(line)
+            if (n <= 0) return
+            s = s.copy(eggs = if (n <= 1) s.eggs - line else s.eggs + (line to n - 1))
+            val coins = Eggs.giveAwayCoins(line)
+            message("${line.emoji} Das ${line.title} wohnt jetzt in der Eier-Gärtnerei und wird dort liebevoll versorgt. +$coins 🪙")
+            addCoins(coins)
+        }
+
+        private fun giveAwayFamilyEgg(id: Long) {
+            val egg = s.familyEggs.firstOrNull { it.id == id } ?: return
+            s = s.copy(familyEggs = s.familyEggs.filter { it.id != id })
+            message("💕 Das Familien-Ei wohnt jetzt in der Eier-Gärtnerei und wird dort liebevoll versorgt. +${Eggs.FAMILY_EGG_COINS} 🪙")
+            addCoins(Eggs.FAMILY_EGG_COINS)
         }
 
         /** Picks a (non-event) egg line, preferring lines that haven't been discovered and the chosen look. */
@@ -936,7 +987,10 @@ object Engine {
                     val key = "adult:${pet.id}"
                     if (key !in s.milestones) {
                         s = s.copy(milestones = s.milestones + key)
-                        addEgg(randomEggLine(Random(now xor pet.id)), "${pet.name} ist erwachsen und hat ein Ei gefunden!")
+                        // free eggs are rare
+                        if (Random(now xor pet.id xor 0xADL).nextFloat() < Eggs.FREE_CHANCE) {
+                            addEgg(randomEggLine(Random(now xor pet.id)), "${pet.name} ist erwachsen und hat ein Ei gefunden!")
+                        }
                     }
                 }
             }
@@ -1050,6 +1104,9 @@ object Engine {
                     quiz = s.quiz.copy(seen = s.quiz.seen + action.id, answered = s.quiz.answered + 1, right = s.quiz.right + if (action.correct) 1 else 0),
                 )
                 is Action.QuizRoundDone -> quizRoundDone(action.category, action.score, action.total, now)
+                Action.SayGoodbye -> sayGoodbye(now)
+                is Action.GiveAwayEgg -> giveAwayEgg(action.line)
+                is Action.GiveAwayFamilyEgg -> giveAwayFamilyEgg(action.id)
             }
             checkPerfect()
         }
@@ -2554,7 +2611,7 @@ object Engine {
             counters { it.copy(monthlies = it.monthlies + 1) }
             addCoins(Quests.MONTHLY_BONUS_COINS)
             addItem(Catalog.GLITTER)
-            addEgg(rareEggLine(Random(now)), "Belohnung für alle Monatsziele")
+            if (Random(now xor 0x30L).nextFloat() < Eggs.FREE_CHANCE) addEgg(rareEggLine(Random(now)), "Belohnung für alle Monatsziele") else addCoins(80)
             addAdventure(40)
             addXp(80, now)
             feel(Emotion.STOLZ, now)

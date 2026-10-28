@@ -255,8 +255,12 @@ class EngineTest {
 
     @Test
     fun linesHaveCompleteFamilyTrees() {
-        assertEquals(124, Form.creatures.size)
+        assertEquals(304, Form.creatures.size)
         for (line in EggLine.entries) {
+            // every ten levels a new form, on two paths
+            for (stage in Stage.entries.filter { it.ordinal > Stage.ADULT.ordinal }) {
+                for (cozy in listOf(false, true)) assertNotNull("$line $stage $cozy", Form.find(line, Role.elder(stage, cozy)!!))
+            }
             assertNotNull("$line baby", Form.find(line, Role.BABY))
             assertNotNull("$line legend", Form.find(line, Role.LEGEND))
             if (line != EggLine.KNUFFEL) {
@@ -438,15 +442,17 @@ class EngineTest {
         s = Engine.perform(s, Action.ClaimWeekly(0), now, zone).state
         assertTrue(s.weekly.quests[0].claimed)
         assertTrue(s.pass.xp > passXp)
-        // Pass tier 10 gives an egg
-        s = s.copy(pass = s.pass.copy(xp = 10 * SeasonPass.XP_PER_TIER))
+        // Pass tier 30 gives an egg (tier 10 not any more, eggs are rare)
+        s = s.copy(pass = s.pass.copy(xp = 30 * SeasonPass.XP_PER_TIER))
         val eggs = s.totalEggs
         s = Engine.perform(s, Action.ClaimPass(10), now, zone).state
+        assertEquals(eggs, s.totalEggs)
+        s = Engine.perform(s, Action.ClaimPass(30), now, zone).state
         assertEquals(eggs + 1, s.totalEggs)
-        val again = Engine.perform(s, Action.ClaimPass(10), now, zone).state
+        val again = Engine.perform(s, Action.ClaimPass(30), now, zone).state
         assertEquals(eggs + 1, again.totalEggs)
-        val tooHigh = Engine.perform(s, Action.ClaimPass(11), now, zone).state
-        assertFalse(11 in tooHigh.pass.claimed)
+        val tooHigh = Engine.perform(s, Action.ClaimPass(31), now, zone).state
+        assertFalse(31 in tooHigh.pass.claimed)
     }
 
     @Test

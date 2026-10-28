@@ -168,6 +168,7 @@ fun AppRoot(debug: DebugScenes.Launch? = null) {
                 val screen = when {
                     !state.onboarded || pet == null -> 0
                     !pet.alive -> 1
+                    pet.farewell -> 3
                     else -> 2
                 }
                 AnimatedContent(
@@ -178,6 +179,7 @@ fun AppRoot(debug: DebugScenes.Launch? = null) {
                     when (s) {
                         0 -> OnboardingScreen()
                         1 -> MemorialScreen(state)
+                        3 -> FarewellScreen(state)
                         else -> MainNavigation(state, debug)
                     }
                 }

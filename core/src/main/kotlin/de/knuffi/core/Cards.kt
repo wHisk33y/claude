@@ -58,6 +58,12 @@ object Cards {
             Stage.CHILD -> 22 to 50
             Stage.TEEN -> 34 to 64
             Stage.ADULT -> 48 to 82
+            Stage.PRAECHTIG -> 54 to 86
+            Stage.ERFAHREN -> 58 to 89
+            Stage.WEISE -> 62 to 92
+            Stage.EHRWUERDIG -> 66 to 95
+            Stage.URALT -> 70 to 97
+            Stage.ZEITLOS -> 74 to 99
         }
         fun roll() = lo + rnd.nextInt(hi - lo + 1)
         var power = roll()

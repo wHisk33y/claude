@@ -95,6 +95,8 @@ data class Pet(
     val parents: List<Long> = emptyList(),
     /** Form of the other parent; its colours shine through a little. */
     val blend: String? = null,
+    /** The pet has reached the end of its life and wants to say goodbye (see [Lifespan]). */
+    val farewell: Boolean = false,
 ) {
     /** Pets are identified by their birth time. */
     val id: Long get() = bornAt
@@ -361,6 +363,8 @@ data class Memorial(
     val bornAt: Long,
     val endedAt: Long,
     val shiny: Boolean = false,
+    /** Went to the stars because it was old (not because of bad care). */
+    val oldAge: Boolean = false,
 )
 
 @Serializable
@@ -571,6 +575,10 @@ sealed interface GameEvent {
     data class CardsOpened(val forms: List<Form>) : GameEvent
     data class RoomBuilt(val room: RoomKind) : GameEvent
     data class RoomEntered(val room: RoomKind) : GameEvent
+    /** The pet has grown old and wants to say goodbye. */
+    data class FarewellBegins(val name: String) : GameEvent
+    /** The pet has become a star. */
+    data class Ascended(val memorial: Memorial) : GameEvent
     /** A Lernzeit task was solved. */
     data class LearnSolved(val subject: Subject, val firstTry: Boolean, val subjectDone: Boolean, val dayDone: Boolean) : GameEvent
 }

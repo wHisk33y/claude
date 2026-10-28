@@ -178,9 +178,11 @@ class PlayTest {
         s = Engine.perform(s, Action.ClaimMonthly(1), t0 + 2000, zone).state
         s = Engine.perform(s, Action.ClaimMonthly(2), t0 + 3000, zone).state
         val eggs = s.totalEggs
+        val before = s.coins
         s = Engine.perform(s, Action.ClaimMonthlyBonus, t0 + 4000, zone).state
         assertTrue(s.monthly.bonusClaimed)
-        assertEquals(eggs + 1, s.totalEggs)
+        // an egg only sometimes, otherwise extra coins
+        assertTrue(s.totalEggs == eggs + 1 || s.coins >= before + Quests.MONTHLY_BONUS_COINS + 80)
         assertEquals(1, s.counters.monthlies)
         // Next month brings new goals.
         val next = Engine.tick(s, at(9, day = 10) + 32L * 24 * hour, zone).state
@@ -222,7 +224,8 @@ class PlayTest {
         var eggs = s.totalEggs
         for (i in 0 until 10) s = Engine.perform(s, Action.AdventureStep, t0 + 2000 + i, zone).state
         assertEquals(10, s.adventure.station)
-        assertEquals(eggs + 1, s.totalEggs)
+        // only the end of the map brings an egg now
+        assertEquals(eggs, s.totalEggs)
         assertEquals(10, s.counters.adventureSteps)
         // Finishing the whole map starts a new one.
         s = s.copy(adventure = AdventureState(points = 500, station = Adventure.STATIONS - 1))

@@ -358,7 +358,7 @@ object Adventure {
         val bonus = map.coerceAtMost(5)
         val reward = when {
             index == STATIONS - 1 -> StationReward(coins = 300 + 50 * bonus, itemId = Catalog.GLITTER, count = 2, egg = newLines[(map + 2) % newLines.size])
-            index % 10 == 9 -> StationReward(coins = 100 + 20 * bonus, egg = newLines[(map + index / 10) % newLines.size])
+            index % 10 == 9 -> StationReward(coins = 150 + 25 * bonus, itemId = Catalog.GLITTER, count = 1)
             index % 5 == 4 -> StationReward(coins = 40 + 10 * bonus, itemId = Catalog.STICKER_PACK, chest = true)
             index % 3 == 2 -> StationReward(itemId = smallItems[rnd.nextInt(smallItems.size)], count = 2)
             index % 7 == 3 -> StationReward(itemId = Catalog.SEED_PACK, count = 2)
@@ -411,7 +411,7 @@ object Tournament {
         val out = mutableListOf<Rival>()
         val home = s.resting.filter { !it.isEgg && it.alive && s.onTrip(it.id) == null }.shuffled(rnd)
         for (p in home.take(RIVALS)) out += Rival(p.name, p.form, p.id, p.fur, p.shiny, cup.skill * (0.92f + rnd.nextFloat() * 0.16f) * (1f + 0.01f * p.level.coerceAtMost(20)))
-        val forms = Form.creatures.filter { it.stage == Stage.ADULT || it.stage == Stage.TEEN }
+        val forms = Form.creatures.filter { it.stage == Stage.ADULT || it.stage == Stage.TEEN || it.stage == Stage.PRAECHTIG }
         val names = guests.shuffled(rnd)
         var i = 0
         while (out.size < RIVALS) {

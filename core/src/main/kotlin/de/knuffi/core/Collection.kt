@@ -171,7 +171,8 @@ object Trips {
         val stickerChance = (0.4f + 0.05f * d.hours).coerceAtMost(0.9f)
         if (rnd.nextFloat() < stickerChance) stickers += Stickers.roll(rnd).id
         if (d.hours >= 6 && rnd.nextFloat() < 0.5f) stickers += Stickers.roll(rnd).id
-        val egg = if (rnd.nextFloat() < 0.02f + 0.01f * d.hours) d.egg else null
+        // eggs from trips are rare
+        val egg = if (rnd.nextFloat() < (0.02f + 0.01f * d.hours) * Eggs.FREE_CHANCE) d.egg else null
         return TripLoot(coins, items, stickers, egg)
     }
 }
@@ -243,7 +244,7 @@ object SeasonPass {
         return when {
             tier == 20 -> PassReward(itemId = a)
             tier == TIERS -> PassReward(itemId = b)
-            tier == 10 || tier == 30 -> PassReward(egg = true)
+            tier == 30 -> PassReward(egg = true)
             tier % 5 == 0 -> PassReward(itemId = Catalog.STICKER_PACK)
             tier % 4 == 2 -> PassReward(itemId = Catalog.SEED_PACK)
             tier % 7 == 3 -> PassReward(itemId = "cake")

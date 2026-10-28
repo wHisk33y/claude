@@ -775,6 +775,32 @@ class PetRenderer {
             }
         }
 
+        // An old pet: bushy grey eyebrows and grey tufts on the cheeks
+        if (fl.elder > 0.05f && !fl.faceplate) {
+            val grey = Colors.alpha(0xFFF4F2F8.toInt(), 0.6f + 0.35f * fl.elder)
+            for (s in intArrayOf(-1, 1)) {
+                val sf = s.toFloat()
+                val x = fx + sf * ex
+                val lift = if (pose.eyes == EyeShape.CLOSED) re * 0.12f else 0f
+                for (k in 0..2) {
+                    path.reset()
+                    val ox = x + sf * re * (k - 1) * 0.42f
+                    path.moveTo(ox - re * 0.26f, ey - re * 1.3f + lift)
+                    path.quadTo(ox, ey - re * (1.62f + 0.12f * fl.elder) + lift, ox + re * 0.26f, ey - re * 1.32f + lift)
+                    stroke(c, path, grey, re * (0.3f + 0.12f * fl.elder))
+                }
+                if (fl.elder > 0.3f) {
+                    path3.reset()
+                    for (k in 0..3) {
+                        val y = cy + bh * (0.0f + 0.07f * k)
+                        path3.moveTo(fx + sf * bw * 0.74f, y)
+                        path3.lineTo(fx + sf * bw * (0.96f + 0.03f * k), y + u * 0.04f)
+                    }
+                    stroke(c, path3, grey, u * 0.035f)
+                }
+            }
+        }
+
         // Tear
         if (pose.tear > 0.01f) {
             val tt = (pose.t % 2.2f) / 2.2f

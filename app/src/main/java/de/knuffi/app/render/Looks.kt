@@ -78,12 +78,14 @@ data class FormLook(
     val faceplate: Boolean = false,
     val jelly: Boolean = false,
     val ring: Boolean = false,
+    /** How old the pet looks (0 young, 1 at the end of its life): silvery colours and grey eyebrows. */
+    val elder: Float = 0f,
 ) {
     val feet: Boolean get() = !ghost && shape != Shape.DROP
 
     fun withColors(c: PetColors, sparkle: Boolean) = FormLook(
         c, width, height, ears, antenna, wings, tail, horns, spikes, ghost, crown, headband, eyes, bigBelly,
-        sparkles || sparkle, pattern, back, muzzle, shape, aura, antlers, claws, faceplate, jelly, ring,
+        sparkles || sparkle, pattern, back, muzzle, shape, aura, antlers, claws, faceplate, jelly, ring, elder,
     )
 }
 
@@ -373,6 +375,255 @@ object Looks {
         Form.KUSCHELSCHWEINCHEN to guineaLook(1.12f, 0.88f),
         Form.STRUPPELSCHWEINCHEN to guineaLook(1.1f, 0.86f, scruffy = true),
         Form.SEIDENSCHWEINCHEN to guineaLook(1.1f, 0.9f, mane = true, sparkles = true),
+
+        // Ältere Formen (alle 10 Level eine neue Stufe, zwei Wege)
+        // Knuffel
+        Form.WIRBELKNUFFEL to FormLook(pal(0xFFFF9FCB, 0xFF7FD3FF, 0xFFFFE066, 0xFF6A4FB3), 0.86f, 0.98f, ears = Ears.CAT, tail = Tail.FLUFFY, headband = true, pattern = Pattern.STRIPES),
+        Form.PLUESCHKNUFFEL to FormLook(pal(0xFFFFD6E8, 0xFFFFADCD, 0xFFFFFFFF, 0xFFA0476A), 1.12f, 0.86f, ears = Ears.ROUND, bigBelly = true, back = Back.MANE, tail = Tail.POM),
+        Form.ABENTEUERKNUFFEL to FormLook(pal(0xFF8CCEFF, 0xFFFF5E6C, 0xFFFFD27D, 0xFF2F6BC4), 0.88f, 1f, ears = Ears.FOX, tail = Tail.FLUFFY, back = Back.CAPE, headband = true),
+        Form.HERZKNUFFEL to FormLook(pal(0xFFFFB8D2, 0xFFFF5C9A, 0xFFFFFFFF, 0xFFC21F5A), 1.06f, 0.9f, ears = Ears.ROUND, pattern = Pattern.HEARTS, aura = Aura.HEARTS, bigBelly = true),
+        Form.HIMMELSKNUFFEL to FormLook(pal(0xFFC8E4FF, 0xFFFFE680, 0xFFFFFFFF, 0xFF3A6FD6), 0.9f, 1f, ears = Ears.BUNNY, wings = Wings.FEATHER, antenna = Antenna.GLOW),
+        Form.MONDKNUFFEL to FormLook(pal(0xFF9C8CE8, 0xFFFFF0B0, 0xFFE8E0FF, 0xFF3A2E8A), 1.04f, 0.92f, ears = Ears.ROUND, antenna = Antenna.MOON, pattern = Pattern.STARS),
+        Form.DRACHENKNUFFEL to FormLook(pal(0xFFFF8A9A, 0xFFFFD24D, 0xFFFF5A6A, 0xFF8A1E3A), 0.94f, 1.02f, wings = Wings.DRAGON, horns = true, tail = Tail.DRAGON, aura = Aura.FLAMES),
+        Form.KISSENKOENIG to FormLook(pal(0xFFFFF4FA, 0xFFFFC53A, 0xFFFF9BB7, 0xFFA0476A), 1.18f, 0.86f, ears = Ears.ROUND, crown = true, bigBelly = true, back = Back.CAPE, sparkles = true),
+        Form.URKNUFFEL to FormLook(pal(0xFFC8C4D8, 0xFFFFD86B, 0xFFE8E4F0, 0xFF5A4F7A), 0.92f, 0.98f, ears = Ears.CAT, back = Back.MANE, muzzle = Muzzle.WHISKERS, antenna = Antenna.GLOW, wings = Wings.SMALL),
+        Form.SILBERKNUFFEL to FormLook(pal(0xFFE6E4F0, 0xFFFFB3C6, 0xFFFFFFFF, 0xFF6A6A8A), 1.08f, 0.9f, ears = Ears.ROUND, back = Back.MANE, muzzle = Muzzle.WHISKERS, aura = Aura.HEARTS),
+        Form.STERNENKNUFFEL to FormLook(pal(0xFF5A4AB8, 0xFFFFE680, 0xFF9AD8FF, 0xFFFFE680, eye = 0xFF1A1F3D), 0.94f, 1.02f, ears = Ears.CAT, wings = Wings.ANGEL, pattern = Pattern.GALAXY, antenna = Antenna.STAR, aura = Aura.STARS, sparkles = true),
+        Form.ENGELSKNUFFEL to FormLook(pal(0xFFFFF8FC, 0xFFFFE680, 0xFFFFC2DC, 0xFF8A6AD6), 1f, 1f, ears = Ears.ROUND, wings = Wings.ANGEL, antenna = Antenna.HALO, aura = Aura.HEARTS, sparkles = true),
+        // Wald
+        Form.RINDENSPRINGER to FormLook(pal(0xFFC98A5A, 0xFF7FC46A, 0xFFF6E3C8, 0xFF5A3418), 0.86f, 0.98f, ears = Ears.FOX, tail = Tail.FLUFFY, muzzle = Muzzle.NOSE, antenna = Antenna.SPROUT),
+        Form.MOOSKISSEN to FormLook(pal(0xFF9ED67A, 0xFF5FB35A, 0xFFFFE08A, 0xFF3E7A2E), 1.1f, 0.86f, ears = Ears.ROUND, bigBelly = true, pattern = Pattern.SPOTS, antenna = Antenna.CLOVER),
+        Form.WALDLAEUFER to FormLook(pal(0xFF8FB86A, 0xFFB08457, 0xFFE8F4D0, 0xFF2F6B3A), 0.86f, 1.02f, ears = Ears.LEAF, tail = Tail.LEAF, back = Back.CAPE, headband = true),
+        Form.BEERENBAER to FormLook(pal(0xFFA87A5A, 0xFF8A3AB8, 0xFFE8533F, 0xFF4A2E1A), 1.12f, 0.9f, ears = Ears.ROUND, muzzle = Muzzle.SNOUT, bigBelly = true, pattern = Pattern.SEEDS),
+        Form.EICHENHIRSCH to FormLook(pal(0xFFB8885A, 0xFF7FC46A, 0xFFF6E3C8, 0xFF4A2E14), 0.9f, 1.04f, ears = Ears.HORSE, antlers = true, muzzle = Muzzle.NOSE, pattern = Pattern.SPOTS, aura = Aura.LEAVES),
+        Form.BLUETENBAER to FormLook(pal(0xFF9AB87A, 0xFFFF9EC2, 0xFFFFE066, 0xFF2E5A2E), 1.12f, 0.9f, ears = Ears.ROUND, back = Back.MANE, antenna = Antenna.FLOWER, aura = Aura.LEAVES, muzzle = Muzzle.SNOUT),
+        Form.HAINWAECHTER to FormLook(pal(0xFF6FA87A, 0xFFFFD24D, 0xFFA6E3FF, 0xFF1F4A2E), 0.92f, 1.04f, ears = Ears.LEAF, antlers = true, back = Back.CAPE, aura = Aura.LEAVES, eyes = EyeStyle.GLOW),
+        Form.PILZKOENIG to FormLook(pal(0xFFC8A07A, 0xFFE8533F, 0xFFFFFFFF, 0xFF4A2E1A), 1.14f, 0.9f, ears = Ears.ROUND, antenna = Antenna.MUSHROOM, back = Back.MANE, bigBelly = true, pattern = Pattern.SPOTS, sparkles = true),
+        Form.MOOSGEWEIH to FormLook(pal(0xFF9A9A80, 0xFF6FB05A, 0xFFE0E4D0, 0xFF3A4A2E), 0.92f, 1.02f, ears = Ears.HORSE, antlers = true, back = Back.MANE, muzzle = Muzzle.WHISKERS, aura = Aura.LEAVES),
+        Form.KNORRBART to FormLook(pal(0xFF8A7A6A, 0xFF8FC46A, 0xFFD8D0C0, 0xFF3A2E24), 1.08f, 0.9f, ears = Ears.ROUND, muzzle = Muzzle.WHISKERS, pattern = Pattern.STRIPES, antenna = Antenna.SPROUT, back = Back.MANE),
+        Form.WALDGEIST to FormLook(pal(0xFFB8F0C8, 0xFFFFF4A8, 0xFF7AE8B0, 0xFF1F6B4A), 0.9f, 1.02f, ghost = true, antlers = true, aura = Aura.LEAVES, eyes = EyeStyle.GLOW, sparkles = true),
+        Form.LEBENSBAUM to FormLook(pal(0xFF6FB88A, 0xFFFF9EC2, 0xFFFFE680, 0xFF1F5E3E), 1.04f, 1.04f, ears = Ears.LEAF, antlers = true, back = Back.MANE, aura = Aura.STARS, pattern = Pattern.STARS, sparkles = true),
+        // Meer
+        Form.WELLENREITER to FormLook(pal(0xFF5EC3D8, 0xFFFFFFFF, 0xFF2E93B0, 0xFF12607A), 0.86f, 1f, antenna = Antenna.CREST, tail = Tail.FISH, headband = true),
+        Form.MUSCHELCHEN to FormLook(pal(0xFFFFC8D8, 0xFF8ED8FF, 0xFFFFFFFF, 0xFF8A3A5A), 1.06f, 0.88f, back = Back.SHELL, ears = Ears.FIN, antenna = Antenna.PEARL),
+        Form.STROEMLING to FormLook(pal(0xFF4F9AD8, 0xFF8AE8FF, 0xFFE8F8FF, 0xFF1F3F7A), 0.84f, 1.02f, ears = Ears.FIN, tail = Tail.FISH, pattern = Pattern.STRIPES, muzzle = Muzzle.SNOUT),
+        Form.PERLENWAL to FormLook(pal(0xFF7AA0E0, 0xFFFFFFFF, 0xFFBFE6FF, 0xFF1F3F7A, belly = 0xFFE8F4FF), 1.18f, 0.86f, antenna = Antenna.PEARL, tail = Tail.FISH, bigBelly = true, pattern = Pattern.BUTTONS),
+        Form.TIEFSEEFLITZER to FormLook(pal(0xFF2E3A6A, 0xFF6FE8FF, 0xFF4A5A9A, 0xFF6FE8FF, eye = 0xFF6FE8FF), 0.88f, 1f, antenna = Antenna.GLOW, tail = Tail.FISH, ears = Ears.FIN, eyes = EyeStyle.GLOW, pattern = Pattern.SPOTS),
+        Form.KORALLENHUETER to FormLook(pal(0xFFFF9A8A, 0xFFFFE0D8, 0xFFFF6A7A, 0xFF8A2A2A), 1.04f, 0.94f, antenna = Antenna.FLOWER, back = Back.FRILL, tail = Tail.FISH, aura = Aura.BUBBLES),
+        Form.MEERESDRACHE to FormLook(pal(0xFF3E9AC8, 0xFFB8F0FF, 0xFF2E6AB0, 0xFF0E3A6E), 0.92f, 1.04f, wings = Wings.DRAGON, horns = true, tail = Tail.DRAGON, back = Back.FRILL, aura = Aura.BUBBLES),
+        Form.GEZEITENWAL to FormLook(pal(0xFF5A7AC8, 0xFFFFE680, 0xFFBFE6FF, 0xFF1F2F6A, belly = 0xFFE8F0FF), 1.2f, 0.88f, tail = Tail.FISH, bigBelly = true, crown = true, aura = Aura.BUBBLES, sparkles = true),
+        Form.ALTERSEEBAER to FormLook(pal(0xFF8A9AB0, 0xFFFFFFFF, 0xFFC8D8E8, 0xFF2E3A5A), 1f, 0.96f, ears = Ears.ROUND, muzzle = Muzzle.WHISKERS, back = Back.MANE, tail = Tail.FISH, headband = true),
+        Form.PERLMUTTGREIS to FormLook(pal(0xFFE8E4F4, 0xFFB8F0E8, 0xFFFFD8E8, 0xFF5A5A8A), 1.06f, 0.92f, back = Back.SHELL, antenna = Antenna.PEARL, muzzle = Muzzle.WHISKERS, sparkles = true),
+        Form.OZEANOS to FormLook(pal(0xFF3AA8D8, 0xFFFFF4E0, 0xFF8AF0FF, 0xFF0E4A6E), 0.96f, 1.04f, ears = Ears.FIN, tail = Tail.FISH, crown = true, aura = Aura.BUBBLES, jelly = true, eyes = EyeStyle.GLOW, sparkles = true),
+        Form.MONDFLUT to FormLook(pal(0xFF4A5AA8, 0xFFFFF0B0, 0xFF9AD8FF, 0xFFFFF0B0, eye = 0xFF1A1F3D), 1f, 1f, antenna = Antenna.MOON, tail = Tail.FISH, pattern = Pattern.STARS, aura = Aura.BUBBLES, jelly = true, sparkles = true),
+        // Feuer
+        Form.FUNKENFLITZER to FormLook(pal(0xFFFF8A4D, 0xFFFFE066, 0xFFFF4A2E, 0xFF7A1E00), 0.86f, 0.98f, antenna = Antenna.FLAME, tail = Tail.FLAME, headband = true, pattern = Pattern.ZIGZAG),
+        Form.GLUTKISSEN to FormLook(pal(0xFFFFB27A, 0xFFFF6A3D, 0xFFFFE680, 0xFF8A2E00), 1.12f, 0.86f, antenna = Antenna.FLAME, bigBelly = true, ears = Ears.ROUND),
+        Form.FLAMMENLAEUFER to FormLook(pal(0xFFFF6A4D, 0xFFFFD166, 0xFFFFA24D, 0xFF7A0E0E), 0.86f, 1.02f, ears = Ears.FOX, tail = Tail.FLAME, antenna = Antenna.FLAME, aura = Aura.FLAMES),
+        Form.OFENBAER to FormLook(pal(0xFFB86A4A, 0xFFFF8A2E, 0xFFFFD8A8, 0xFF4A1E0A), 1.14f, 0.9f, ears = Ears.ROUND, muzzle = Muzzle.SNOUT, antenna = Antenna.CHEF, bigBelly = true),
+        Form.LAVADRACHE to FormLook(pal(0xFF8A2E2E, 0xFFFF8A2E, 0xFFFFD14D, 0xFFFFB02E, eye = 0xFFFFC94D), 0.92f, 1.02f, wings = Wings.DRAGON, horns = true, tail = Tail.DRAGON, pattern = Pattern.CRACKS, eyes = EyeStyle.GLOW),
+        Form.KAMINWAECHTER to FormLook(pal(0xFFC87A5A, 0xFFFFC94D, 0xFF8A4A3A, 0xFF4A1E0A), 1.04f, 0.94f, ears = Ears.ROUND, back = Back.MANE, antenna = Antenna.FLAME, pattern = Pattern.BANDS, aura = Aura.SMOKE),
+        Form.FEUERFUERST to FormLook(pal(0xFFFF4D3A, 0xFFFFD24D, 0xFFFF8A3D, 0xFF7A0E0E), 0.92f, 1.04f, wings = Wings.DRAGON, horns = true, crown = true, tail = Tail.FLAME, aura = Aura.FLAMES, back = Back.CAPE),
+        Form.SONNENOFEN to FormLook(pal(0xFFFFC23D, 0xFFFF7A2E, 0xFFFFF4A8, 0xFFB84A00), 1.16f, 0.9f, antenna = Antenna.RAYS, bigBelly = true, aura = Aura.FLAMES, ears = Ears.ROUND),
+        Form.ASCHEDRACHE to FormLook(pal(0xFF7A747E, 0xFFFF6A3D, 0xFF5E5068, 0xFFFF8A3D, eye = 0xFFFF8A3D), 0.94f, 1.02f, wings = Wings.DRAGON, horns = true, tail = Tail.DRAGON, pattern = Pattern.CRACKS, eyes = EyeStyle.GLOW, aura = Aura.SMOKE, muzzle = Muzzle.WHISKERS),
+        Form.GLIMMGREIS to FormLook(pal(0xFFA8908A, 0xFFFF9A5C, 0xFFE8D8D0, 0xFF5A2E1E), 1.08f, 0.9f, ears = Ears.ROUND, muzzle = Muzzle.WHISKERS, antenna = Antenna.FLAME, back = Back.MANE, aura = Aura.SMOKE),
+        Form.SONNENDRACHE to FormLook(pal(0xFFFFD86B, 0xFFFFFFFF, 0xFFFF9A2E, 0xFFB86B00), 0.94f, 1.04f, wings = Wings.FEATHER, horns = true, tail = Tail.FLAME, antenna = Antenna.RAYS, aura = Aura.FLAMES, sparkles = true),
+        Form.EWIGEFLAMME to FormLook(pal(0xFFFF8A3D, 0xFFFFF4A8, 0xFFFFD24D, 0xFF8A2E00), 0.9f, 1.02f, shape = Shape.DROP, antenna = Antenna.FLAME, jelly = true, aura = Aura.FLAMES, eyes = EyeStyle.GLOW, sparkles = true),
+        // Urzeit
+        Form.SPRINTRAPTOR to FormLook(pal(0xFF7FD3B0, 0xFFFF9A5C, 0xFF4FAE8C, 0xFF1F5E48), 0.84f, 1.02f, antenna = Antenna.CREST, tail = Tail.DINO, muzzle = Muzzle.SNOUT, pattern = Pattern.STRIPES, headband = true),
+        Form.KUSCHELSAURUS to FormLook(pal(0xFFB8E0A0, 0xFFFFC8D8, 0xFF8AC07A, 0xFF2E6B2A), 1.12f, 0.88f, tail = Tail.DINO, bigBelly = true, pattern = Pattern.SPOTS, ears = Ears.ROUND),
+        Form.HORNSAURUS to FormLook(pal(0xFFC7A77A, 0xFFFFE8B8, 0xFFE58B5A, 0xFF5A4A1E), 1.04f, 0.92f, back = Back.FRILL, horns = true, muzzle = Muzzle.SNOUT, tail = Tail.DINO, spikes = true),
+        Form.BLATTFRESSER to FormLook(pal(0xFF9AB6A0, 0xFF7FC46A, 0xFF6F8F80, 0xFF28403A), 1.14f, 0.9f, tail = Tail.DINO, bigBelly = true, antenna = Antenna.SPROUT, pattern = Pattern.SPOTS),
+        Form.FLUGSAURIER to FormLook(pal(0xFFE0A07A, 0xFFFF8A5C, 0xFFC77A55, 0xFF5A2E14), 0.86f, 1f, wings = Wings.BAT, antenna = Antenna.CREST, muzzle = Muzzle.BEAK, aura = Aura.SMOKE),
+        Form.PANZERSAURUS to FormLook(pal(0xFF8FA090, 0xFFE8A25A, 0xFF6E8070, 0xFF2E3A30), 1.12f, 0.88f, back = Back.SHELL, spikes = true, tail = Tail.DINO, pattern = Pattern.PANELS),
+        Form.DONNERECHSE to FormLook(pal(0xFF5E9E5A, 0xFFFFE08A, 0xFF3E7A3A, 0xFF1F3A12), 1.02f, 1.04f, tail = Tail.DINO, muzzle = Muzzle.FANGS, back = Back.PLATES, aura = Aura.BOLTS, spikes = true),
+        Form.RIESENSAURUS to FormLook(pal(0xFF8AA8D8, 0xFFFFD6A8, 0xFF6F8FC4, 0xFF28406E), 1.2f, 0.94f, tail = Tail.DINO, bigBelly = true, pattern = Pattern.SPOTS, back = Back.PLATES),
+        Form.FOSSILKOENIG to FormLook(pal(0xFFD8CCB8, 0xFF8A7A6A, 0xFFF2E8D8, 0xFF4A3A2A), 1f, 1.02f, tail = Tail.DINO, crown = true, pattern = Pattern.CRACKS, back = Back.PLATES, muzzle = Muzzle.WHISKERS),
+        Form.STEINSAURUS to FormLook(pal(0xFF9A98A0, 0xFF7AC07A, 0xFFC8C4CC, 0xFF3A3840), 1.12f, 0.9f, tail = Tail.DINO, pattern = Pattern.CRACKS, back = Back.SHELL, antenna = Antenna.SPROUT, muzzle = Muzzle.WHISKERS),
+        Form.METEORSAURUS to FormLook(pal(0xFF3E3A6A, 0xFFFF8A3D, 0xFF8A7AE8, 0xFFFFE066, eye = 0xFFFFE066), 1f, 1.04f, tail = Tail.COMET, back = Back.PLATES, pattern = Pattern.GALAXY, aura = Aura.STARS, eyes = EyeStyle.GLOW, sparkles = true),
+        Form.BERNSTEINSAURUS to FormLook(pal(0xFFF2A84A, 0xFFFFE0A0, 0xFFC87A2A, 0xFF6A3A0A), 1.1f, 0.96f, tail = Tail.DINO, jelly = true, back = Back.PLATES, aura = Aura.STARS, sparkles = true),
+        // Techno
+        Form.TURBOBOT to FormLook(pal(0xFF6FC8FF, 0xFFFF5A5A, 0xFF3A8AD6, 0xFF6FE8FF, eye = 0xFF6FE8FF), 0.9f, 0.98f, shape = Shape.SQUARE, antenna = Antenna.BOLT, tail = Tail.BOLT, faceplate = true, eyes = EyeStyle.GLOW, pattern = Pattern.ZIGZAG),
+        Form.KUSCHELBOT to FormLook(pal(0xFFFFD8E8, 0xFF8AD8FF, 0xFFFFFFFF, 0xFF6FE8FF, eye = 0xFF6FE8FF), 1.1f, 0.88f, antenna = Antenna.BOLT, ears = Ears.ROUND, faceplate = true, eyes = EyeStyle.GLOW, bigBelly = true),
+        Form.DUESENBOT to FormLook(pal(0xFFE8ECF6, 0xFF5AC8FF, 0xFFB0B8C8, 0xFF6FE8FF, eye = 0xFF6FE8FF), 0.9f, 1.02f, shape = Shape.SQUARE, wings = Wings.JET, antenna = Antenna.BOLT, faceplate = true, eyes = EyeStyle.GLOW, pattern = Pattern.PANELS),
+        Form.TEEBOT to FormLook(pal(0xFFC8E8D8, 0xFFB86A4A, 0xFFFFFFFF, 0xFF6FE8FF, eye = 0xFF6FE8FF), 1.08f, 0.9f, shape = Shape.SQUARE, antenna = Antenna.SWIRL, faceplate = true, eyes = EyeStyle.GLOW, bigBelly = true, pattern = Pattern.BANDS),
+        Form.MECHADRACHE to FormLook(pal(0xFF8A9AB8, 0xFFFFD24D, 0xFF6A7A98, 0xFFFF6A3D, eye = 0xFFFF6A3D), 0.94f, 1.02f, wings = Wings.DRAGON, horns = true, tail = Tail.DRAGON, faceplate = true, eyes = EyeStyle.GLOW, pattern = Pattern.PANELS),
+        Form.GARTENBOT to FormLook(pal(0xFFA8D88A, 0xFFFF9EC2, 0xFFE8F4E0, 0xFF6FE8FF, eye = 0xFF6FE8FF), 1.04f, 0.94f, shape = Shape.SQUARE, antenna = Antenna.FLOWER, faceplate = true, eyes = EyeStyle.GLOW, pattern = Pattern.PANELS),
+        Form.TITANBOT to FormLook(pal(0xFF5A6A8A, 0xFFFFC23D, 0xFF8A9AB8, 0xFFFFC23D, eye = 0xFFFFC23D), 1.06f, 1.04f, shape = Shape.SQUARE, antenna = Antenna.CREST, faceplate = true, eyes = EyeStyle.GLOW, pattern = Pattern.PANELS, back = Back.PLATES, aura = Aura.BOLTS),
+        Form.HAUSMEISTERBOT to FormLook(pal(0xFFFFC96A, 0xFF3A6AD8, 0xFF8A94A8, 0xFF6FE8FF, eye = 0xFF6FE8FF), 1.1f, 0.94f, shape = Shape.SQUARE, headband = true, ears = Ears.ROUND, faceplate = true, eyes = EyeStyle.GLOW, pattern = Pattern.PANELS, bigBelly = true),
+        Form.RETROBOT to FormLook(pal(0xFFC8B89A, 0xFFFF8A3D, 0xFF8A7A6A, 0xFFFFB85A, eye = 0xFFFFB85A), 0.96f, 1f, shape = Shape.SQUARE, antenna = Antenna.ANTENNAE, faceplate = true, eyes = EyeStyle.GLOW, pattern = Pattern.BUTTONS),
+        Form.ROSTGREIS to FormLook(pal(0xFFB8805E, 0xFF8A5A3A, 0xFF7A8A9A, 0xFFFFB85A, eye = 0xFFFFB85A), 1.04f, 0.92f, shape = Shape.SQUARE, antenna = Antenna.BOLT, faceplate = true, eyes = EyeStyle.GLOW, pattern = Pattern.SPOTS, muzzle = Muzzle.WHISKERS),
+        Form.QUANTENBOT to FormLook(pal(0xFF3A2E6A, 0xFF6FE8FF, 0xFFB98AFF, 0xFF6FE8FF, eye = 0xFF6FE8FF), 0.94f, 1.04f, shape = Shape.SQUARE, antenna = Antenna.CRYSTAL, faceplate = true, eyes = EyeStyle.GLOW, pattern = Pattern.GALAXY, aura = Aura.BOLTS, jelly = true, sparkles = true),
+        Form.STERNENCOMPUTER to FormLook(pal(0xFF2E3A6A, 0xFFFFE680, 0xFF6A78C8, 0xFFFFE680, eye = 0xFFFFE680), 1.08f, 1f, shape = Shape.SQUARE, antenna = Antenna.STAR, ring = true, faceplate = true, eyes = EyeStyle.GLOW, pattern = Pattern.STARS, aura = Aura.STARS, sparkles = true),
+        // Einhorn
+        Form.GALOPPHORN to FormLook(pal(0xFFFFFFFF, 0xFF8FD8FF, 0xFFFF8FB8, 0xFF3A6FD6), 0.88f, 1f, ears = Ears.HORSE, antenna = Antenna.UNICORN, back = Back.MANE, tail = Tail.RAINBOW, headband = true),
+        Form.WATTEHORN to FormLook(pal(0xFFFFE0F0, 0xFFB9A4FF, 0xFFFFFFFF, 0xFFC23A7A), 1.08f, 0.9f, ears = Ears.HORSE, antenna = Antenna.UNICORN, back = Back.MANE, tail = Tail.FLUFFY, bigBelly = true),
+        Form.WOLKENRENNER to FormLook(pal(0xFFE8F0FF, 0xFF8FD8FF, 0xFFFFFFFF, 0xFF3A5AA8), 0.88f, 1.02f, ears = Ears.HORSE, antenna = Antenna.UNICORN, back = Back.MANE, tail = Tail.FLUFFY, aura = Aura.SMOKE),
+        Form.BLUETENHORN to FormLook(pal(0xFFFFF0F6, 0xFFFF7FAF, 0xFFB8F0C8, 0xFF8A5AD6), 1f, 0.94f, ears = Ears.HORSE, antenna = Antenna.UNICORN, back = Back.MANE, tail = Tail.RAINBOW, aura = Aura.LEAVES),
+        Form.HIMMELSROSS to FormLook(pal(0xFFF8FAFF, 0xFFFFE08A, 0xFF8FD8FF, 0xFF3A6FD6), 0.9f, 1.02f, ears = Ears.HORSE, back = Back.MANE, wings = Wings.FEATHER, tail = Tail.FLUFFY, antenna = Antenna.UNICORN),
+        Form.TRAUMHORN to FormLook(pal(0xFFC8B8FF, 0xFFFFF0B0, 0xFFFFC2E0, 0xFF5A3DC8), 1.02f, 0.96f, ears = Ears.HORSE, antenna = Antenna.UNICORN, back = Back.MANE, tail = Tail.RAINBOW, pattern = Pattern.STARS),
+        Form.REGENBOGENRITTER to FormLook(pal(0xFFFFFFFF, 0xFFFF5A8A, 0xFFFFD24D, 0xFF3A3DC8), 0.92f, 1.04f, ears = Ears.HORSE, antenna = Antenna.UNICORN, back = Back.CAPE, tail = Tail.RAINBOW, headband = true, aura = Aura.STARS),
+        Form.HERZHORN to FormLook(pal(0xFFFFD1E8, 0xFFFF5C9A, 0xFFFFFFFF, 0xFFC21F5A), 1.04f, 0.98f, ears = Ears.HORSE, antenna = Antenna.UNICORN, back = Back.MANE, pattern = Pattern.HEARTS, aura = Aura.HEARTS, tail = Tail.FLUFFY),
+        Form.SILBERHORN to FormLook(pal(0xFFE0E4EC, 0xFFC8D0E0, 0xFFFFFFFF, 0xFF4A5A7A), 0.92f, 1.02f, ears = Ears.HORSE, antenna = Antenna.UNICORN, back = Back.MANE, tail = Tail.FLUFFY, wings = Wings.FEATHER),
+        Form.MONDMAEHNE to FormLook(pal(0xFF9C9CC8, 0xFFFFF0B0, 0xFFE8E8FF, 0xFF2E2E6A), 1.02f, 0.98f, ears = Ears.HORSE, antenna = Antenna.MOON, back = Back.MANE, tail = Tail.FLUFFY, pattern = Pattern.STARS),
+        Form.STERNENROSS to FormLook(pal(0xFF3E3A8A, 0xFFFFE680, 0xFF9AD8FF, 0xFFFFE680, eye = 0xFF1A1F3D), 0.94f, 1.04f, ears = Ears.HORSE, antenna = Antenna.UNICORN, back = Back.MANE, wings = Wings.ANGEL, tail = Tail.COMET, pattern = Pattern.GALAXY, aura = Aura.STARS, sparkles = true),
+        Form.LICHTHORN to FormLook(pal(0xFFFFFCF0, 0xFFFFE680, 0xFFB8F0FF, 0xFF8A6AD6), 0.98f, 1.02f, ears = Ears.HORSE, antenna = Antenna.UNICORN, back = Back.MANE, tail = Tail.RAINBOW, aura = Aura.STARS, jelly = true, eyes = EyeStyle.GLOW, sparkles = true),
+        // Bluete
+        Form.BLUETENFLITZ to FormLook(pal(0xFFB8F0C8, 0xFFFF7FAF, 0xFFFFE066, 0xFF2E6B3A), 0.86f, 0.98f, wings = Wings.FAIRY, antenna = Antenna.BUD, pattern = Pattern.STRIPES),
+        Form.POLLENPUSCHEL to FormLook(pal(0xFFFFE680, 0xFFFFB84D, 0xFFFFFFFF, 0xFF8A5A00), 1.1f, 0.88f, antenna = Antenna.ANTENNAE, pattern = Pattern.SPOTS, bigBelly = true, back = Back.MANE),
+        Form.WINDBLUETE to FormLook(pal(0xFFE0F0FF, 0xFFFF9EDC, 0xFFB8F0C8, 0xFF3A6AB8), 0.86f, 1.02f, wings = Wings.FAIRY, antenna = Antenna.FLOWER, aura = Aura.LEAVES, tail = Tail.LEAF),
+        Form.HONIGBLUETE to FormLook(pal(0xFFFFE0A0, 0xFFFF9EC2, 0xFFFFFFFF, 0xFF8A5A1E), 1.06f, 0.92f, wings = Wings.BEE, antenna = Antenna.FLOWER, pattern = Pattern.SPOTS, bigBelly = true),
+        Form.SCHMETTERLINGSFEE to FormLook(pal(0xFFF0E0FF, 0xFFFF9A2E, 0xFF7AD8FF, 0xFF6A4FC8), 0.86f, 1.02f, wings = Wings.FAIRY, antenna = Antenna.ANTENNAE, pattern = Pattern.SWIRL, sparkles = true),
+        Form.ROSENHERZ to FormLook(pal(0xFFFFD6E0, 0xFFE84A6A, 0xFFB8F0C8, 0xFFB83A5A), 1.02f, 0.96f, antenna = Antenna.FLOWER, pattern = Pattern.HEARTS, aura = Aura.HEARTS, ears = Ears.LEAF),
+        Form.LILIENFEE to FormLook(pal(0xFFFFFFFF, 0xFFFFE066, 0xFFB8F0C8, 0xFF4A7A3A), 0.88f, 1.04f, wings = Wings.FAIRY, antenna = Antenna.FLOWER, crown = true, aura = Aura.LEAVES, sparkles = true),
+        Form.GARTENHUETERIN to FormLook(pal(0xFFC8E8B0, 0xFFFF7FAF, 0xFFFFE066, 0xFF2E5A2E), 1.06f, 0.98f, wings = Wings.FAIRY, antenna = Antenna.FLOWER, back = Back.MANE, aura = Aura.LEAVES, ears = Ears.LEAF),
+        Form.HERBSTFEE to FormLook(pal(0xFFE8A86A, 0xFFC84A2E, 0xFFFFE066, 0xFF6A2E12), 0.88f, 1.02f, wings = Wings.FAIRY, ears = Ears.LEAF, aura = Aura.LEAVES, pattern = Pattern.SPOTS),
+        Form.LAVENDELHAUBE to FormLook(pal(0xFFC8B8E8, 0xFF8A6AC8, 0xFFE8E0F0, 0xFF4A3A7A), 1.04f, 0.94f, antenna = Antenna.FLOWER, back = Back.MANE, muzzle = Muzzle.WHISKERS, ears = Ears.LEAF),
+        Form.BLUETENGEIST to FormLook(pal(0xFFE8FFE0, 0xFFFFF4A8, 0xFFB8F0C8, 0xFF2E8A5A), 0.88f, 1.02f, ghost = true, wings = Wings.FAIRY, antenna = Antenna.GLOW, aura = Aura.LEAVES, eyes = EyeStyle.GLOW, sparkles = true),
+        Form.EWIGEROSE to FormLook(pal(0xFFFF6A8A, 0xFFFFE680, 0xFFFFD0DC, 0xFF8A1E3A), 0.98f, 1.02f, antenna = Antenna.FLOWER, crown = true, wings = Wings.FAIRY, aura = Aura.HEARTS, jelly = true, sparkles = true),
+        // Stern
+        Form.STERNSCHNUPPE to FormLook(pal(0xFFFFE680, 0xFF9AB8FF, 0xFFFFF7C8, 0xFFB86B00), 0.88f, 0.98f, antenna = Antenna.STAR, tail = Tail.COMET, headband = true),
+        Form.KUSCHELSTERN to FormLook(pal(0xFFFFF0B0, 0xFFFFB84D, 0xFFFFFFFF, 0xFFB86B00), 1.08f, 0.88f, antenna = Antenna.STAR, bigBelly = true, ears = Ears.ROUND, sparkles = true),
+        Form.KOMETENREITER to FormLook(pal(0xFF7A98FF, 0xFFFFE680, 0xFFE0E8FF, 0xFF2E3A9A), 0.88f, 1f, tail = Tail.COMET, antenna = Antenna.STAR, back = Back.CAPE, pattern = Pattern.STARS),
+        Form.MONDKISSEN to FormLook(pal(0xFF5A6AB8, 0xFFFFF0B0, 0xFF8A98E0, 0xFFFFF0B0, eye = 0xFF1A1F3D), 1.08f, 0.88f, antenna = Antenna.MOON, bigBelly = true, pattern = Pattern.STARS, ears = Ears.ROUND),
+        Form.STERNENPILOT to FormLook(pal(0xFFFFFFFF, 0xFFFF5A5A, 0xFF8FD8FF, 0xFF2E4A8A), 0.9f, 1.02f, antenna = Antenna.HELMET, wings = Wings.JET, headband = true),
+        Form.PLANETENHUETER to FormLook(pal(0xFFFFB88A, 0xFF8AD8FF, 0xFFFFE8C8, 0xFF8A4A1E), 1.12f, 0.9f, ring = true, pattern = Pattern.BANDS, antenna = Antenna.STAR, bigBelly = true),
+        Form.POLARSTERN to FormLook(pal(0xFFE8F0FF, 0xFFFFE680, 0xFF9AB8FF, 0xFF2E4AB8), 0.92f, 1.04f, antenna = Antenna.RAYS, wings = Wings.ANGEL, aura = Aura.STARS, sparkles = true),
+        Form.NEBELSTERN to FormLook(pal(0xFFC8A0F0, 0xFFFF9AD8, 0xFF7AD8FF, 0xFF4A2E8A), 1.06f, 0.96f, pattern = Pattern.GALAXY, aura = Aura.SMOKE, antenna = Antenna.STAR, jelly = true),
+        Form.ALTERKOMET to FormLook(pal(0xFF9AA0C0, 0xFFFFF0B0, 0xFFD0D8F0, 0xFF3A4070), 0.92f, 1f, tail = Tail.COMET, antenna = Antenna.STAR, back = Back.MANE, muzzle = Muzzle.WHISKERS),
+        Form.MONDGREIS to FormLook(pal(0xFF6A6A9A, 0xFFFFF0B0, 0xFFC8C8E8, 0xFFFFF0B0, eye = 0xFF1A1F3D), 1.04f, 0.94f, antenna = Antenna.MOON, back = Back.MANE, muzzle = Muzzle.WHISKERS, pattern = Pattern.STARS),
+        Form.SUPERNOVA to FormLook(pal(0xFFFFF4E0, 0xFFFF9A2E, 0xFFFFE680, 0xFFFF7A2E, eye = 0xFF8A2E00), 0.96f, 1.04f, antenna = Antenna.RAYS, wings = Wings.FEATHER, aura = Aura.FLAMES, eyes = EyeStyle.GLOW, sparkles = true),
+        Form.GALAXIENHERZ to FormLook(pal(0xFF3A2E8A, 0xFFFF9AD8, 0xFF7AD8FF, 0xFFFFE680, eye = 0xFF1A1F3D), 1.06f, 1f, pattern = Pattern.GALAXY, ring = true, aura = Aura.STARS, antenna = Antenna.STAR, sparkles = true),
+        // Zucker
+        Form.BRAUSEBONBON to FormLook(pal(0xFF8AE8D8, 0xFFFF5A9A, 0xFFFFFFFF, 0xFF1F7A6A), 0.9f, 0.96f, ears = Ears.WRAPPER, pattern = Pattern.SPRINKLES, aura = Aura.BUBBLES),
+        Form.MARSHMALLOW to FormLook(pal(0xFFFFF4F8, 0xFFFFC2DC, 0xFFFFFFFF, 0xFFC23A7A), 1.14f, 0.86f, shape = Shape.SQUARE, bigBelly = true),
+        Form.ZUCKERSTANGE to FormLook(pal(0xFFFFFFFF, 0xFFFF3A5A, 0xFF8AE8A0, 0xFF8A1E2E), 0.84f, 1.04f, pattern = Pattern.STRIPES, antenna = Antenna.SWIRL, headband = true),
+        Form.PUDDING to FormLook(pal(0xFFFFE08A, 0xFF8A4A1E, 0xFFFFFFFF, 0xFF6A3A12), 1.12f, 0.9f, jelly = true, antenna = Antenna.CHERRY, bigBelly = true),
+        Form.RAKETENEIS to FormLook(pal(0xFFFF8AC8, 0xFFFFE066, 0xFF8AD8FF, 0xFFC23A7A), 0.88f, 1.02f, wings = Wings.JET, pattern = Pattern.STRIPES, antenna = Antenna.CHERRY),
+        Form.SAHNETORTE to FormLook(pal(0xFFFFF0F4, 0xFFFF6A8A, 0xFFFFE0C8, 0xFF8A3A1E), 1.14f, 0.94f, shape = Shape.SQUARE, pattern = Pattern.BANDS, antenna = Antenna.CHERRY, aura = Aura.HEARTS),
+        Form.BONBONRITTER to FormLook(pal(0xFFE8A85A, 0xFFFF5A9A, 0xFFFFE8B8, 0xFF6A3A12), 0.92f, 1.04f, back = Back.CAPE, headband = true, pattern = Pattern.SWIRL, ears = Ears.WRAPPER, sparkles = true),
+        Form.PRALINENKOENIG to FormLook(pal(0xFF8A5A3A, 0xFFFFD24D, 0xFFFFB3D1, 0xFF3A1E0A), 1.14f, 0.9f, crown = true, bigBelly = true, pattern = Pattern.SPRINKLES, back = Back.CAPE),
+        Form.ALTERLEBKUCHEN to FormLook(pal(0xFFC0804A, 0xFFFFFFFF, 0xFFFF6A7A, 0xFF4A2410), 0.94f, 1f, pattern = Pattern.ICING, muzzle = Muzzle.WHISKERS, ears = Ears.ROUND, back = Back.MANE),
+        Form.HONIGKUCHEN to FormLook(pal(0xFFD8A060, 0xFFFFE0A0, 0xFFFFFFFF, 0xFF5A3410), 1.08f, 0.92f, pattern = Pattern.ICING, jelly = true, muzzle = Muzzle.WHISKERS, ears = Ears.ROUND),
+        Form.ZUCKERSTERN to FormLook(pal(0xFFFFF4FA, 0xFF8AD8FF, 0xFFFFE680, 0xFFB86BC8), 0.94f, 1.02f, antenna = Antenna.STAR, pattern = Pattern.SPRINKLES, aura = Aura.STARS, jelly = true, wings = Wings.FAIRY, sparkles = true),
+        Form.ZAUBERKONFEKT to FormLook(pal(0xFFFFC2E0, 0xFFFFE680, 0xFF8AE8FF, 0xFFC23A7A), 1.06f, 1f, crown = true, pattern = Pattern.SWIRL, aura = Aura.HEARTS, jelly = true, ears = Ears.WRAPPER, sparkles = true),
+        // Dschungel
+        Form.LIANENSCHWINGER to FormLook(pal(0xFF8A6A5A, 0xFF4FA84A, 0xFFE8D8C8, 0xFF3A2A1A), 0.86f, 0.98f, ears = Ears.ROUND, tail = Tail.LEAF, muzzle = Muzzle.SNOUT, antenna = Antenna.SPROUT),
+        Form.MANGOMAMPF to FormLook(pal(0xFFFFB84D, 0xFF5FB35A, 0xFFFF8A3D, 0xFF8A4A00), 1.12f, 0.88f, bigBelly = true, antenna = Antenna.SPROUT, ears = Ears.ROUND),
+        Form.PANTHERPFOTE to FormLook(pal(0xFF2E2A3A, 0xFF7AE8A0, 0xFF4A4458, 0xFF7AE8A0, eye = 0xFF120C12), 0.86f, 1.02f, ears = Ears.CAT, tail = Tail.CAT, muzzle = Muzzle.WHISKERS, eyes = EyeStyle.GLOW),
+        Form.FAULTI to FormLook(pal(0xFFB8A090, 0xFF7A6A5A, 0xFFE8DCD0, 0xFF3A2A1A), 1.08f, 0.9f, ears = Ears.ROUND, muzzle = Muzzle.SNOUT, bigBelly = true, pattern = Pattern.BANDS, antenna = Antenna.SPROUT),
+        Form.PARADIESVOGEL to FormLook(pal(0xFFFF6A8A, 0xFF3AC8E8, 0xFFFFE066, 0xFF8A1E3A), 0.88f, 1.02f, wings = Wings.FEATHER, muzzle = Muzzle.BEAK, antenna = Antenna.CREST, tail = Tail.RAINBOW),
+        Form.ORCHIDEENAFFE to FormLook(pal(0xFF9A7A8A, 0xFFFF8AC8, 0xFFE8D8E0, 0xFF3A2A3A), 1.04f, 0.94f, ears = Ears.ROUND, antenna = Antenna.FLOWER, muzzle = Muzzle.SNOUT, aura = Aura.LEAVES),
+        Form.REGENWALDWAECHTER to FormLook(pal(0xFF3A8A5A, 0xFFFFD24D, 0xFF7AE8A0, 0xFF1F3A1E), 0.94f, 1.04f, ears = Ears.CAT, tail = Tail.CAT, back = Back.MANE, pattern = Pattern.SPOTS, aura = Aura.LEAVES, eyes = EyeStyle.GLOW),
+        Form.BANANENKOENIG to FormLook(pal(0xFF5A5060, 0xFFFFE04D, 0xFFB8A8B8, 0xFF3A2A1A, belly = 0xFFD8C8D0), 1.16f, 0.92f, ears = Ears.ROUND, crown = true, bigBelly = true, muzzle = Muzzle.SNOUT, back = Back.CAPE),
+        Form.ALTERJAGUAR to FormLook(pal(0xFFC8B090, 0xFF8A8A8A, 0xFF5A4A3A, 0xFF6A8A2A, belly = 0xFFF0E8E0), 0.9f, 1f, ears = Ears.CAT, tail = Tail.CAT, pattern = Pattern.SPOTS, muzzle = Muzzle.WHISKERS, back = Back.MANE),
+        Form.SILBERRUECKEN to FormLook(pal(0xFF4A4650, 0xFFC8C8D0, 0xFF8A8890, 0xFF2A2420, belly = 0xFFB8B4BC), 1.16f, 0.94f, ears = Ears.ROUND, bigBelly = true, muzzle = Muzzle.SNOUT, back = Back.MANE),
+        Form.DSCHUNGELGEIST to FormLook(pal(0xFFB8F0D0, 0xFFFFE680, 0xFF7AE8A0, 0xFF1F6B4A), 0.9f, 1.02f, ghost = true, ears = Ears.CAT, aura = Aura.LEAVES, eyes = EyeStyle.GLOW, antenna = Antenna.GLOW, sparkles = true),
+        Form.SMARAGDHERZ to FormLook(pal(0xFF3AC88A, 0xFFFFE680, 0xFFB8F0D0, 0xFF1F5E3E), 1.04f, 1f, ears = Ears.ROUND, back = Back.MANE, crown = true, jelly = true, aura = Aura.LEAVES, pattern = Pattern.HEARTS, sparkles = true),
+        // Wueste
+        Form.DUENENFLITZER to FormLook(pal(0xFFF2C890, 0xFFFFB3A0, 0xFFFFF4E4, 0xFF6A3A1A), 0.86f, 0.98f, ears = Ears.FOX, tail = Tail.FLUFFY, muzzle = Muzzle.NOSE, headband = true),
+        Form.DATTELCHEN to FormLook(pal(0xFFC88A5A, 0xFFFFE0B0, 0xFF8A5A3A, 0xFF4A2A10), 1.1f, 0.88f, ears = Ears.ROUND, bigBelly = true, antenna = Antenna.STEM),
+        Form.WUESTENWIND to FormLook(pal(0xFFE8D0A0, 0xFFFFE8B8, 0xFFC89A5A, 0xFF8A5A2A), 0.86f, 1.02f, antenna = Antenna.SWIRL, tail = Tail.COMET, aura = Aura.SMOKE, ears = Ears.FOX),
+        Form.OASENWAECHTER to FormLook(pal(0xFF7AC0B0, 0xFFFFD86A, 0xFFE8F4E0, 0xFF2E6A5A), 1.06f, 0.94f, antenna = Antenna.DROPLET, ears = Ears.ROUND, back = Back.MANE, pattern = Pattern.SPOTS),
+        Form.SANDLAEUFER to FormLook(pal(0xFFE8B880, 0xFF3A6AD8, 0xFFFFF0D8, 0xFF5A3A1A), 0.86f, 1.02f, ears = Ears.CAT, tail = Tail.CAT, headband = true, muzzle = Muzzle.NOSE, back = Back.CAPE),
+        Form.KARAWANENFREUND to FormLook(pal(0xFFD8A870, 0xFFE84A6A, 0xFFFFE0B0, 0xFF5A3A1A), 1.12f, 0.94f, ears = Ears.HORSE, bigBelly = true, muzzle = Muzzle.SNOUT, back = Back.CAPE, pattern = Pattern.ZIGZAG),
+        Form.SONNENSKARABAEUS to FormLook(pal(0xFF2E8AA8, 0xFFFFD24D, 0xFF1F5A7A, 0xFFFFE680), 1f, 0.94f, back = Back.SHELL, antenna = Antenna.RAYS, sparkles = true),
+        Form.RAETSELSPHINX to FormLook(pal(0xFFE8C080, 0xFF3A6AD8, 0xFFFFD24D, 0xFF3A6AD8), 1.02f, 1f, ears = Ears.CAT, tail = Tail.CAT, headband = true, muzzle = Muzzle.NOSE, crown = true, back = Back.MANE),
+        Form.ALTERWUESTENFUCHS to FormLook(pal(0xFFE0D0B8, 0xFFFFB3A0, 0xFFFFFFFF, 0xFF6A4A2A), 0.88f, 0.98f, ears = Ears.FOX, tail = Tail.FLUFFY, muzzle = Muzzle.WHISKERS, back = Back.MANE),
+        Form.SANDGREIS to FormLook(pal(0xFFD8C8A8, 0xFF3A6AD8, 0xFFF2E8D8, 0xFF5A4A2A), 1.04f, 0.94f, pattern = Pattern.BANDAGE, muzzle = Muzzle.WHISKERS, headband = true),
+        Form.GOLDENEDUENE to FormLook(pal(0xFFFFD86A, 0xFFFFFFFF, 0xFFFFB02E, 0xFF8A5A00), 0.92f, 1.04f, ears = Ears.FOX, tail = Tail.COMET, antenna = Antenna.SWIRL, aura = Aura.STARS, wings = Wings.FEATHER, sparkles = true),
+        Form.STERNENSPHINX to FormLook(pal(0xFF3A3A7A, 0xFFFFD24D, 0xFF6A78C8, 0xFFFFD24D, eye = 0xFF1A1F3D), 1.02f, 1.02f, ears = Ears.CAT, tail = Tail.CAT, crown = true, wings = Wings.ANGEL, pattern = Pattern.STARS, aura = Aura.STARS, sparkles = true),
+        // Edelstein
+        Form.TOPASFLITZ to FormLook(pal(0xFFFFD86A, 0xFFFFF4C2, 0xFFE8A02E, 0xFF8A5A00), 0.86f, 0.98f, antenna = Antenna.CRYSTAL, jelly = true, tail = Tail.COMET, headband = true),
+        Form.ROSENQUARZ to FormLook(pal(0xFFF2C4D6, 0xFFFFE0EC, 0xFFD98AB0, 0xFF9A3A6A), 1.08f, 0.88f, antenna = Antenna.CRYSTAL, jelly = true, ears = Ears.ROUND, bigBelly = true),
+        Form.SMARAGDLAEUFER to FormLook(pal(0xFF3AC88A, 0xFFB8F0D0, 0xFF1F8A5A, 0xFF0E4A2E), 0.86f, 1.02f, ears = Ears.FIN, jelly = true, tail = Tail.CAT, pattern = Pattern.STARS),
+        Form.ACHATBAER to FormLook(pal(0xFFC88A6A, 0xFFF2E0D0, 0xFF8A5A4A, 0xFF4A2A1A), 1.12f, 0.9f, ears = Ears.ROUND, bigBelly = true, pattern = Pattern.BANDS, jelly = true, muzzle = Muzzle.SNOUT),
+        Form.SAPHIRDRACHE to FormLook(pal(0xFF3A6AE8, 0xFFB8D8FF, 0xFF2E4AB8, 0xFF0E2A8A), 0.92f, 1.02f, wings = Wings.DRAGON, horns = true, tail = Tail.DRAGON, jelly = true, sparkles = true),
+        Form.PERLMUTTHERZ to FormLook(pal(0xFFF0ECF8, 0xFFB8F0E8, 0xFFFFD8E8, 0xFF6A5AA8), 1.04f, 0.94f, antenna = Antenna.PEARL, pattern = Pattern.HEARTS, jelly = true, back = Back.SHELL),
+        Form.KRISTALLRITTER to FormLook(pal(0xFFE0F4FF, 0xFF8AE0FF, 0xFFB8D0F0, 0xFF2E7AB8), 0.94f, 1.04f, antenna = Antenna.CRYSTAL, back = Back.CAPE, headband = true, spikes = true, jelly = true, aura = Aura.STARS),
+        Form.KRONJUWEL to FormLook(pal(0xFFC21F4A, 0xFFFFD24D, 0xFFFF8AA8, 0xFF5A0E1E), 1.08f, 0.96f, crown = true, jelly = true, sparkles = true, ears = Ears.ROUND, pattern = Pattern.STARS),
+        Form.ALTEROBSIDIAN to FormLook(pal(0xFF2E2A36, 0xFF9A98A8, 0xFF4A4658, 0xFFB98AFF, eye = 0xFFB98AFF), 0.94f, 1f, spikes = true, pattern = Pattern.CRACKS, eyes = EyeStyle.GLOW, muzzle = Muzzle.WHISKERS, jelly = true),
+        Form.MONDSTEIN to FormLook(pal(0xFFDCE4F4, 0xFFB8C8E8, 0xFFFFFFFF, 0xFF4A5A8A), 1.04f, 0.94f, antenna = Antenna.MOON, jelly = true, muzzle = Muzzle.WHISKERS, sparkles = true),
+        Form.STERNENDIAMANT to FormLook(pal(0xFFF4FAFF, 0xFFFFE680, 0xFF8AE0FF, 0xFF2E7AB8), 0.94f, 1.04f, antenna = Antenna.STAR, wings = Wings.ANGEL, jelly = true, aura = Aura.STARS, horns = true, sparkles = true),
+        Form.REGENBOGENKRISTALL to FormLook(pal(0xFFF8F4FF, 0xFFFF8AC8, 0xFF8AE8FF, 0xFF6A4AC8), 1.04f, 1.02f, antenna = Antenna.CRYSTAL, tail = Tail.RAINBOW, jelly = true, aura = Aura.STARS, pattern = Pattern.STARS, ring = true, sparkles = true),
+        // Frost
+        Form.SCHNEEFLITZER to FormLook(pal(0xFF3E4A6A, 0xFFFFB84D, 0xFF2A3350, 0xFF1A1F3D, belly = 0xFFFFFFFF), 0.9f, 0.96f, muzzle = Muzzle.BEAK, wings = Wings.SMALL, headband = true),
+        Form.SCHNEEBALL to FormLook(pal(0xFFFFFFFF, 0xFF9AD8FF, 0xFFE8F6FF, 0xFF3A7AB8), 1.14f, 0.88f, bigBelly = true, aura = Aura.SNOW, ears = Ears.ROUND),
+        Form.EISLAEUFER to FormLook(pal(0xFFB8E4FF, 0xFFFF8AC8, 0xFFE8F8FF, 0xFF1F5E96), 0.86f, 1.02f, ears = Ears.FOX, tail = Tail.FLUFFY, headband = true, aura = Aura.SNOW),
+        Form.PUDELMUETZE to FormLook(pal(0xFFF6FAFF, 0xFFFF5A6A, 0xFFFFFFFF, 0xFF2E3A5A), 1.06f, 0.92f, ears = Ears.ROUND, pattern = Pattern.STRIPES, headband = true, muzzle = Muzzle.SNOUT),
+        Form.FROSTFALKE to FormLook(pal(0xFFD8ECFF, 0xFF6FC8FF, 0xFFFFFFFF, 0xFF1F5E96), 0.88f, 1.02f, wings = Wings.FEATHER, muzzle = Muzzle.BEAK, antenna = Antenna.CREST, aura = Aura.SNOW),
+        Form.IGLUBAER to FormLook(pal(0xFFF6FAFF, 0xFFB8D8F0, 0xFF9AB8D8, 0xFF2E3A5A), 1.12f, 0.94f, ears = Ears.ROUND, muzzle = Muzzle.SNOUT, bigBelly = true, pattern = Pattern.PANELS),
+        Form.NORDLICHTWOLF to FormLook(pal(0xFFE8F0FF, 0xFF7AF0D8, 0xFFB98AFF, 0xFF1F5E96), 0.92f, 1.04f, ears = Ears.FOX, tail = Tail.FLUFFY, muzzle = Muzzle.NOSE, back = Back.MANE, aura = Aura.STARS, sparkles = true),
+        Form.SCHNEEKOENIG to FormLook(pal(0xFFFFFFFF, 0xFF6FC8FF, 0xFFE8F6FF, 0xFF1F3F7A), 1.14f, 0.94f, crown = true, back = Back.CAPE, bigBelly = true, ears = Ears.ROUND, aura = Aura.SNOW),
+        Form.GLETSCHERWOLF to FormLook(pal(0xFFC8D8E8, 0xFF8AB8E0, 0xFFF0F6FF, 0xFF2E4A6A), 0.94f, 1.02f, ears = Ears.FOX, tail = Tail.FLUFFY, muzzle = Muzzle.WHISKERS, back = Back.MANE, spikes = true, aura = Aura.SNOW),
+        Form.FROSTBART to FormLook(pal(0xFFE8F2FF, 0xFF9AD8FF, 0xFFFFFFFF, 0xFF3A5A8A), 1.06f, 0.92f, muzzle = Muzzle.WHISKERS, back = Back.MANE, antenna = Antenna.CRYSTAL, ears = Ears.ROUND),
+        Form.POLARLICHT to FormLook(pal(0xFFB8F0E8, 0xFFB98AFF, 0xFF6FE8C8, 0xFF2E6B8A), 0.94f, 1.04f, ghost = true, wings = Wings.ANGEL, aura = Aura.STARS, eyes = EyeStyle.GLOW, antlers = true, sparkles = true),
+        Form.EWIGESEIS to FormLook(pal(0xFFE0F4FF, 0xFF8AE0FF, 0xFFFFFFFF, 0xFF2E7AB8), 1.02f, 1.02f, antenna = Antenna.CRYSTAL, crown = true, jelly = true, aura = Aura.SNOW, pattern = Pattern.STARS, sparkles = true),
+        // Grusel
+        Form.SPUKFLITZER to FormLook(pal(0xFFE8E8FF, 0xFF9A6AE8, 0xFFFFFFFF, 0xFF3A3A6A), 0.86f, 1f, ghost = true, aura = Aura.SMOKE),
+        Form.KUERBISKUCHEN to FormLook(pal(0xFFE8963D, 0xFFFFF0D8, 0xFFC86A1E, 0xFF5A2E00), 1.14f, 0.84f, pattern = Pattern.RIBS, antenna = Antenna.STEM, bigBelly = true, ears = Ears.ROUND),
+        Form.NACHTSCHWAERMER to FormLook(pal(0xFF4A3A6A, 0xFFFFE066, 0xFF2E2448, 0xFFFFE066), 0.88f, 0.98f, ears = Ears.BAT, wings = Wings.BAT, eyes = EyeStyle.GLOW, antenna = Antenna.ANTENNAE),
+        Form.HEXENKESSEL to FormLook(pal(0xFF3A3A4A, 0xFF8AE86A, 0xFF5A5A6A, 0xFF8AE86A, eye = 0xFF8AE86A), 1.12f, 0.9f, antenna = Antenna.WITCH, bigBelly = true, aura = Aura.BUBBLES, eyes = EyeStyle.GLOW),
+        Form.FLEDERMAUSGRAF to FormLook(pal(0xFF5A4A7A, 0xFFC21F3A, 0xFF2A1F3D, 0xFFFFE066), 0.9f, 1.02f, ears = Ears.BAT, wings = Wings.BAT, back = Back.CAPE, muzzle = Muzzle.FANGS),
+        Form.ZAUBERKUERBIS to FormLook(pal(0xFFFF9A3D, 0xFF9A6AE8, 0xFFFFC66A, 0xFF3A1E00, eye = 0xFFFFE066), 1.12f, 0.92f, pattern = Pattern.RIBS, antenna = Antenna.WITCH, eyes = EyeStyle.GLOW, sparkles = true),
+        Form.SCHATTENRITTER to FormLook(pal(0xFF3A3450, 0xFF9A6AE8, 0xFF2A2438, 0xFFB98AFF, eye = 0xFFB98AFF), 0.94f, 1.04f, back = Back.CAPE, horns = true, eyes = EyeStyle.GLOW, aura = Aura.SMOKE, headband = true),
+        Form.SCHLOSSGESPENST to FormLook(pal(0xFFF6F6FF, 0xFFB8B8E8, 0xFFFFFFFF, 0xFF3A3A6A), 1f, 1.02f, ghost = true, crown = true, aura = Aura.SMOKE),
+        Form.URALTERVAMPIR to FormLook(pal(0xFFC8C0D8, 0xFF8A1E3A, 0xFF2A1F3D, 0xFFC21F3A), 0.92f, 1.02f, ears = Ears.CAT, back = Back.CAPE, muzzle = Muzzle.FANGS, wings = Wings.BAT, eyes = EyeStyle.GLOW),
+        Form.SPINNWEBGREIS to FormLook(pal(0xFFD8D4E0, 0xFF9A98A8, 0xFFF0EEF4, 0xFF4A4658), 1.04f, 0.94f, pattern = Pattern.BANDAGE, muzzle = Muzzle.WHISKERS, ears = Ears.ROUND, aura = Aura.SMOKE),
+        Form.GEISTERLICHT to FormLook(pal(0xFFB8F0FF, 0xFF6FE8FF, 0xFFE8FFFF, 0xFF2E8AB8, eye = 0xFF6FE8FF), 0.86f, 1.02f, ghost = true, eyes = EyeStyle.GLOW, aura = Aura.STARS, antenna = Antenna.GLOW, sparkles = true),
+        Form.MONDKUERBIS to FormLook(pal(0xFFFFE6A0, 0xFF9A6AE8, 0xFFFFF8D8, 0xFF8A5A00, eye = 0xFFFFE066), 1.12f, 0.96f, pattern = Pattern.RIBS, antenna = Antenna.MOON, eyes = EyeStyle.GLOW, aura = Aura.STARS, sparkles = true),
+        // Katze
+        Form.STREIFZUEGLERIN to catLook(0.86f, 1f),
+        Form.SOFAKATZE to catLook(1.1f, 0.9f, bigBelly = true),
+        Form.KLETTERKATZE to catLook(0.84f, 1.04f),
+        Form.SCHNURRMEISTERIN to catLook(1.02f, 0.96f).copy(back = Back.MANE),
+        Form.GARTENWAECHTERIN to catLook(0.88f, 1.02f),
+        Form.FENSTERBANKKATZE to catLook(1.06f, 0.94f, bigBelly = true),
+        Form.ERFAHRENEJAEGERIN to catLook(0.9f, 1.04f).copy(back = Back.MANE),
+        Form.HAUSKOENIGIN to catLook(1.12f, 0.96f, bigBelly = true).copy(back = Back.MANE),
+        Form.GRAUEPFOTE to catLook(0.9f, 1f),
+        Form.SONNENPLATZKATZE to catLook(1.08f, 0.92f, bigBelly = true),
+        Form.WEISEKATZE to catLook(0.92f, 1.02f).copy(back = Back.MANE),
+        Form.HERZENSKATZE to catLook(1.04f, 0.98f).copy(back = Back.MANE),
+        // Hase
+        Form.WIESENHASE to bunnyLook(0.86f, 1f),
+        Form.MOEHRENFREUND to bunnyLook(1.08f, 0.9f, bigBelly = true),
+        Form.HAKENSCHLAEGER to bunnyLook(0.84f, 1.04f),
+        Form.HEUHASE to bunnyLook(1.04f, 0.92f, ears = Ears.LOP),
+        Form.LANGOHR to bunnyLook(0.88f, 1.08f),
+        Form.WIDDERHASE to bunnyLook(1.1f, 0.92f, ears = Ears.LOP, bigBelly = true),
+        Form.FELDHUETER to bunnyLook(0.9f, 1.04f),
+        Form.SAMTHASE to bunnyLook(1.06f, 0.96f, ears = Ears.LOP).copy(back = Back.MANE),
+        Form.GRAUESLANGOHR to bunnyLook(0.9f, 1.02f),
+        Form.SONNENHASE to bunnyLook(1.1f, 0.9f, ears = Ears.LOP, bigBelly = true),
+        Form.WEISERHASE to bunnyLook(0.92f, 1.04f).copy(back = Back.MANE),
+        Form.HERZENSHASE to bunnyLook(1.04f, 0.98f, ears = Ears.LOP).copy(back = Back.MANE),
+        // Hamster
+        Form.SPRINTHAMSTER to hamsterLook(0.9f, 0.94f, bigBelly = false),
+        Form.PAUSBAECKCHEN to hamsterLook(1.2f, 0.86f),
+        Form.TUNNELGRAEBER to hamsterLook(0.94f, 0.92f, bigBelly = false),
+        Form.VORRATSMEISTER to hamsterLook(1.22f, 0.9f),
+        Form.KLETTERHAMSTER to hamsterLook(0.9f, 0.98f, bigBelly = false),
+        Form.GOLDBAECKCHEN to hamsterLook(1.16f, 0.9f),
+        Form.LABYRINTHPROFI to hamsterLook(0.94f, 0.96f, bigBelly = false),
+        Form.KUSCHELKUGEL to hamsterLook(1.2f, 0.84f).copy(back = Back.MANE),
+        Form.GRAUERFLITZER to hamsterLook(0.94f, 0.94f, bigBelly = false),
+        Form.SCHLAFMUETZE to hamsterLook(1.18f, 0.86f),
+        Form.WEISERHAMSTER to hamsterLook(1f, 0.96f).copy(back = Back.MANE),
+        Form.HERZENSHAMSTER to hamsterLook(1.12f, 0.92f).copy(back = Back.MANE),
+        // Meeri
+        Form.HUEPFSCHWEINCHEN to guineaLook(1.02f, 0.92f),
+        Form.LOEWENZAHNFREUND to guineaLook(1.16f, 0.86f).copy(bigBelly = true),
+        Form.RENNSCHWEINCHEN to guineaLook(1f, 0.94f),
+        Form.HEUSCHWEINCHEN to guineaLook(1.14f, 0.88f),
+        Form.WIRBELWIND to guineaLook(1.08f, 0.9f, mane = true, scruffy = true),
+        Form.LANGHAARSCHWEINCHEN to guineaLook(1.14f, 0.88f, mane = true),
+        Form.QUIEKMEISTER to guineaLook(1.06f, 0.94f),
+        Form.PLUESCHSCHWEINCHEN to guineaLook(1.18f, 0.9f, mane = true).copy(bigBelly = true),
+        Form.GRAUNAESCHEN to guineaLook(1.06f, 0.92f),
+        Form.GEMUETLICHSCHWEINCHEN to guineaLook(1.2f, 0.86f).copy(bigBelly = true),
+        Form.WEISESMEERSCHWEINCHEN to guineaLook(1.1f, 0.94f, mane = true),
+        Form.HERZENSSCHWEINCHEN to guineaLook(1.14f, 0.92f, mane = true),
     )
 
     private val shinyCache = HashMap<Form, FormLook>()
@@ -431,7 +682,12 @@ object Looks {
     }
 
     /** The final look of a pet: form, cat fur, festival costume and the shiny variant. */
-    fun compose(form: Form, fur: String?, skin: String?, shiny: Boolean, blend: String? = null): FormLook {
+    fun compose(form: Form, fur: String?, skin: String?, shiny: Boolean, blend: String? = null, age: Float = 0f): FormLook {
+        if (age > 0.01f) {
+            val key = "${form.name}|$fur|$skin|$shiny|$blend|${(age * 20f).toInt()}"
+            composed[key]?.let { return it }
+            return aged(compose(form, fur, skin, shiny, blend), age).also { composed[key] = it }
+        }
         if (fur == null && skin == null && blend == null) return if (shiny) shiny(form) else of(form)
         val key = "${form.name}|$fur|$skin|$shiny|$blend"
         composed[key]?.let { return it }
@@ -445,6 +701,19 @@ object Looks {
         if (other != null && skin == null && other != Form.EGG) fl = mix(fl, of(other).colors)
         composed[key] = fl
         return fl
+    }
+
+    /** An old pet: the colours become a little silvery. */
+    private fun aged(base: FormLook, age: Float): FormLook {
+        val k = base.colors
+        val f = 0.5f * age
+        fun silver(c: Int): Int {
+            val l = (0.3f * Color.red(c) + 0.59f * Color.green(c) + 0.11f * Color.blue(c)).toInt().coerceIn(0, 255)
+            val grey = Colors.lighten(Color.argb(Color.alpha(c), l, l, l), 0.25f)
+            return Colors.lerp(c, grey, f)
+        }
+        val col = PetColors(silver(k.body), silver(k.light), silver(k.shade), silver(k.belly), k.accent, k.accent2, k.cheek, k.iris, k.eye, k.extra)
+        return base.withColors(col, sparkle = base.sparkles).copy(elder = age)
     }
 
     private fun mix(base: FormLook, o: PetColors): FormLook {
@@ -527,8 +796,10 @@ data class PetLook(
     val back: String? = null,
     /** Form of the other parent (family eggs): its colours shine through a little. */
     val blend: String? = null,
+    /** How old the pet is (0 young, 1 at the end of its life, see [de.knuffi.core.Lifespan]). */
+    val age: Float = 0f,
 ) {
-    val formLook: FormLook get() = Looks.compose(form, fur, skin, shiny, blend)
+    val formLook: FormLook get() = Looks.compose(form, fur, skin, shiny, blend, age)
     val isEgg: Boolean get() = form == Form.EGG
     val isCat: Boolean get() = form.isCat
 
@@ -559,8 +830,12 @@ data class PetLook(
                 tool = pet.job?.tool,
                 back = state.equipped[Slot.BACK],
                 blend = pet.blend,
+                age = ageOf(pet),
             )
         }
+
+        /** Rounded, so the look does not change all the time. */
+        fun ageOf(pet: de.knuffi.core.Pet): Float = (de.knuffi.core.Lifespan.age(pet) * 10f).toInt() / 10f
 
         /** Look of any pet (e.g. one resting in the Kuschelhaus), wearing the shared outfit. */
         fun of(pet: de.knuffi.core.Pet, state: GameState): PetLook = PetLook(
@@ -579,6 +854,7 @@ data class PetLook(
             skin = pet.skin,
             back = state.equipped[Slot.BACK],
             blend = pet.blend,
+            age = ageOf(pet),
         )
     }
 }
